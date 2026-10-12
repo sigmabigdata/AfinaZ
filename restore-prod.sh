@@ -27,6 +27,10 @@ echo "▶ Останавливаю app"
 docker compose -f docker-compose-prod.yml --env-file .env.prod stop app
 
 echo "▶ Расшифровываю и восстанавливаю БД"
+# Восстанавливаем под СУПЕРЮЗЕРОМ: в дампе есть команды, которые
+# afina_migrator выполнить не может (COMMENT ON EXTENSION uuid-ossp,
+# ALTER SCHEMA OWNER и т.п.) — раньше это роняло транзакцию с
+# "must be owner of extension" и весь restore откатывался.
 case "$FILE" in
     *.sql.gz.enc)
         [ -r "$PASS_FILE" ] || { echo "✗ Нет $PASS_FILE"; exit 1; }
@@ -34,13 +38,13 @@ case "$FILE" in
             -pass file:"$PASS_FILE" -in "$FILE" \
             | gunzip \
             | docker exec -i afina-postgres psql \
-                -U afina_migrator -d afina_db -q --single-transaction
+                -U postgres -d afina_db -q
         ;;
     *.sql.gz)
         echo "  (plaintext-бэкап, устаревший формат)"
         gunzip -c "$FILE" \
             | docker exec -i afina-postgres psql \
-                -U afina_migrator -d afina_db -q --single-transaction
+                -U postgres -d afina_db -q
         ;;
     *)
         echo "✗ Неизвестный формат: $FILE"; exit 1 ;;
