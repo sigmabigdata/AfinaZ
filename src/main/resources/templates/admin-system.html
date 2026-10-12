@@ -146,8 +146,9 @@
                             class="btn-ghost btn-sm btn-restore"
                             th:attr="data-name=${b.name}" title="Восстановить">⟲ Восстановить</button>
                     <button th:if="${b.encrypted}" type="button"
-                            class="btn-ghost btn-sm" disabled
-                            title="Зашифрованный бэкап восстанавливается через CLI: cd /opt/afina && ./restore-prod.sh backups/...">🔒 CLI</button>
+                            class="btn-ghost btn-sm btn-cli-restore"
+                            th:attr="data-name=${b.name}"
+                            title="Как восстановить зашифрованный бэкап">🔒 Как восстановить</button>
 
                     <form method="post"
                           th:action="@{'/admin/system/backups/' + ${b.name} + '/delete'}"
@@ -256,6 +257,61 @@
     </div>
 </main>
 
+<!-- Модальное окно: инструкция по восстановлению зашифрованного бэкапа -->
+<div id="modal-cli-restore" class="modal" style="display:none">
+    <div class="modal-card" style="max-width:640px;">
+        <h2>🔒 Восстановление зашифрованного бэкапа</h2>
+
+        <div class="alert info">
+            <b>Почему через SSH, а не из UI?</b><br>
+            Пароль от бэкапа (<code>secrets/backup.pass</code>) намеренно
+            не передаётся в браузер. Это защищает ключ расшифровки:
+            даже при краже сессии админа восстановить БД нельзя.
+        </div>
+
+        <p style="margin:16px 0 8px; font-weight:600;">
+            Файл для восстановления:
+        </p>
+        <p style="margin:0 0 16px;">
+            <code id="cli-restore-name" style="font-size:13px; padding:6px 10px; display:inline-block;">—</code>
+        </p>
+
+        <p style="margin:16px 0 8px; font-weight:600;">
+            Выполни на сервере:
+        </p>
+        <pre id="cli-restore-cmd" style="background:#0f172a; color:#e2e8f0;
+             padding:14px 16px; border-radius:8px; font-size:12px;
+             overflow-x:auto; margin:0; white-space:pre-wrap;
+             word-break:break-all;"></pre>
+
+        <p style="margin-top:14px;">
+            <button type="button" id="cli-restore-copy" class="btn-ghost btn-sm">
+                📋 Скопировать команду
+            </button>
+            <span id="cli-restore-copied" class="muted small"
+                  style="display:none; margin-left:8px;">скопировано</span>
+        </p>
+
+        <div class="alert warn" style="margin-top:16px;">
+            <b>Что произойдёт:</b>
+            <ol style="padding-left:20px; margin:8px 0 0;">
+                <li>Скрипт запросит подтверждение (введи <code>RESTORE</code>).</li>
+                <li>Остановит приложение.</li>
+                <li>Расшифрует бэкап паролем из <code>secrets/backup.pass</code>.</li>
+                <li>Загрузит дамп в БД.</li>
+                <li>Запустит приложение (~30 секунд).</li>
+            </ol>
+            <br>
+            <b>⚠️ Текущие данные в БД будут заменены.</b>
+            Перед восстановлением создаётся safety-бэкап.
+        </div>
+
+        <div class="modal-actions" style="margin-top:20px;">
+            <button type="button" class="btn-ghost" id="cli-restore-close">Закрыть</button>
+        </div>
+    </div>
+</div>
+
 <!-- Модальное окно подтверждения восстановления -->
 <div id="modal-restore" class="modal" style="display:none">
     <div class="modal-card">
@@ -341,5 +397,61 @@
         }
     });
 </script>
+<script>
+// ============ Модалка «Как восстановить через CLI» ============
+(function () {
+    var modal = document.getElementById('modal-cli-restore');
+    var nameEl = document.getElementById('cli-restore-name');
+    var cmdEl = document.getElementById('cli-restore-cmd');
+    var copyBtn = document.getElementById('cli-restore-copy');
+    var copiedEl = document.getElementById('cli-restore-copied');
+    var closeBtn = document.getElementById('cli-restore-close');
+
+    function buildCommand(fileName) {
+        return [
+            'ssh afina-vps',
+            'cd /opt/afina',
+            './restore-prod.sh backups/' + fileName
+        ].join('\n');
+    }
+
+    document.querySelectorAll('.btn-cli-restore').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var name = btn.dataset.name || '';
+            nameEl.textContent = name;
+            cmdEl.textContent = buildCommand(name);
+            copiedEl.style.display = 'none';
+            modal.style.display = 'flex';
+        });
+    });
+
+    closeBtn.addEventListener('click', function () {
+        modal.style.display = 'none';
+    });
+
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) modal.style.display = 'none';
+    });
+
+    copyBtn.addEventListener('click', function () {
+        var text = cmdEl.textContent;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                copiedEl.style.display = 'inline';
+                setTimeout(function () { copiedEl.style.display = 'none'; }, 2000);
+            });
+        } else {
+            // fallback
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); copiedEl.style.display = 'inline'; } catch (e) {}
+            document.body.removeChild(ta);
+        }
+    });
+})();
+</script>
+
 </body>
 </html>
