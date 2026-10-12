@@ -7,6 +7,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.view.RedirectView;
 import ru.example.ukep.service.CrlService;
 
 import java.util.List;
@@ -37,11 +38,11 @@ public class CrlController {
     }
 
     @PostMapping("/upload")
-    public String upload(@RequestParam("file") MultipartFile file,
-                         RedirectAttributes ra) {
+    public RedirectView upload(@RequestParam("file") MultipartFile file,
+                               RedirectAttributes ra) {
         if (file.isEmpty()) {
             ra.addFlashAttribute("err", "Файл пустой");
-            return REDIR_CRL;
+            return new RedirectView(REDIR_CRL);
         }
         try {
             crlService.saveManual(file.getOriginalFilename(), file.getBytes());
@@ -51,38 +52,38 @@ public class CrlController {
             log.error("CRL upload failed", e);
             ra.addFlashAttribute("err", "Не удалось загрузить: " + e.getMessage());
         }
-        return REDIR_CRL;
+        return new RedirectView(REDIR_CRL);
     }
 
     @PostMapping("/{name}/delete")
-    public String delete(@PathVariable String name, RedirectAttributes ra) {
+    public RedirectView delete(@PathVariable String name, RedirectAttributes ra) {
         try {
             crlService.delete(name);
             ra.addFlashAttribute("ok", "Удалён: " + name);
         } catch (Exception e) {
             ra.addFlashAttribute("err", "Ошибка удаления: " + e.getMessage());
         }
-        return REDIR_CRL;
+        return new RedirectView(REDIR_CRL);
     }
 
     /** Удалить выбранные CRL по чекбоксам. */
     @PostMapping("/delete-selected")
-    public String deleteSelected(@RequestParam(required = false) List<String> names,
-                                 RedirectAttributes ra) {
+    public RedirectView deleteSelected(@RequestParam(required = false) List<String> names,
+                                       RedirectAttributes ra) {
         if (names == null || names.isEmpty()) {
             ra.addFlashAttribute("err", "Ничего не выбрано");
-            return REDIR_CRL;
+            return new RedirectView(REDIR_CRL);
         }
         int n = crlService.deleteMany(names);
         ra.addFlashAttribute("ok", "Удалено: " + n + " из " + names.size());
-        return REDIR_CRL;
+        return new RedirectView(REDIR_CRL);
     }
 
     /** Удалить все auto-*.crl. */
     @PostMapping("/delete-all-auto")
-    public String deleteAllAuto(RedirectAttributes ra) {
+    public RedirectView deleteAllAuto(RedirectAttributes ra) {
         int n = crlService.deleteAllAuto();
         ra.addFlashAttribute("ok", "Удалено auto-*.crl: " + n);
-        return REDIR_CRL;
+        return new RedirectView(REDIR_CRL);
     }
 }

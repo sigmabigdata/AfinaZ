@@ -83,36 +83,49 @@ public class CrlDownloader {
 
     /** Извлекает все CDP URL (http/https) из расширения 2.5.29.31. */
     private Set<String> extractCdpUrls(X509Certificate cert) {
-        Set<String> urls = new HashSet<>();
         byte[] ext;
         try {
             ext = cert.getExtensionValue(CDP_OID);
         } catch (Exception e) {
-            return urls;
+            return Set.of();
         }
-        if (ext == null) return urls;
+        if (ext == null) return Set.of();
 
+        try {
+            CRLDistPoint cdp = parseCdpExtension(ext);
+            return collectHttpUrls(cdp);
+        } catch (Exception e) {
+            log.debug("CDP parse failed для {}: {}",
+                    cert.getSubjectX500Principal(), e.getMessage());
+            return Set.of();
+        }
+    }
+
+    /** Парсит ASN.1-обёртку расширения CDP → CRLDistPoint. */
+    private CRLDistPoint parseCdpExtension(byte[] ext) throws Exception {
         try (ASN1InputStream aIn = new ASN1InputStream(ext)) {
             ASN1OctetString octet = (ASN1OctetString) aIn.readObject();
             try (ASN1InputStream innerIn = new ASN1InputStream(octet.getOctets())) {
                 ASN1Primitive p = innerIn.readObject();
-                CRLDistPoint cdp = CRLDistPoint.getInstance(p);
-                for (DistributionPoint dp : cdp.getDistributionPoints()) {
-                    DistributionPointName name = dp.getDistributionPoint();
-                    if (name == null || name.getType() != DistributionPointName.FULL_NAME) continue;
-                    GeneralNames gns = GeneralNames.getInstance(name.getName());
-                    for (GeneralName gn : gns.getNames()) {
-                        if (gn.getTagNo() != GeneralName.uniformResourceIdentifier) continue;
-                        String url = DERIA5String.getInstance(gn.getName()).getString();
-                        if (url.startsWith("http://") || url.startsWith("https://")) {
-                            urls.add(url);
-                        }
-                    }
+                return CRLDistPoint.getInstance(p);
+            }
+        }
+    }
+
+    /** Собирает http/https URI из всех distribution points. */
+    private Set<String> collectHttpUrls(CRLDistPoint cdp) {
+        Set<String> urls = new HashSet<>();
+        for (DistributionPoint dp : cdp.getDistributionPoints()) {
+            DistributionPointName name = dp.getDistributionPoint();
+            if (name == null || name.getType() != DistributionPointName.FULL_NAME) continue;
+            GeneralNames gns = GeneralNames.getInstance(name.getName());
+            for (GeneralName gn : gns.getNames()) {
+                if (gn.getTagNo() != GeneralName.uniformResourceIdentifier) continue;
+                String url = DERIA5String.getInstance(gn.getName()).getString();
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    urls.add(url);
                 }
             }
-        } catch (Exception e) {
-            log.debug("CDP parse failed для {}: {}",
-                    cert.getSubjectX500Principal(), e.getMessage());
         }
         return urls;
     }

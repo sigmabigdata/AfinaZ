@@ -22,6 +22,9 @@ import java.util.*;
 public class SystemInfoService {
 
     private static final Logger log = LoggerFactory.getLogger(SystemInfoService.class);
+    private static final String K_INSTALLED_ON = "installed_on";
+    private static final String K_TOTAL = "total";
+    private static final String K_PERCENT = "percent";
 
     private final JdbcTemplate jdbc;
 
@@ -62,21 +65,21 @@ public class SystemInfoService {
                 else if (line.startsWith("MemFree:"))      free      = parseKb(line);
             }
             long used = total - available;
-            result.put("total",     total / 1024);      // MB
+            result.put(K_TOTAL,     total / 1024);      // MB
             result.put("used",      used  / 1024);
             result.put("available", available / 1024);
             result.put("free",      free / 1024);
-            result.put("percent",   total > 0 ? (used * 100 / total) : 0);
+            result.put(K_PERCENT,   total > 0 ? (used * 100 / total) : 0);
         } catch (Exception e) {
             // fallback — данные JVM
             Runtime rt = Runtime.getRuntime();
             long total = rt.totalMemory();
             long free  = rt.freeMemory();
-            result.put("total",     total / 1024 / 1024);
+            result.put(K_TOTAL,     total / 1024 / 1024);
             result.put("used",      (total - free) / 1024 / 1024);
             result.put("available", free / 1024 / 1024);
             result.put("free",      free / 1024 / 1024);
-            result.put("percent",   total > 0 ? ((total - free) * 100 / total) : 0);
+            result.put(K_PERCENT,   total > 0 ? ((total - free) * 100 / total) : 0);
         }
         return result;
     }
@@ -86,7 +89,7 @@ public class SystemInfoService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("cores", Runtime.getRuntime().availableProcessors());
         result.put("loadAvg", getLoadAverage());
-        result.put("percent", cpuPercent());
+        result.put(K_PERCENT, cpuPercent());
         return result;
     }
 
@@ -115,6 +118,9 @@ public class SystemInfoService {
             for (int i = 0; i < s2.length; i++) total += s2[i] - s1[i];
             if (total <= 0) return 0;
             return (total - idle) * 100 / total;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return 0;
         } catch (Exception e) {
             return 0;
         }
@@ -140,10 +146,10 @@ public class SystemInfoService {
         long total = root.getTotalSpace();
         long free  = root.getFreeSpace();
         long used  = total - free;
-        result.put("total",   total / 1024 / 1024 / 1024);
+        result.put(K_TOTAL,   total / 1024 / 1024 / 1024);
         result.put("used",    used  / 1024 / 1024 / 1024);
         result.put("free",    free  / 1024 / 1024 / 1024);
-        result.put("percent", total > 0 ? (used * 100 / total) : 0);
+        result.put(K_PERCENT, total > 0 ? (used * 100 / total) : 0);
         return result;
     }
 
@@ -191,12 +197,12 @@ public class SystemInfoService {
                 m.put("version", r.get("version"));
                 m.put("description", r.get("description"));
                 m.put("success", r.get("success"));
-                Object ts = r.get("installed_on");
+                Object ts = r.get(K_INSTALLED_ON);
                 // Timestamp → Instant, чтобы Thymeleaf #temporals умел форматировать
                 if (ts instanceof java.sql.Timestamp timestamp) {
-                    m.put("installed_on", timestamp.toInstant());
+                    m.put(K_INSTALLED_ON, timestamp.toInstant());
                 } else {
-                    m.put("installed_on", ts);
+                    m.put(K_INSTALLED_ON, ts);
                 }
                 migr.add(m);
             }

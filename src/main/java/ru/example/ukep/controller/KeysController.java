@@ -111,8 +111,9 @@ public class KeysController {
     private byte[] buildEncryptedZip(Path fileKey, Path piiKey, String password) throws Exception {
         // zip4j работает с файлами, поэтому соберём во временном каталоге
         Path tmpDir = Files.createTempDirectory("afina-keys-");
-        Path tmpZip = tmpDir.resolve("afina-keys.zip");
-        try {
+        try (TempDirCleanup cleaner = new TempDirCleanup(tmpDir)) {
+            Path tmpZip = tmpDir.resolve("afina-keys.zip");
+
             ZipParameters params = new ZipParameters();
             params.setCompressionMethod(CompressionMethod.DEFLATE);
             params.setEncryptFiles(true);
@@ -123,7 +124,7 @@ public class KeysController {
                 zip.addFile(fileKey.toFile(), params);
                 zip.addFile(piiKey.toFile(), params);
 
-                // README.txt — добавлен как plaintext, чтобы человек увидел инструкции без пароля
+                // README.txt — plaintext, чтобы человек увидел инструкции без пароля
                 ZipParameters plain = new ZipParameters();
                 plain.setCompressionMethod(CompressionMethod.DEFLATE);
                 plain.setEncryptFiles(false);
@@ -135,12 +136,29 @@ public class KeysController {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             Files.copy(tmpZip, baos);
             return baos.toByteArray();
-        } finally {
-            try (var stream = Files.walk(tmpDir)) {
+        }
+    }
+
+    /** Автоудаление временного каталога при закрытии (try-with-resources). */
+    private static final class TempDirCleanup implements AutoCloseable {
+        private final Path dir;
+        TempDirCleanup(Path dir) { this.dir = dir; }
+
+        @Override
+        public void close() {
+            try (var stream = Files.walk(dir)) {
                 stream.sorted((a, b) -> b.getNameCount() - a.getNameCount())
-                        .forEach(p -> {
-                            try { Files.deleteIfExists(p); } catch (Exception ignored) {}
-                        });
+                        .forEach(this::deleteQuietly);
+            } catch (Exception ex) {
+                log.warn("Temp cleanup (walk) failed: {}", ex.getMessage());
+            }
+        }
+
+        private void deleteQuietly(Path p) {
+            try {
+                Files.deleteIfExists(p);
+            } catch (Exception ex) {
+                log.debug("Temp cleanup skip {}: {}", p, ex.getMessage());
             }
         }
     }

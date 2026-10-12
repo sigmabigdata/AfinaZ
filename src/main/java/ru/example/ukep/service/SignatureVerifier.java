@@ -44,6 +44,8 @@ import java.util.stream.Stream;
  */
 @Service
 public class SignatureVerifier {
+    private static final String LOG_SKIP_CERT = "Skipping certificate: {}";
+
 
     private static final Logger log = LoggerFactory.getLogger(SignatureVerifier.class);
 
@@ -200,7 +202,7 @@ public class SignatureVerifier {
                 try (InputStream is = Files.newInputStream(f)) {
                     result.add((X509Certificate) cf.generateCertificate(is));
                 } catch (Exception ex) {
-                    log.debug("Skipping certificate: {}", ex.getMessage());
+                    log.debug(LOG_SKIP_CERT, ex.getMessage());
                 }
             });
         } catch (Exception e) {
@@ -287,7 +289,7 @@ public class SignatureVerifier {
             try {
                 candidates.add(conv.getCertificate(holder));
             } catch (Exception ex) {
-                log.debug("Skipping certificate: {}", ex.getMessage());
+                log.debug(LOG_SKIP_CERT, ex.getMessage());
             }
         }
         return candidates;
@@ -346,7 +348,7 @@ public class SignatureVerifier {
                         return true;
                     }
                 } catch (Exception ex) {
-                    log.debug("Skipping certificate: {}", ex.getMessage());
+                    log.debug(LOG_SKIP_CERT, ex.getMessage());
                 }
             }
         }

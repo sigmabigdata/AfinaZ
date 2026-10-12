@@ -27,6 +27,7 @@ import java.util.List;
 public class AuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+    private static final String REDIR_DASHBOARD = "redirect:/dashboard";
 
     private final UserService userService;
     private final EmailService emailService;
@@ -50,12 +51,12 @@ public class AuthController {
     @GetMapping("/")
     public String root(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) return "redirect:/login";
-        return "redirect:/dashboard";
+        return REDIR_DASHBOARD;
     }
 
     @GetMapping("/login")
     public String loginPage(Authentication auth) {
-        if (auth != null && auth.isAuthenticated()) return "redirect:/dashboard";
+        if (auth != null && auth.isAuthenticated()) return REDIR_DASHBOARD;
         return "login";
     }
 
@@ -100,7 +101,7 @@ public class AuthController {
         userContextRepository.saveContext(ctx, request, response);
         audit.loginSuccess(user.getEmail(), user.getRole().name());
 
-        return "redirect:/dashboard";
+        return REDIR_DASHBOARD;
     }
 
     @PostMapping("/logout")

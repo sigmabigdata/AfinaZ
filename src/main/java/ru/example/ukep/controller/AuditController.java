@@ -7,6 +7,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.view.RedirectView;
 import ru.example.ukep.entity.AuditEvent;
 import ru.example.ukep.repository.AuditEventRepository;
 import ru.example.ukep.service.AuditCleanupService;
@@ -163,11 +164,11 @@ public class AuditController {
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/cleanup")
-    public String cleanupNow(org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+    public RedirectView cleanupNow(org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         int days = settings.getIntOrDefault(K_RETENTION, 365);
         if (days <= 0) {
             ra.addFlashAttribute("err", "Retention = 0, очистка отключена");
-            return REDIR_AUDIT;
+            return new RedirectView(REDIR_AUDIT);
         }
         try {
             long deleted = cleanupService.cleanup(days);
@@ -175,21 +176,21 @@ public class AuditController {
         } catch (Exception e) {
             ra.addFlashAttribute("err", "Ошибка очистки: " + e.getMessage());
         }
-        return REDIR_AUDIT;
+        return new RedirectView(REDIR_AUDIT);
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/retention")
-    public String setRetention(@RequestParam int days,
-                               java.security.Principal auth,
-                               org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+    public RedirectView setRetention(@RequestParam int days,
+                                     java.security.Principal auth,
+                                     org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         if (days < 0 || days > 3650) {
             ra.addFlashAttribute("err", "Допустимо 0..3650 дней");
-            return REDIR_AUDIT;
+            return new RedirectView(REDIR_AUDIT);
         }
         settings.set(K_RETENTION, String.valueOf(days),
                 auth != null ? auth.getName() : "admin");
         ra.addFlashAttribute("ok", "Retention: " + days + " дней");
-        return REDIR_AUDIT;
+        return new RedirectView(REDIR_AUDIT);
     }
 
     /** Парсит дату из query param (ISO format: yyyy-MM-dd). */

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.view.RedirectView;
 import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.BackupService;
 import ru.example.ukep.service.LogService;
@@ -63,6 +64,9 @@ public class SystemInfoController {
             String who = auth != null ? auth.getName() : UNKNOWN;
             audit.backupCreate(who, name);
             ra.addFlashAttribute("ok", "Бэкап создан: " + name);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            ra.addFlashAttribute("err", "Операция прервана");
         } catch (Exception e) {
             log.error("Backup create failed", e);
             ra.addFlashAttribute("err", "Ошибка создания бэкапа: " + e.getMessage());
@@ -83,13 +87,13 @@ public class SystemInfoController {
     }
 
     @PostMapping("/backups/{name}/restore")
-    public String restoreBackup(@PathVariable String name,
-                                @RequestParam String confirm,
-                                java.security.Principal auth,
-                                RedirectAttributes ra) {
+    public RedirectView restoreBackup(@PathVariable String name,
+                                      @RequestParam String confirm,
+                                      java.security.Principal auth,
+                                      RedirectAttributes ra) {
         if (!"RESTORE".equals(confirm)) {
             ra.addFlashAttribute("err", "Неверное подтверждение. Введите RESTORE.");
-            return REDIR;
+            return new RedirectView(REDIR);
         }
         try {
             String safety = backups.restore(name);
@@ -99,11 +103,14 @@ public class SystemInfoController {
                     "БД восстановлена из " + name +
                     ". Safety-бэкап: " + safety +
                     ". Перезапустите приложение!");
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            ra.addFlashAttribute("err", "Операция прервана");
         } catch (Exception e) {
             log.error("Backup restore failed", e);
             ra.addFlashAttribute("err", "Ошибка восстановления: " + e.getMessage());
         }
-        return REDIR;
+        return new RedirectView(REDIR);
     }
 
     @GetMapping("/backups/{name}/download")

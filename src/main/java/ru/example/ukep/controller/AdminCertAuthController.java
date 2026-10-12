@@ -81,14 +81,9 @@ public class AdminCertAuthController {
                                        HttpServletResponse response) {
         try {
             // 1. Проверяем и потребляем челлендж
-            if (req.getChallenge() == null || req.getChallenge().isBlank()) {
-                return ResponseEntity.badRequest().body(Map.of(K_ERROR, "Челлендж не передан"));
-            }
-            Long createdAt = challenges.remove(req.getChallenge());
-            if (createdAt == null || System.currentTimeMillis() - createdAt > 300_000) {
-                log.warn("Challenge invalid or expired: {}",
-                        req.getChallenge() == null ? "null" : "(present)");
-                return ResponseEntity.badRequest().body(Map.of(K_ERROR, "Челлендж недействителен"));
+            ResponseEntity<Map<String, Object>> challengeError = checkChallenge(req.getChallenge());
+            if (challengeError != null) {
+                return challengeError;
             }
 
             // 2. Проверяем CN + СНИЛС в admins.env
@@ -160,6 +155,24 @@ public class AdminCertAuthController {
         }
         SecurityContextHolder.clearContext();
         return "redirect:/admin/login?logout";
+    }
+
+    /**
+     * Проверяет и потребляет одноразовый челлендж.
+     * Возвращает badRequest-ответ при ошибке или null, если челлендж валиден.
+     */
+    private ResponseEntity<Map<String, Object>> checkChallenge(String challenge) {
+        if (challenge == null || challenge.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(K_ERROR, "Челлендж не передан"));
+        }
+        Long createdAt = challenges.remove(challenge);
+        if (createdAt != null && System.currentTimeMillis() - createdAt <= 300_000) {
+            return null;
+        }
+        if (log.isWarnEnabled()) {
+            log.warn("Challenge invalid or expired (present)");
+        }
+        return ResponseEntity.badRequest().body(Map.of(K_ERROR, "Челлендж недействителен"));
     }
 
     private void cleanOldChallenges() {

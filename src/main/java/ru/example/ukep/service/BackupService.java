@@ -30,6 +30,7 @@ public class BackupService {
      * каталога, а не из унаследованного окружения.
      */
     private static final String SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+    private static final String LOG_STREAM_INTERRUPTED = "stream read interrupted: {}";
 
     private static ProcessBuilder safePb(String... command) {
         ProcessBuilder pb = new ProcessBuilder(command);
@@ -120,7 +121,7 @@ public class BackupService {
                     stderrBuf.append(line).append("\n");
                 }
             } catch (IOException ex) {
-                log.debug("stream read interrupted: {}", ex.getMessage());
+                log.debug(LOG_STREAM_INTERRUPTED, ex.getMessage());
             }
         }, "pg_dump-stderr");
         errThread.setDaemon(true);
@@ -237,7 +238,7 @@ public class BackupService {
                 String line;
                 while ((line = br.readLine()) != null) outBuf.append(line).append("\n");
             } catch (IOException ex) {
-                log.debug("stream read interrupted: {}", ex.getMessage());
+                log.debug(LOG_STREAM_INTERRUPTED, ex.getMessage());
             }
         }, tag + "-out");
 
@@ -247,7 +248,7 @@ public class BackupService {
                 String line;
                 while ((line = br.readLine()) != null) errBuf.append(line).append("\n");
             } catch (IOException ex) {
-                log.debug("stream read interrupted: {}", ex.getMessage());
+                log.debug(LOG_STREAM_INTERRUPTED, ex.getMessage());
             }
         }, tag + "-err");
 
@@ -365,7 +366,7 @@ public class BackupService {
                 String line;
                 while ((line = br.readLine()) != null) stderrBuf.append(line).append("\n");
             } catch (IOException ex) {
-                log.debug("stream read interrupted: {}", ex.getMessage());
+                log.debug(LOG_STREAM_INTERRUPTED, ex.getMessage());
             }
         }, "psql-super-stderr");
         errThread.setDaemon(true);

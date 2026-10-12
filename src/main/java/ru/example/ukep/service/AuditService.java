@@ -20,6 +20,7 @@ public class AuditService {
     private static final String T_DOC = "DOCUMENT";
     private static final String T_EMAIL = "EMAIL";
     private static final String T_KEYS = "KEYS";
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
 
     private final AuditEventWriter writer;
 
@@ -42,11 +43,11 @@ public class AuditService {
     }
 
     public void adminLoginSuccess(String cn) {
-        write("ADMIN_LOGIN_SUCCESS", OK, cn, "ROLE_ADMIN", null, null, null, null);
+        write("ADMIN_LOGIN_SUCCESS", OK, cn, ROLE_ADMIN, null, null, null, null);
     }
 
     public void adminLoginFail(String cn, String reason) {
-        write("ADMIN_LOGIN_FAIL", FAIL, cn, "ROLE_ADMIN", null, null, null, reason);
+        write("ADMIN_LOGIN_FAIL", FAIL, cn, ROLE_ADMIN, null, null, null, reason);
     }
 
     public void userCreate(String actor, Long userId, String email) {
@@ -120,7 +121,7 @@ public class AuditService {
     // ============ Keys ============
 
     public void keysDownload(String actor, String fileName) {
-        write("KEYS_DOWNLOAD", WARN, actor, "ROLE_ADMIN",
+        write("KEYS_DOWNLOAD", WARN, actor, ROLE_ADMIN,
                 T_KEYS, "file.key+pii.key", fileName,
                 "Скачан архив с ключами шифрования");
     }

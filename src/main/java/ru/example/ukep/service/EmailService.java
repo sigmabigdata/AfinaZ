@@ -18,9 +18,6 @@ import java.util.Properties;
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
-    private static final String T_EMAIL = "EMAIL";
-    private static final String RES_OK = "SUCCESS";
-    private static final String RES_FAIL = "FAIL";
 
     /** Fallback: Spring Boot JavaMailSender из application-prod.yml (.env.prod) */
     private final ObjectProvider<JavaMailSender> mailSenderProvider;

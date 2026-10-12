@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.view.RedirectView;
 import ru.example.ukep.security.PiiEncryptor;
 import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.EmailService;
@@ -27,6 +28,7 @@ public class SettingsController {
     private static final String K_SMTP_SSL  = "smtp.ssl";
     private static final String UNKNOWN = "unknown";
     private static final String REDIR = "redirect:/admin/settings";
+    private static final String FALSE = "false";
 
     private final SettingsService settings;
     private final AuditService audit;
@@ -91,18 +93,18 @@ public class SettingsController {
         try {
             // Основные
             settings.set("monitor.mail_to", monitorMailTo == null ? "" : monitorMailTo.trim(), who);
-            settings.set("monitor.enabled", monitorEnabled != null ? "true" : "false", who);
+            settings.set("monitor.enabled", monitorEnabled != null ? "true" : FALSE, who);
             settings.set("revocation.mode", revocationMode == null ? "soft" : revocationMode, who);
             settings.set("auth.rate_limit.login", rateLimitLogin == null ? "5" : rateLimitLogin, who);
             settings.set("auth.rate_limit.window_min",
                     rateLimitWindow == null ? "15" : rateLimitWindow, who);
-            settings.set("signature.require_crl", requireCrl != null ? "true" : "false", who);
+            settings.set("signature.require_crl", requireCrl != null ? "true" : FALSE, who);
 
             // SMTP
             settings.set(K_SMTP_HOST, smtpHost == null ? "" : smtpHost.trim(), who);
             settings.set(K_SMTP_PORT, smtpPort == null ? "465" : smtpPort.trim(), who);
             settings.set(K_SMTP_USER, smtpUsername == null ? "" : smtpUsername.trim(), who);
-            settings.set(K_SMTP_SSL, smtpSsl != null ? "true" : "false", who);
+            settings.set(K_SMTP_SSL, smtpSsl != null ? "true" : FALSE, who);
 
             // Пароль — только если введён новый (не пустая строка)
             if (smtpPassword != null && !smtpPassword.isBlank()) {
@@ -137,13 +139,13 @@ public class SettingsController {
     }
 
     @PostMapping("/test-email")
-    public String testEmail(@RequestParam String to,
-                            Authentication auth,
-                            RedirectAttributes ra) {
+    public RedirectView testEmail(@RequestParam String to,
+                                  Authentication auth,
+                                  RedirectAttributes ra) {
         String who = auth != null ? auth.getName() : UNKNOWN;
         if (to == null || to.isBlank() || !to.contains("@")) {
             ra.addFlashAttribute("err", "Укажите корректный email");
-            return REDIR;
+            return new RedirectView(REDIR);
         }
         try {
             emailService.sendTest(to.trim());
@@ -153,6 +155,6 @@ public class SettingsController {
             log.error("Test email failed", e);
             ra.addFlashAttribute("err", "Ошибка отправки: " + e.getMessage());
         }
-        return REDIR;
+        return new RedirectView(REDIR);
     }
 }
