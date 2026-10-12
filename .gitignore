@@ -64,3 +64,6 @@ issues.json
 measures.json
 sonar-report.html
 make-report.sh
+
+# Sonar CNES report
+sonar-cnes-report.jar
