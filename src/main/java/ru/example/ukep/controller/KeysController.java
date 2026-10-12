@@ -24,6 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalDate;
 
 @Controller
@@ -109,8 +110,13 @@ public class KeysController {
 
     /** Создаёт защищённый паролем ZIP в памяти. */
     private byte[] buildEncryptedZip(Path fileKey, Path piiKey, String password) throws Exception {
-        // zip4j работает с файлами, поэтому соберём во временном каталоге
-        Path tmpDir = Files.createTempDirectory("afina-keys-");
+        // zip4j работает с файлами, поэтому соберём во временном каталоге.
+        // Явно задаём права 0700 — только владелец (защита от подглядывания
+        // через /tmp, Sonar java:S5443).
+        Path tmpDir = Files.createTempDirectory(
+                "afina-keys-",
+                PosixFilePermissions.asFileAttribute(
+                        PosixFilePermissions.fromString("rwx------")));
         try (TempDirCleanup cleaner = new TempDirCleanup(tmpDir)) {
             Path tmpZip = tmpDir.resolve("afina-keys.zip");
 
