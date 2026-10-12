@@ -10,7 +10,10 @@ services:
     environment:
       POSTGRES_DB: afina_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: local_test_password
+      POSTGRES_PASSWORD: ${DB_SUPERUSER_PASSWORD:-local_test_password}
+      DB_PASSWORD: ${DB_PASSWORD:-app_password_change_me}
+      DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD:-migrator_password_change_me}
+      DB_AUDITOR_PASSWORD: ${DB_AUDITOR_PASSWORD:-auditor_password_change_me}
     ports:
       - "5433:5432"
     volumes:
@@ -40,9 +43,9 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/afina_db
       DB_USER: afina_app
-      DB_PASSWORD: app_password_change_me
+      DB_PASSWORD: ${DB_PASSWORD:-app_password_change_me}
       DB_MIGRATOR_USER: afina_migrator
-      DB_MIGRATOR_PASSWORD: migrator_password_change_me
+      DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD:-migrator_password_change_me}
       APP_BASE_URL: http://localhost:8081
       APP_STORAGE_PATH: /app/storage/documents
       ADMINS_FILE: /app/admins.env

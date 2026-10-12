@@ -15,6 +15,10 @@ services:
       POSTGRES_DB: ${DB_NAME:-afina_db}
       POSTGRES_USER: ${DB_SUPERUSER:-postgres}
       POSTGRES_PASSWORD: ${DB_SUPERUSER_PASSWORD}
+      # Пароли ролей для init-скрипта db/init/02_roles.sh
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD}
+      DB_AUDITOR_PASSWORD: ${DB_AUDITOR_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
     volumes:
       - pgdata:/var/lib/postgresql/data
