@@ -80,7 +80,8 @@
 | `FileEncryptor` | AES-256-GCM для файлов |
 | `PiiEncryptor` | AES-256-GCM для PII (email, phone, ФИО) |
 | `PiiStringConverter` | JPA `@Convert` для прозрачного шифрования |
-| `AuditService` | Запись событий в `audit_events` |
+| `AuditEventWriter` | Запись событий в `audit_events` (REQUIRES_NEW, отдельный бин) |
+| `AuditService` | Фасад над `AuditEventWriter` (специфичные методы) |
 | `MonitoringService` | Scheduled health-check + алерты |
 | `BackupService` | pg_dump + psql restore |
 | `SettingsService` | Key-value настройки (`app_settings`) |
@@ -123,11 +124,12 @@ Reverse-proxy с автоматическим TLS.
 | Путь | Содержимое | Формат |
 |---|---|---|
 | `/opt/afina/storage/documents/` | Файлы документов | `<uuid>_<orig>.enc`, AES-256-GCM |
-| `/opt/afina/secrets/file.key` | Ключ для файлов | base64, 32 байта |
-| `/opt/afina/secrets/pii.key` | Ключ для PII | base64, 32 байта |
+| `/opt/afina/secrets/file.key` | Ключ для файлов (AES-256-GCM) | base64, 32 байта |
+| `/opt/afina/secrets/pii.key` | Ключ для PII (AES-256-GCM) | base64, 32 байта |
+| `/opt/afina/secrets/backup.pass` | Ключ для бэкапов (AES-256-CBC) | base64, 32 байта |
 | `/opt/afina/certs/` | Truststore | X.509 .cer/.crt/.pem |
 | `/opt/afina/crls/` | CRL | `auto-*.crl` + вручную |
-| `/opt/afina/backups/` | Бэкапы | `.sql.gz` + `storage_*.tar.gz` |
+| `/opt/afina/backups/` | Бэкапы (AES-256-CBC) | `.sql.gz.enc` + `storage_*.tar.gz.enc` |
 | `/opt/afina/logs/` | Логи приложения | `app.log` |
 
 ---
@@ -330,23 +332,42 @@ stateless magic-link для клиентов).
 формата (короткая или не парсится) — возвращается как есть. Это
 legacy-fallback для строк, оставшихся в plaintext до миграции.
 
+### Бэкапы БД и storage
+
+- **Шифр:** AES-256-CBC + PBKDF2-HMAC-SHA256 (100 000 итераций)
+- **Ключ:** `/opt/afina/secrets/backup.pass` (0600, root)
+- **Формат:** `afina_*.sql.gz.enc`, `storage_*.tar.gz.enc`
+- **Инструмент:** `openssl enc -aes-256-cbc -pbkdf2 -iter 100000`
+- Скрипты: `backup-prod.sh` (шифрует), `restore-prod.sh` (расшифровывает)
+- Ротация: 30 дней
+
+### ZIP с ключами
+
+- **Шифр:** AES-256 (zip4j)
+- **Пароль:** вводится в UI `/admin/keys`, **не сохраняется**
+- **Содержимое:** `file.key`, `pii.key` + `README.txt` (plaintext-инструкция)
+- Восстановление — только вручную (пароль знает только оператор)
+
 ### Что защищает
 
 | Угроза | Защита |
 |---|---|
 | Кража HDD / snapshot диска | ✅ Криптомусор без ключа |
 | Утечка через хостинг | ✅ Только шифротекст |
-| Утечка бэкапа БД | ✅ PII в бэкапе зашифрован |
-| Root-компрометация на работающем сервере | ⚠️ Ключ доступен из `secrets/` |
+| Утечка бэкапа БД | ✅ PII зашифрован + сам бэкап AES-256-CBC |
+| Кража ZIP с ключами | ✅ Пароль знает только оператор |
+| Root-компрометация на работающем сервере | ⚠️ Ключи доступны из `secrets/` |
 | Fuzzy-поиск по email в админке | ❌ Только exact по hash |
 
 Для защиты от root-компрометации нужен KMS (Vault, AWS KMS) — отдельная итерация.
 
 ### Жизненный цикл ключа
 
-- **Создание:** `install.sh` или `openssl rand -base64 32`
+- **Создание:** `install.sh` / `deploy.sh` (или `openssl rand -base64 32`)
 - **Ротация:** не реализована (нет утилиты `RotateKey`)
-- **Резервная копия:** `/admin/keys` → скачать ZIP
+- **Резервная копия:**
+  - `file.key`, `pii.key` — `/admin/keys` → ZIP с паролем (AES-256)
+  - `backup.pass` — только вручную (`cat secrets/backup.pass`)
 - **Компромисс:** потеря ключа = потеря данных
 
 ---
@@ -518,6 +539,13 @@ Superuser (`postgres`) — только для restore и init-скриптов.
 
 ## Криптография УКЭП
 
+### Ограничение PATH для подпроцессов
+
+`BackupService` запускает `pg_dump` и `psql` через `ProcessBuilder`.
+Чтобы исключить подмену бинаря через наследованный `PATH`
+(Sonar `java:S4036`), в `pb.environment()` явно ставится:
+`PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`.
+
 ### Проверка подписи
 
 Класс `SignatureVerifier` — на BouncyCastle (не JCSP).
@@ -590,6 +618,8 @@ Superuser (`postgres`) — только для restore и init-скриптов.
 
 ### Cron
 
+- `afina-cleanup-all` (4:30 и 16:30) — `cleanup-all.sh`: Docker prune,
+  ротация логов, CRL, бэкапов
 - `afina-crl-cleanup` (вс 4:00) — `cleanup-crls.sh` удаляет `auto-*.crl`
   старше 90 дней
 - Ручные CRL (не `auto-*`) не удаляются никогда
@@ -907,7 +937,7 @@ Flyway применит новые миграции автоматически �
     /admin/system → «Восстановить»
 
     # или через CLI
-    ./restore-prod.sh backups/afina_*.sql.gz
+    ./restore-prod.sh backups/afina_*.sql.gz.enc
 
 Перед восстановлением создаётся safety-бэкап.
 

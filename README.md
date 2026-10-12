@@ -39,6 +39,8 @@
 ### Безопасность
 - **Шифрование файлов** AES-256-GCM (`file.key`)
 - **Шифрование PII** (email, телефон, ФИО в документах) AES-256-GCM (`pii.key`)
+- **Шифрование бэкапов БД** AES-256-CBC (`backup.pass`)
+- **Пароль на ZIP с ключами** (AES-256, zip4j)
 - **Email-hash** (SHA-256) для поиска без расшифровки
 - Проверка подписи: **BouncyCastle** chain building + CRL
 - **Авто-загрузка CRL** по CDP-URL из сертификатов
@@ -72,6 +74,8 @@
 | ORM | Spring Data JPA, Hibernate 6 |
 | Криптография УКЭП | BouncyCastle (chain, CRL), КриптоПро JCSP (ГОСТ) |
 | Шифрование данных | AES-256-GCM (JCE SunJCE) — `file.key`, `pii.key` |
+| Шифрование бэкапов | AES-256-CBC + PBKDF2 (openssl), `backup.pass` |
+| ZIP с паролем | zip4j 2.11.5 (AES-256) |
 | Хэширование | SHA-256 (email-hash, phone-hash) |
 | Frontend | Thymeleaf, ванильный JS, плагин CryptoPro CAdES |
 | Мониторинг | Spring @Scheduled + shell-cron `monitor.sh` |
@@ -114,6 +118,9 @@
 | `.env.prod` | При ручном развёртывании (install.sh создаёт сам) |
 | `caddy-certs/fullchain.pem` + `privkey.pem` | Если свой SSL вместо Let's Encrypt |
 
+`install.sh` / `deploy.sh` автоматически создают в `secrets/`:
+`file.key`, `pii.key`, `backup.pass` — сохранить все три в 1Password.
+
 ---
 
 ## Развёртывание
@@ -145,8 +152,9 @@
     sudo ./install.sh
 
 Скрипт спросит домен, SSL-режим, порты, SMTP; сгенерирует `.env.prod`,
-ключи шифрования, пароли БД; установит Docker, UFW, fail2ban; соберёт
-и запустит стек; настроит cron; поставит CLI `afina`.
+ключи шифрования (`file.key`, `pii.key`, `backup.pass`), пароли БД;
+установит Docker, UFW, fail2ban; соберёт и запустит стек; настроит
+cron; поставит CLI `afina`.
 
 **6. Сохранить в менеджер паролей** пароли БД и ключи шифрования
 (скрипт покажет их в конце).
@@ -217,11 +225,14 @@
     chmod 700 secrets
     openssl rand -base64 32 > secrets/file.key
     openssl rand -base64 32 > secrets/pii.key
+    openssl rand -base64 32 | tr -d '\n' > secrets/backup.pass
     chown -R 999:999 secrets
-    chmod 600 secrets/*.key
+    chmod 600 secrets/*.key secrets/backup.pass
 
-Сохранить оба ключа вне сервера (1Password, сейф).
-Без них данные не восстановить.
+Сохранить **все три** файла вне сервера (1Password, сейф):
+`file.key`, `pii.key`, `backup.pass`.
+Без первых двух — данные не расшифровать.
+Без третьего — бэкапы не восстановить.
 
 **6. DNS:**
 
@@ -289,6 +300,8 @@ fail2ban → параметры ядра → каталоги → сборка �
 Открыть `/admin/settings` → блок «SMTP» → «Проверить SMTP» →
 отправить тестовое письмо. Проверить inbox.
 
+Пароль SMTP хранится в БД **зашифрованным** (`pii.key`), не в plaintext.
+
 ---
 
 ## Админ-панель
@@ -348,7 +361,8 @@ fail2ban → параметры ядра → каталоги → сборка �
 - Хранить 3 копии вне сервера: менеджер паролей + бумага в сейфе + флешка
 - Никогда не передавать по открытым каналам
 
-Управление: `/admin/keys` → скачать ZIP с бэкапом.
+Управление: `/admin/keys` → скачать ZIP **с паролем** (AES-256, zip4j).
+Пароль задаётся в UI, нигде не сохраняется — если забудете, архив не открыть.
 
 ### Проверка подписи
 
@@ -467,8 +481,11 @@ Retention: `audit.retention_days` (по умолчанию 365), автоочи�
 
 ### Восстановление
 
-**Через UI:** `/admin/system` → рядом с бэкапом кнопка «Восстановить».
-Требует ввести `RESTORE`. Перед восстановлением создаётся safety-бэкап.
+**Через UI:** `/admin/system` → кнопка «Восстановить».
+**Только для legacy-бэкапов** (`*.sql.gz`, без `.enc`).
+
+Для зашифрованных `.enc` — **только CLI**: пароль от `backup.pass`
+не должен ходить через веб-сессию админа.
 
 **Через CLI:**
 
@@ -507,13 +524,19 @@ Retention: `audit.retention_days` (по умолчанию 365), автоочи�
     END $$;
     SQL
 
-    # Восстановить файлы
-    tar xzf backups/storage_YYYYMMDD_HHMMSS.tar.gz -C /opt/afina
+    # Восстановить файлы (расшифровать .tar.gz.enc)
+    openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
+        -pass file:secrets/backup.pass \
+        -in backups/storage_YYYYMMDD_HHMMSS.tar.gz.enc \
+      | tar xzf - -C /opt/afina
 
     # Запустить
     docker compose -f docker-compose-prod.yml --env-file .env.prod up -d app
 
 ### Обновление приложения
+
+> ⚠️ Не используйте `afina restart` для обновления кода — он **не пересобирает jar**.
+> Только `afina deploy` (git pull + rebuild + up).
 
     cd /opt/afina
     afina deploy
@@ -549,7 +572,8 @@ Flyway применит новые миграции автоматически.
 
 | Файл | Расписание | Что делает |
 |---|---|---|
-| `afina-backup` | 3:00 ежедневно | Бэкап БД + файлов |
+| `afina-backup` | 3:00 ежедневно | Бэкап БД + файлов (AES-256) |
+| `afina-cleanup-all` | 4:30 и 16:30 | Чистка Docker-кэша, логов, старых CRL |
 | `afina-crl-cleanup` | вс 4:00 | Удаление auto-CRL старше 90 дней |
 | `afina-monitor` | каждые 5 мин | Внешний health-check + email-алерт |
 | `afina-ssl-check` | пн 9:00 | Проверка срока SSL |
@@ -596,7 +620,7 @@ Flyway применит новые миграции автоматически.
     cd /opt/afina
     chown -R 999:999 secrets
     chmod 700 secrets
-    chmod 600 secrets/*.key
+    chmod 600 secrets/*.key secrets/backup.pass
     docker compose -f docker-compose-prod.yml --env-file .env.prod restart app
 
 ### Caddy отдаёт 502 Bad Gateway

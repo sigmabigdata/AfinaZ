@@ -51,7 +51,7 @@ ok "certs/: $cert_files сертификат(ов)"
 
 # Проверим, что хотя бы один .cer/.crt парсится как X.509
 valid_certs=0
-for f in certs/*.cer certs/*.crt; do
+for f in certs/*.cer certs/*.crt certs/*.pem; do
     [ -f "$f" ] || continue
     if openssl x509 -in "$f" -noout 2>/dev/null; then
         valid_certs=$((valid_certs + 1))
@@ -117,6 +117,10 @@ if [ "$mem_mb" -lt 1500 ]; then
     warn "Свободной памяти мало: ${mem_mb} MB (рекомендуется > 1.5 GB)"
 fi
 ok "Свободная память: ${mem_mb} MB"
+
+if [ -f .gitignore ]; then
+    grep -qE '^/?secrets' .gitignore || warn "secrets/ не в .gitignore — добавь!"
+fi
 
 [ "$UNATTENDED" = "1" ] && [ ! -f .env.install ] && err "Нужен .env.install"
 
@@ -330,11 +334,19 @@ else
     warn "secrets/pii.key уже существует — НЕ перезаписываю"
 fi
 
+# backup.pass — ключ AES-256 для шифрования бэкапов БД
+if [ ! -f secrets/backup.pass ]; then
+    openssl rand -base64 32 | tr -d '\n' > secrets/backup.pass
+    ok "secrets/backup.pass создан"
+else
+    warn "secrets/backup.pass уже существует — НЕ перезаписываю"
+fi
+
 # Владелец — uid контейнера (999:999)
 chown -R 999:999 secrets 2>/dev/null || true
-chmod 600 secrets/*.key
+chmod 600 secrets/*.key secrets/backup.pass
 
-ok "Ключи шифрования готовы"
+ok "Ключи шифрования готовы (file.key, pii.key, backup.pass)"
 
 # ============================================================
 # 3. Формирование .env.prod
@@ -474,6 +486,12 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 0 3 * * * root cd $WORK_DIR && ./backup-prod.sh >> $WORK_DIR/logs/backup.log 2>&1
 CRONEOF
 
+cat > /etc/cron.d/afina-cleanup-all <<CRONEOF
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 4,16 * * * root cd $WORK_DIR && ./cleanup-all.sh >> $WORK_DIR/logs/cleanup.log 2>&1
+CRONEOF
+
 cat > /etc/cron.d/afina-crl-cleanup <<CRONEOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -494,7 +512,7 @@ CRONEOF
 
 chmod 644 /etc/cron.d/afina-*
 systemctl restart cron
-ok "Cron: 4 задачи установлены"
+ok "Cron: 5 задач установлены"
 
 # ---- Установка CLI afina ----
 if [ -f afina.sh ]; then
@@ -569,11 +587,16 @@ echo "  DB auditor:       afina_auditor / $DB_AUDITOR_PASSWORD"
 echo ""
 echo "  file.key:         $(cat secrets/file.key)"
 echo "  pii.key:          $(cat secrets/pii.key)"
+echo "  backup.pass:      $(cat secrets/backup.pass)"
 echo ""
 echo -e "${R}${BOLD}⚠️  СЕЙЧАС ЖЕ:${N}"
 echo "  1. Сохрани пароли БД выше в менеджер паролей"
-echo "  2. Сохрани file.key и pii.key в менеджер паролей + на бумаге в сейфе"
-echo "  3. Без этих ключей данные восстановить НЕВОЗМОЖНО"
+echo "  2. Сохрани file.key, pii.key и backup.pass в менеджер паролей"
+echo "     + на бумаге в сейфе"
+echo "  3. Без этих ключей данные и бэкапы восстановить НЕВОЗМОЖНО"
+echo ""
+echo -e "${BOLD}Восстановление бэкапа:${N}"
+echo "  ./restore-prod.sh backups/afina_*.sql.gz.enc"
 echo ""
 echo -e "${BOLD}Управление:${N}"
 echo "  afina status         — состояние"
