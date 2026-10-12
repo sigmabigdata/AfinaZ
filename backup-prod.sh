@@ -27,6 +27,8 @@ docker exec afina-postgres pg_dump \
     -U afina_migrator -d afina_db \
     --clean --if-exists \
     --no-owner --no-privileges \
+    --exclude-extension=uuid-ossp \
+    --exclude-extension=pgcrypto \
     | gzip \
     | openssl enc "${OPENSSL_ARGS[@]}" -out "$DB_FILE"
 echo "[$(date)] БД: $DB_FILE ($(du -h "$DB_FILE" | cut -f1), AES-256)"
