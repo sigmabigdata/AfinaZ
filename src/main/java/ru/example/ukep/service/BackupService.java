@@ -57,6 +57,10 @@ public class BackupService {
     @Value("${app.db-superuser-password:}")
     private String superPassword;
 
+    /** Путь к файлу с паролем шифрования бэкапов (внутри контейнера). */
+    @Value("${app.backups-pass-file:/opt/afina/secrets/backup.pass}")
+    private String backupPassFile;
+
     public record BackupFile(String name, long size, Instant createdAt,
                              String sizePretty, boolean encrypted) {}
 
@@ -93,22 +97,34 @@ public class BackupService {
 
     public String create() throws IOException, InterruptedException {
         Files.createDirectories(Paths.get(backupsPath));
+
+        Path passFile = Paths.get(backupPassFile);
+        if (!Files.isReadable(passFile)) {
+            throw new IOException("Пароль бэкапа не найден или недоступен: " + backupPassFile);
+        }
+
         String stamp = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
                 .withZone(ZoneId.systemDefault()).format(Instant.now());
-        String fileName = "afina_" + stamp + ".sql.gz";
-        Path out = Paths.get(backupsPath).resolve(fileName);
+        String fileName = "afina_" + stamp + ".sql.gz.enc";
+        Path out = Paths.get(backupsPath).resolve(fileName).toAbsolutePath();
 
         DbParams db = parseDbParams();
 
-        ProcessBuilder pb = safePb(
+        // pg_dump | gzip | openssl AES-256-CBC (PBKDF2)
+        String cmd = String.join(" ",
                 "pg_dump",
-                "-h", db.host,
+                "-h", shellQuote(db.host),
                 "-p", String.valueOf(db.port),
-                "-U", dbUser,
-                "-d", db.name,
-                "--clean", "--if-exists",
-                "--no-owner", "--no-privileges"
+                "-U", shellQuote(dbUser),
+                "-d", shellQuote(db.name),
+                "--clean --if-exists --no-owner --no-privileges",
+                "| gzip",
+                "| openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt",
+                "-pass file:" + shellQuote(backupPassFile),
+                "-out " + shellQuote(out.toString())
         );
+
+        ProcessBuilder pb = safePb("sh", "-c", cmd);
         pb.environment().put(ENV_PGPASSWORD, dbPassword);
         Process proc = pb.start();
 
@@ -127,10 +143,9 @@ public class BackupService {
         errThread.setDaemon(true);
         errThread.start();
 
-        try (InputStream dumpOut = proc.getInputStream();
-             GZIPOutputStream gz = new GZIPOutputStream(
-                     new BufferedOutputStream(Files.newOutputStream(out)))) {
-            dumpOut.transferTo(gz);
+        // Drain stdout (openssl пишет в файл; stdout пустой)
+        try (InputStream ignored = proc.getInputStream()) {
+            ignored.transferTo(OutputStream.nullOutputStream());
         }
 
         int rc = proc.waitFor();
@@ -142,13 +157,19 @@ public class BackupService {
         if (rc != 0) {
             Files.deleteIfExists(out);
             String err = stderrBuf.toString().trim();
-            log.error("pg_dump stderr:\n{}", err);
-            throw new IOException("pg_dump exit " + rc +
+            log.error("backup pipeline stderr:\n{}", err);
+            throw new IOException("pg_dump|gzip|openssl exit " + rc +
                     (err.isEmpty() ? "" : ": " + err));
         }
 
-        log.info("Backup created: {} ({} bytes)", fileName, Files.size(out));
+        log.info("Backup created (AES-256): {} ({} bytes)", fileName, Files.size(out));
         return fileName;
+    }
+
+    /** Обернуть строку в одинарные кавычки для sh -c. */
+    private static String shellQuote(String s) {
+        if (s == null) return "''";
+        return "'" + s.replace("'", "'\\''") + "'";
     }
 
     public void delete(String name) throws IOException {
