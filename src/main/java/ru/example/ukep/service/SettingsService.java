@@ -3,7 +3,6 @@ package ru.example.ukep.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.example.ukep.entity.AppSetting;
 import ru.example.ukep.repository.AppSettingRepository;
 import ru.example.ukep.security.PiiEncryptor;
@@ -61,21 +60,24 @@ public class SettingsService {
     }
 
     /**
-     * Записать одну настройку. Транзакция — на этом методе.
-     * Тело вынесено в private writeSetting(), чтобы не было self-invocation
-     * @Transactional из setAll() (Sonar java:S2229).
+     * Записать одну настройку.
+     *
+     * Без @Transactional: реальная работа идёт через repo.findById() и
+     * repo.save() — каждый вызов JpaRepository сам оборачивается в
+     * транзакцию. Внешний @Transactional здесь только вредит:
+     *   - setSmtpPasswordEncrypted() вызывает set() через this.set() =
+     *     self-invocation, @Transactional всё равно игнорируется;
+     *   - Sonar (java:S2229) справедливо на это ругается.
      */
-    @Transactional
     public void set(String key, String value, String updatedBy) {
         writeSetting(key, value, updatedBy);
     }
 
-    @Transactional
     public void setAll(Map<String, String> updates, String updatedBy) {
         updates.forEach((k, v) -> writeSetting(k, v, updatedBy));
     }
 
-    /** Общее тело записи. Без @Transactional — вызывается из публичных методов. */
+    /** Общее тело записи. */
     private void writeSetting(String key, String value, String updatedBy) {
         AppSetting s = repo.findById(key).orElseGet(() -> {
             AppSetting ns = new AppSetting();

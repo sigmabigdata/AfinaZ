@@ -22,6 +22,12 @@
     <properties>
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Единый ключ SonarQube (иначе Maven использует groupId:artifactId) -->
+        <sonar.projectKey>ukep-sign-service</sonar.projectKey>
+        <sonar.projectName>Афина</sonar.projectName>
+        <sonar.host.url>http://localhost:9000</sonar.host.url>
+        <sonar.sources>src/main/java</sonar.sources>
+        <sonar.java.binaries>target/classes</sonar.java.binaries>
         <cryptopro.version>5.0.49800</cryptopro.version>
         <bouncycastle.version>1.70</bouncycastle.version>
     </properties>
