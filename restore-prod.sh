@@ -26,6 +26,16 @@ read -p "Введи 'RESTORE' для подтверждения: " ans
 echo "▶ Останавливаю app"
 docker compose -f docker-compose-prod.yml --env-file .env.prod stop app
 
+# Убираем из дампа команды, которые ломают restore от не-суперюзера:
+#   COMMENT ON EXTENSION uuid-ossp ...
+#   ALTER EXTENSION ...
+#   CREATE EXTENSION ... (уже созданы V1-V14)
+# Сам extension НЕ трогаем — он уже есть в целевой БД.
+filter_extensions() {
+    grep -vE "^(COMMENT ON EXTENSION|ALTER EXTENSION|CREATE EXTENSION)" \
+        | grep -vE "^-- Name: (EXTENSION|EXTENSION )"
+}
+
 echo "▶ Расшифровываю и восстанавливаю БД"
 # Восстанавливаем под СУПЕРЮЗЕРОМ: в дампе есть команды, которые
 # afina_migrator выполнить не может (COMMENT ON EXTENSION uuid-ossp,
@@ -37,12 +47,14 @@ case "$FILE" in
         openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
             -pass file:"$PASS_FILE" -in "$FILE" \
             | gunzip \
+            | filter_extensions \
             | docker exec -i afina-postgres psql \
                 -U postgres -d afina_db -q
         ;;
     *.sql.gz)
         echo "  (plaintext-бэкап, устаревший формат)"
         gunzip -c "$FILE" \
+            | filter_extensions \
             | docker exec -i afina-postgres psql \
                 -U postgres -d afina_db -q
         ;;

@@ -117,8 +117,6 @@ public class BackupService {
                 "-U", shellQuote(dbUser),
                 "-d", shellQuote(db.name),
                 "--clean --if-exists --no-owner --no-privileges",
-                "--exclude-extension=uuid-ossp",
-                "--exclude-extension=pgcrypto",
                 "| gzip",
                 "| openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt",
                 "-pass file:" + shellQuote(backupPassFile),
