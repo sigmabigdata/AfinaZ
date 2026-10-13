@@ -15,7 +15,6 @@ import java.util.Comparator;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 @Service
 public class BackupService {
