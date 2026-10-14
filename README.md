@@ -79,7 +79,7 @@
 | Хэширование | SHA-256 (email-hash, phone-hash) |
 | Frontend | Thymeleaf, ванильный JS, плагин CryptoPro CAdES |
 | Мониторинг | Spring @Scheduled + shell-cron `monitor.sh` |
-| Инфраструктура | Docker Compose, Caddy 2 |
+| Инфраструктура | Docker Compose, Angie (форк Nginx, ФСТЭК) |
 | ОС | Ubuntu 22.04 / 24.04 LTS, x86_64 |
 | CLI | bash (`afina.sh`) |
 
@@ -116,7 +116,7 @@
 | Файл | Когда нужен |
 |---|---|
 | `.env.prod` | При ручном развёртывании (install.sh создаёт сам) |
-| `caddy-certs/fullchain.pem` + `privkey.pem` | Если свой SSL вместо Let's Encrypt |
+| `angie-certs/fullchain.pem` + `privkey.pem` | Если свой SSL вместо Let's Encrypt |
 
 `install.sh` / `deploy.sh` автоматически создают в `secrets/`:
 `file.key`, `pii.key`, `backup.pass` — сохранить все три в 1Password.
@@ -561,7 +561,7 @@ Flyway применит новые миграции автоматически.
 
     afina logs app -f              # в реальном времени
     afina logs app                 # последние 200 строк
-    afina logs caddy
+    afina logs angie
     afina logs pg
 
 ### Cron-задачи
@@ -593,7 +593,7 @@ Flyway применит новые миграции автоматически.
 | `afina health` | Health local + external |
 | `afina up / down / restart` | Управление стеком |
 | `afina deploy` | git pull + rebuild + up |
-| `afina logs [app\|caddy\|pg] [-f]` | Логи |
+| `afina logs [app\|angie\|pg] [-f]` | Логи |
 | `afina shell [app\|pg]` | Войти в контейнер |
 | `afina db "SQL"` | SQL-запрос на проде |
 | `afina backup` | Ручной бэкап |
@@ -623,7 +623,7 @@ Flyway применит новые миграции автоматически.
     chmod 600 secrets/*.key secrets/backup.pass
     docker compose -f docker-compose-prod.yml --env-file .env.prod restart app
 
-### Caddy отдаёт 502 Bad Gateway
+### Angie отдаёт 502 Bad Gateway
 
 **Причина:** приложение не запустилось или ещё стартует.
 
@@ -631,14 +631,14 @@ Flyway применит новые миграции автоматически.
 
 **Ожидание:** после `Started UkepSignApplication` (~15 секунд) 502 пропадёт.
 
-### Caddy не получает Let's Encrypt
+### Angie не получает Let's Encrypt
 
 **Причины:**
 - DNS не указывает на IP сервера (`dig +short afina.example.ru`)
 - Порт 80 закрыт (нужен для ACME-челленджа)
 - Rate limit LE (много выпусков за короткое время)
 
-    afina logs caddy | tail -30
+    afina logs angie | tail -30
 
 ### Письма не приходят клиентам
 

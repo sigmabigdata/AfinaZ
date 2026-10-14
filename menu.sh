@@ -822,7 +822,7 @@ menu_prod() {
         echo ""
         echo -e "${BOLD}  ${BLUE}Прод-развёртывание (VPS):${NC}"
         echo -e "  ${GREEN}5.${NC} Показать .env.prod.example"
-        echo -e "  ${GREEN}6.${NC} Показать Caddyfile"
+        echo -e "  ${GREEN}6.${NC} Показать angie.conf"
         echo -e "  ${GREEN}7.${NC} Показать docker-compose-prod.yml"
         echo -e "  ${GREEN}8.${NC} Открыть README.md (раздел деплоя)"
         echo ""
@@ -864,9 +864,9 @@ menu_prod() {
                 pause
                 ;;
             6)
-                echo -e "${BLUE}▶ Caddyfile:${NC}"
+                echo -e "${BLUE}▶ angie.conf:${NC}"
                 echo ""
-                cat Caddyfile 2>/dev/null || echo -e "${RED}Файл не найден${NC}"
+                cat angie.conf 2>/dev/null || echo -e "${RED}Файл не найден${NC}"
                 pause
                 ;;
             7)
@@ -915,7 +915,7 @@ menu_links() {
     echo -e "${BOLD}  ${BLUE}Документация:${NC}"
     echo -e "  ${GREEN}●${NC} Flyway:            https://documentation.red-gate.com/flyway"
     echo -e "  ${GREEN}●${NC} pgAudit:           https://github.com/pgaudit/pgaudit"
-    echo -e "  ${GREEN}●${NC} Caddy:             https://caddyserver.com/docs/"
+    echo -e "  ${GREEN}●${NC} Angie:             https://angie.software/ru/docs/"
     echo ""
     echo -e "${BOLD}  ${BLUE}Проверить сейчас:${NC}"
     echo -ne "  ${YELLOW}Открыть какой URL? (1–8, 0 — отмена): ${NC}"

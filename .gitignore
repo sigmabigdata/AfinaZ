@@ -37,9 +37,9 @@ secrets/
 *.key
 
 # Клиентские SSL-сертификаты
-caddy-certs/*.pem
-caddy-certs/*.key
-caddy-certs/*.crt
+angie-certs/*.pem
+angie-certs/*.key
+angie-certs/*.crt
 
 # Бэкапы БД и файлов (не хранить в git)
 backups/

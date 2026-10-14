@@ -19,7 +19,7 @@ fi
 
 # --- Получить срок действия ---
 # Проверяем сертификат через openssl s_client (то, что реально отдаётся).
-# Внутри caddy:2-alpine openssl нет, поэтому проверяем с хоста по сети.
+# Внутри angie-alpine openssl нет, поэтому проверяем с хоста по сети.
 END_DATE=$(echo | openssl s_client -connect "${DOMAIN}:443" -servername "${DOMAIN}" 2>/dev/null \
     | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
 

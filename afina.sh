@@ -49,7 +49,7 @@ cmd_help() {
     echo "  deploy              git pull + rebuild + restart"
     echo ""
     echo -e "${BOLD}Логи и отладка:${N}"
-    echo "  logs [app|caddy|pg] [-f]     Логи (по умолчанию app, без -f)"
+    echo "  logs [app|angie|pg] [-f]     Логи (по умолчанию app, без -f)"
     echo "  shell [app|pg]               Открыть sh/bash в контейнере"
     echo "  db \"SQL\"                     SQL-запрос на проде"
     echo "  doctor                       Полная диагностика"
@@ -164,7 +164,7 @@ cmd_logs() {
 
     for arg in "$@"; do
         case "$arg" in
-            app|caddy|postgres|pg)
+            app|angie|postgres|pg)
                 [ "$arg" = "pg" ] && service="postgres" || service="$arg"
                 ;;
             -f|--follow) follow="-f" ;;
@@ -283,7 +283,7 @@ cmd_doctor() {
     # 2. Контейнеры
     local running
     running=$(dc ps --status running --services 2>/dev/null | sort | tr '\n' ' ')
-    for svc in app caddy postgres; do
+    for svc in app angie postgres; do
         if echo "$running" | grep -qw "$svc"; then
             ok "Контейнер $svc: running"
         else

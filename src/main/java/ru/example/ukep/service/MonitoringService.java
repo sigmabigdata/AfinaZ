@@ -61,7 +61,7 @@ public class MonitoringService {
 
         // 2) Внешний HTTPS health (если домен HTTPS)
         if (failReason == null && appBaseUrl.startsWith("https://")) {
-            // APP_DOMAIN через Caddy — но из контейнера может не резолвиться.
+            // APP_DOMAIN через Angie — но из контейнера может не резолвиться.
             // Достаточно локальной проверки. Внешний https — задача monitor.sh.
         }
 

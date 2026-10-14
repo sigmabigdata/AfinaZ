@@ -121,7 +121,7 @@ if docker info >/dev/null 2>&1; then
         # Stopped containers
         docker container prune -f >/dev/null 2>&1 || true
 
-        # ВАЖНО: не трогаем volumes — там БД и caddy
+        # ВАЖНО: не трогаем volumes — там БД и angie
         after=$(docker system df --format '{{.Size}}' 2>/dev/null | head -1)
         log "Docker после очистки: $after (volumes НЕ тронуты)"
     else

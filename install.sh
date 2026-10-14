@@ -196,11 +196,11 @@ if [ "$UNATTENDED" != "1" ]; then
         fi
         ok "SSL: ключ и сертификат соответствуют друг другу"
 
-        mkdir -p caddy-certs
-        cp "$SSL_FULLCHAIN" caddy-certs/fullchain.pem
-        cp "$SSL_PRIVKEY"   caddy-certs/privkey.pem
-        chmod 644 caddy-certs/fullchain.pem
-        chmod 600 caddy-certs/privkey.pem
+        mkdir -p angie-certs
+        cp "$SSL_FULLCHAIN" angie-certs/fullchain.pem
+        cp "$SSL_PRIVKEY"   angie-certs/privkey.pem
+        chmod 644 angie-certs/fullchain.pem
+        chmod 600 angie-certs/privkey.pem
 
         # Проверим срок действия
         ssl_end=$(openssl x509 -in "$SSL_FULLCHAIN" -noout -enddate | cut -d= -f2)
@@ -214,7 +214,7 @@ if [ "$UNATTENDED" != "1" ]; then
             ok "Срок действия: $ssl_days дней"
         fi
 
-        ok "SSL: свой сертификат скопирован в caddy-certs/"
+        ok "SSL: свой сертификат скопирован в angie-certs/"
     else
         TLS_MODE="letsencrypt"
         echo -n "Email для Let's Encrypt (для уведомлений об истечении): "
@@ -533,8 +533,8 @@ if curl -fsS --max-time 10 "https://$APP_DOMAIN/actuator/health" 2>/dev/null | g
     ok "HTTPS /actuator/health: UP"
     HTTPS_OK=1
 else
-    warn "HTTPS не отвечает — Caddy может ещё получать сертификат"
-    warn "Проверь: docker compose logs caddy | tail -20"
+    warn "HTTPS не отвечает — Angie может ещё получать сертификат"
+    warn "Проверь: docker compose logs angie | tail -20"
     HTTPS_OK=0
 fi
 
@@ -612,5 +612,5 @@ echo ""
 if [ "$HTTPS_OK" = "1" ]; then
     ok "Система готова к работе"
 else
-    warn "Проверь Caddy через 30 секунд: afina logs caddy | tail -20"
+    warn "Проверь Angie через 30 секунд: afina logs angie | tail -20"
 fi

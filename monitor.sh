@@ -41,13 +41,13 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 # --- Проверки ---
 fail_reasons=""
 
-# 1. Локальный health через контейнер (не зависит от Caddy/сети)
+# 1. Локальный health через контейнер (не зависит от Angie/сети)
 if ! docker exec afina-app sh -c 'curl -fsS http://localhost:8080/actuator/health 2>/dev/null' \
         | grep -q '"status":"UP"'; then
     fail_reasons="${fail_reasons}app-health "
 fi
 
-# 2. HTTPS снаружи (проверка Caddy + TLS + DNS)
+# 2. HTTPS снаружи (проверка Angie + TLS + DNS)
 if [ -n "$DOMAIN" ]; then
     if ! curl -fsS --max-time 10 "https://${DOMAIN}/actuator/health" \
             | grep -q '"status":"UP"'; then
@@ -58,7 +58,7 @@ fi
 # 3. Контейнеры
 running=$(docker compose -f docker-compose-prod.yml --env-file .env.prod ps \
     --status running --services 2>/dev/null | sort | tr '\n' ' ')
-for need in app caddy postgres; do
+for need in app angie postgres; do
     if ! echo "$running" | grep -qw "$need"; then
         fail_reasons="${fail_reasons}container-${need} "
     fi

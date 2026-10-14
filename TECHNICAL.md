@@ -28,9 +28,9 @@
 ## Обзор архитектуры
 
     ┌─────────────┐         ┌──────────────┐        ┌──────────────────┐
-    │  Браузер    │  HTTPS  │    Caddy     │  HTTP  │  Spring Boot app │
-    │ (клиент или │ ──────► │  (TLS+ACME)  │ ─────► │  (порт 8080)     │
-    │  админ)     │         │              │        │                  │
+    │  Браузер    │  HTTPS  │    Angie     │  HTTP  │  Spring Boot app │
+    │ (клиент или │ ──────► │ (TLS + ACME, │ ─────► │  (порт 8080)     │
+    │  админ)     │         │  ФСТЭК)      │        │                  │
     └──────┬──────┘         └──────────────┘        └────────┬─────────┘
            │                                                  │
            │ плагин КриптоПро                                 │ JDBC
@@ -54,8 +54,8 @@
 - Сервер видит только публичный сертификат и подпись
 - Файлы на диске зашифрованы AES-256-GCM
 - PII в БД (email, телефон, ФИО-в-документах) зашифрованы отдельным ключом
-- Caddy сам получает и обновляет сертификаты Let's Encrypt (или клиентские)
-- Всё в Docker Compose: app + postgres + caddy
+- Angie сам получает и обновляет сертификаты Let's Encrypt (или клиентские)
+- Всё в Docker Compose: app + postgres + angie
 
 ---
 
@@ -98,26 +98,42 @@
 - `pgcrypto` — криптография
 - `uuid-ossp` — UUID-генерация
 
-### 3. Caddy 2
+### 3. Angie (форк Nginx, сертифицирован ФСТЭК)
 
-Контейнер `afina-caddy`. Порты настраиваются через `HTTP_PORT`/`HTTPS_PORT` (по умолчанию 80/443).
-Reverse-proxy с автоматическим TLS.
+Контейнер `afina-angie`. Порты настраиваются через `HTTP_PORT`/`HTTPS_PORT`
+(по умолчанию 80/443). Reverse-proxy с автоматическим TLS.
 
-`Caddyfile` (шаблонный):
+Выбран вместо Caddy, потому что Caddy не имеет сертификата ФСТЭК.
+Angie — форк Nginx от Ростелекома, развивается активнее, имеет
+встроенный ACME-клиент (не нужен отдельный certbot).
 
-    {$APP_DOMAIN} {
-        encode gzip
-        {$TLS_DIRECTIVE}
-        reverse_proxy app:8080
+`angie.conf` (шаблонный):
+
+    server {
+        listen 80;
+        server_name ${APP_DOMAIN} www.${APP_DOMAIN};
+        location /.well-known/acme-challenge/ { root /var/www/acme; }
+        location / { return 301 https://$host$request_uri; }
     }
 
-    www.{$APP_DOMAIN} {
-        redir https://{$APP_DOMAIN}{uri} permanent
+    server {
+        listen 443 ssl;
+        http2 on;
+        server_name ${APP_DOMAIN};
+        acme letsencrypt;
+        ssl_certificate $acme_certificate;
+        ssl_certificate_key $acme_certificate_key;
+        location / {
+            proxy_pass http://app:8080;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
     }
 
-`TLS_DIRECTIVE`:
-- Пусто → Let's Encrypt (ACME автоматически)
-- `tls /certs/fullchain.pem /certs/privkey.pem` → свой сертификат
+**Режимы TLS:**
+- Let's Encrypt — встроенный ACME в Angie (по умолчанию)
+- Custom — свой сертификат из `angie-certs/` (fullchain.pem + privkey.pem)
 
 ### 4. Хранилище
 
@@ -273,7 +289,7 @@ stateless magic-link для клиентов).
 **Что защищено:**
 - Подделка CN/СНИЛС в POST — отсекается сравнением с `admins.env`
 - Подмена IP — фильтр на уровне сервлета
-- MITM при HTTPS — TLS 1.2/1.3 + HSTS от Caddy
+- MITM при HTTPS — TLS 1.2/1.3 + HSTS от Angie
 - Replay challenge — одноразовый + TTL
 
 **Что НЕ защищено:**
@@ -666,7 +682,7 @@ Spring Security, чтобы CSRF не блокировал запросы ран
 
 При превышении: `429 Too Many Requests` + `Retry-After: <секунды>`.
 
-`X-Forwarded-For` от Caddy — берётся первый IP.
+`X-Forwarded-For` от Angie — берётся первый IP.
 
 **Клиент очистки:** `@Scheduled(fixedDelay = 300_000)` в `RateLimitService`.
 
@@ -907,7 +923,7 @@ Flyway применит новые миграции автоматически �
 ### Zero-downtime deploy
 
 **Не реализовано.** Простой 30–60 секунд.
-Возможный апгрейд: blue-green через Caddy upstream.
+Возможный апгрейд: blue-green через Angie upstream.
 
 ### Бэкап и восстановление
 
@@ -1005,7 +1021,7 @@ PII, бэкап, диск, память, перезагрузка.
 
     afina logs app -f
     afina logs app
-    afina logs caddy
+    afina logs angie
     afina logs pg
 
 Ошибки в БД:
@@ -1022,7 +1038,7 @@ PII, бэкап, диск, память, перезагрузка.
 - **Нет Prometheus/Grafana** (только healthcheck + email)
 - **Ключ шифрования на сервере** — root-компрометация опасна
 - **Бэкапы на том же сервере** — не выгружаются в S3/rclone
-- **Нет WAF** перед Caddy
+- **Нет WAF** перед Angie
 - **Rate-limit in-memory** — не масштабируется на несколько инстансов
 - **Fuzzy-поиск по email/phone** не работает (шифрование)
 - **DKIM не настроен** — у хостера почты (spam-риск)
@@ -1053,7 +1069,7 @@ PII, бэкап, диск, память, перезагрузка.
 - PostgreSQL 16: https://www.postgresql.org/docs/16/
 - Flyway: https://documentation.red-gate.com/flyway
 - pgAudit: https://github.com/pgaudit/pgaudit
-- Caddy 2: https://caddyserver.com/docs/
+- Angie: https://angie.software/ru/docs/
 - BouncyCastle: https://www.bouncycastle.org/documentation.html
 - КриптоПро CSP: https://www.cryptopro.ru/products/csp
 - КриптоПро CAdES: https://www.cryptopro.ru/products/cades

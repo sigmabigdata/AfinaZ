@@ -1,9 +1,0 @@
-{$APP_DOMAIN} {
-    encode gzip
-    {$TLS_DIRECTIVE}
-    reverse_proxy app:8080
-}
-
-www.{$APP_DOMAIN} {
-    redir https://{$APP_DOMAIN}{uri} permanent
-}

@@ -73,10 +73,10 @@ ok "Порты ${HTTP_PORT:-80}/${HTTPS_PORT:-443} свободны"
 
 # TLS custom
 if [ "${TLS_MODE:-letsencrypt}" = "custom" ]; then
-    [ -f caddy-certs/fullchain.pem ] || err "TLS_MODE=custom, но caddy-certs/fullchain.pem не найден"
-    [ -f caddy-certs/privkey.pem ]   || err "TLS_MODE=custom, но caddy-certs/privkey.pem не найден"
-    chmod 644 caddy-certs/fullchain.pem
-    chmod 600 caddy-certs/privkey.pem
+    [ -f angie-certs/fullchain.pem ] || err "TLS_MODE=custom, но angie-certs/fullchain.pem не найден"
+    [ -f angie-certs/privkey.pem ]   || err "TLS_MODE=custom, но angie-certs/privkey.pem не найден"
+    chmod 644 angie-certs/fullchain.pem
+    chmod 600 angie-certs/privkey.pem
     export TLS_DIRECTIVE="tls /certs/fullchain.pem /certs/privkey.pem"
     ok "TLS: custom"
 else

@@ -58,7 +58,7 @@ public class KeysController {
      * Скачать ZIP с ключами, защищённый паролем (AES-256).
      *
      * GET-вариант убран намеренно: пароль в query-строке попадёт в
-     * access.log Caddy, Referer, историю браузера. POST с формой — безопаснее.
+     * access.log Angie, Referer, историю браузера. POST с формой — безопаснее.
      */
     @PostMapping("/download")
     public Object download(@RequestParam String password,

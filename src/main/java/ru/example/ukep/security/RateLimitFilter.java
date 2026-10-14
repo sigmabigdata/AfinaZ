@@ -89,7 +89,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return false;
     }
 
-    /** Реальный IP с учётом X-Forwarded-For (Caddy). */
+    /** Реальный IP с учётом X-Forwarded-For (Angie/Nginx). */
     private String clientIp(HttpServletRequest req) {
         String xff = req.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {
