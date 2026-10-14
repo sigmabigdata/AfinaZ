@@ -1,12 +1,69 @@
-# PostgreSQL 16 (Debian) с pgaudit из стандартного репозитория.
-# Debian-образ содержит pgaudit как отдельный пакет.
+# ============================================================
+# AfinaZ · PostgreSQL 15 из состава Astra Linux SE 1.8
+# ============================================================
+# Astra использует Debian-style layout:
+#   Data:   /var/lib/postgresql/15/main/
+#   Config: /etc/postgresql/15/main/postgresql.conf
+# ============================================================
 
-FROM postgres:16
+FROM epicmorg/astralinux:1.8-light
 
-RUN apt-get update && \
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=ru_RU.UTF-8 \
+    LC_ALL=ru_RU.UTF-8 \
+    PGDATA=/var/lib/postgresql/15/main \
+    PGCONF=/etc/postgresql/15/main/postgresql.conf
+
+RUN printf 'Acquire::Retries "10";\n\
+Acquire::http::Timeout "120";\n\
+Acquire::https::Timeout "120";\n' > /etc/apt/apt.conf.d/80-afinaz-timeouts
+
+RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && \
+    chmod +x /usr/sbin/policy-rc.d
+
+# PARSEC-библиотеки (обязательно для initdb)
+RUN apt-get update -o Acquire::Retries=10 && \
     apt-get install -y --no-install-recommends \
-        postgresql-16-pgaudit && \
+        libparsec-base3 libparsec-mac3 libparsec-aud3 \
+        libparsec-cap3 libparsec-mic3 && \
     rm -rf /var/lib/apt/lists/*
 
-# Проверяем установку
-RUN ls /usr/lib/postgresql/16/lib/ | grep -i audit
+# PostgreSQL 15
+RUN apt-get update -o Acquire::Retries=10 && \
+    apt-get install -y --no-install-recommends \
+        postgresql-15 postgresql-client-15 postgresql-common postgresql-contrib \
+        ca-certificates tzdata gnupg curl && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update -o Acquire::Retries=10 && \
+    apt-get install -y --no-install-recommends locales && \
+    rm -rf /var/lib/apt/lists/* && \
+    localedef -i ru_RU -c -f UTF-8 ru_RU.UTF-8 || true
+
+# Убираем автосозданный кластер и создаём заново (с правильным layout)
+RUN pg_dropcluster 15 main --stop 2>/dev/null || true && \
+    rm -rf /var/lib/postgresql/15/main && \
+    mkdir -p /var/lib/postgresql/15 && \
+    chown postgres:postgres /var/lib/postgresql/15 && \
+    pg_createcluster 15 main -- --encoding=UTF-8 --locale=C.UTF-8 --auth-local=trust --auth-host=scram-sha-256 && \
+    mkdir -p /var/lib/postgresql/15/main/pg_log && \
+    chown -R postgres:postgres /var/lib/postgresql/15/main && \
+    ls -la /etc/postgresql/15/main/ && \
+    echo "── ✓ Кластер создан ──"
+
+RUN rm -f /usr/sbin/policy-rc.d
+
+COPY db/init /docker-entrypoint-initdb.d/
+RUN chmod +x /docker-entrypoint-initdb.d/*.sh 2>/dev/null || true
+
+COPY docker/postgres-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/postgres-entrypoint.sh
+
+VOLUME ["/var/lib/postgresql/15/main"]
+EXPOSE 5432
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
+    CMD /usr/lib/postgresql/15/bin/pg_isready -h localhost -p 5432 || exit 1
+
+ENTRYPOINT ["/usr/local/bin/postgres-entrypoint.sh"]
+CMD ["postgres"]

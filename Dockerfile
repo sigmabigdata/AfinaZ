@@ -1,18 +1,21 @@
 # ============================================================
-# Афина · Сборка образа приложения (с Linux CryptoPro CSP)
+# AfinaZ · Dockerfile приложения
 # ============================================================
-# Для x86_64 (VPS). На Apple Silicon не соберётся — там dev-режим.
+# Runtime: Astra Linux SE 1.8 + Axiom JDK Pro 17 + КриптоПро CSP 5.0
+# Build:   Maven + Temurin (для компиляции JDK-поставщик не критичен)
+#
+# ВАЖНО: базовый образ runtime — community (epicmorg/astralinux:1.8-light).
+# Для боевой сдачи заменить на официальный из registry.astralinux.ru.
 # ============================================================
 
-# ---------- Сборка ----------
+# ---------- Стадия сборки ----------
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
 ENV MAVEN_OPTS="-Xmx512m -Xms128m"
 
-COPY pom.xml ./
+# JCSP JAR устанавливаем в локальный .m2
 COPY libs ./libs
-
 RUN cd libs && \
     VERSION=5.0.49800 && G=ru.cryptopro.jcsp && \
     for j in JCSP:jcsp JCP:jcp JCryptoP:jcryptop JCPRevCheck:jcp-revcheck \
@@ -30,80 +33,79 @@ RUN cd libs && \
     mvn -B -q install:install-file -Dfile=bcutil-jdk15on-1.70.jar \
         -DgroupId=org.bouncycastle -DartifactId=bcutil-jdk15on -Dversion=1.70 -Dpackaging=jar
 
+COPY pom.xml ./
 COPY src ./src
 RUN mvn -B clean package -DskipTests
 
-# ---------- Запуск ----------
-# ВАЖНО: jammy (Ubuntu 22.04 LTS) — совместим с пакетами CryptoPro
-FROM eclipse-temurin:17-jre-jammy
+# ---------- Стадия исполнения ----------
+FROM epicmorg/astralinux:1.8-light
 WORKDIR /app
 
-# Системные библиотеки + утилиты
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=ru_RU.UTF-8 \
+    LC_ALL=ru_RU.UTF-8 \
+    JAVA_HOME=/opt/axiom-jdk \
+    PATH="/opt/axiom-jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Системные утилиты + библиотеки для КриптоПро + pg-клиент
 RUN apt-get update -o Acquire::Retries=5 && \
     apt-get install -y --no-install-recommends \
-        pcscd libpcsclite1 curl ca-certificates lsb-base gnupg tzdata \
-    && install -d /usr/share/postgresql-common/pgdg \
-    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-         -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-    && . /etc/os-release \
-    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
-         https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main" \
-         > /etc/apt/sources.list.d/pgdg.list \
-    && apt-get update -o Acquire::Retries=5 \
-    && apt-get install -y --no-install-recommends postgresql-client-16 \
-    && rm -rf /var/lib/apt/lists/*
+        ca-certificates curl gnupg tzdata locales \
+        pcscd libpcsclite1 \
+        openssl \
+        postgresql-client-15 \
+    && rm -rf /var/lib/apt/lists/* \
+    && localedef -i ru_RU -c -f UTF-8 ru_RU.UTF-8 || true
 
-# ---- Установка КриптоПро CSP для Linux ----
+# Axiom JDK 17 (Linux x86_64 tar.gz)
+COPY axiom-dist/axiomjdk-jdk-pro17.0.20.1+1-linux-amd64.tar.gz /tmp/axiom.tgz
+RUN mkdir -p /opt/axiom-jdk && \
+    tar xzf /tmp/axiom.tgz -C /opt/axiom-jdk --strip-components=1 && \
+    rm /tmp/axiom.tgz && \
+    /opt/axiom-jdk/bin/java -version 2>&1
 
-# ---- Установка КриптоПро CSP для Linux ----
-# ---- Установка КриптоПро CSP для Linux ----
-# Устанавливаем ТОЛЬКО серверные пакеты. GUI (cptools-gtk, rdr-gui-gtk) и
-# драйверы токенов (ifd-rutokens, rdr-*) не нужны для проверки подписи.
-# ВАЖНО: lsb-cprocsp-rdr-64 нужен всем остальным пакетам — ставим его явно.
-# ---- Установка КриптоПро CSP для Linux ----
-# Устанавливаем ТОЛЬКО серверные пакеты.
-# lsb-cprocsp-rdr-64 нужен всем остальным — ставим явно.
+# КриптоПро CSP 5.0 R2 для Linux (серверные пакеты)
 COPY cryptopro-dist/linux-amd64_deb.tgz /tmp/cryptopro/
 RUN cd /tmp/cryptopro && \
     tar xzf linux-amd64_deb.tgz && \
     cd linux-amd64_deb && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
         ./lsb-cprocsp-base_*.deb \
-        ./cprocsp-compat-debian_*.deb \
         ./lsb-cprocsp-rdr-64_*.deb \
-        ./lsb-cprocsp-kc1-64_*.deb \
         ./lsb-cprocsp-capilite-64_*.deb \
         ./cprocsp-curl-64_*.deb \
-        ./cprocsp-pki-cades-64_*.deb && \
-    ls -la /opt/cprocsp/bin/amd64/ && \
-    rm -rf /tmp/cryptopro
+    && rm -rf /tmp/cryptopro /var/lib/apt/lists/* && \
+    ls -la /opt/cprocsp/bin/amd64/ 2>&1 | head -10
 
 ENV PATH="${PATH}:/opt/cprocsp/bin/amd64:/opt/cprocsp/sbin/amd64"
 ENV LD_LIBRARY_PATH="/opt/cprocsp/lib/amd64:${LD_LIBRARY_PATH}"
 
 # Непривилегированный пользователь
-RUN groupadd -r afina && useradd -r -g afina afina && \
-    mkdir -p /app/storage/documents /var/log/afina \
+RUN groupadd -r afina 2>/dev/null || true && \
+    useradd -r -g afina -m -d /home/afina afina 2>/dev/null || true && \
+    mkdir -p /app/storage/documents /var/log/afina /opt/afina/secrets \
              /var/opt/cprocsp/tmp /var/opt/cprocsp/keys/afina && \
-    chown -R afina:afina /app /var/log/afina /var/opt/cprocsp && \
-    chmod -R 775 /var/opt/cprocsp && chmod 777 /var/opt/cprocsp/tmp
+    chown -R afina:afina /app /var/log/afina /var/opt/cprocsp /opt/afina && \
+    chmod -R 775 /var/opt/cprocsp && \
+    chmod 777 /var/opt/cprocsp/tmp
 
+# JAR из build-стадии
 COPY --from=build /app/target/ukep-sign-service.jar app.jar
 
-# Сертификаты УЦ — внутрь образа
+# Сертификаты УЦ (пустая папка, если нет файлов)
 COPY certs/ /app/certs/
 
 # Отключаем шум java.util.prefs (CryptoPro использует prefs для license)
 ENV JAVA_TOOL_OPTIONS="-Djava.util.prefs.userRoot=/tmp/.java -Djava.util.prefs.systemRoot=/tmp/.java-system"
 
-
 VOLUME ["/app/storage", "/var/log/afina"]
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
     CMD curl -fsS http://localhost:8080/actuator/health || exit 1
 
 USER afina
-EXPOSE 8080
 
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dfile.encoding=UTF-8"
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]

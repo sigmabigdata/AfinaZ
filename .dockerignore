@@ -1,0 +1,27 @@
+# Build context optimization
+.git/
+.gitignore
+.idea/
+.vscode/
+target/
+logs/
+backups/
+storage/
+node_modules/
+*.log
+*.md
+!README.md
+!TECHNICAL.md
+!CERTIFICATION.md
+.DS_Store
+docker-compose-*.yml
+Caddyfile.bak
+*.bak
+.env
+.env.prod
+.env.example
+.env.prod.example
+sonar-report.html
+hotspots.json
+issues.json
+measures.json

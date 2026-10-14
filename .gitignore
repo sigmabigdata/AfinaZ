@@ -67,3 +67,6 @@ make-report.sh
 
 # Sonar CNES report
 sonar-cnes-report.jar
+
+# Axiom JDK (скачивается из ЛК)
+axiom-dist/

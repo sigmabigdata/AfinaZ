@@ -23,18 +23,15 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
+    # shared_preload_libraries: pg_stat_statements из postgresql-contrib
+    # pgaudit НЕ используется — в Astra Linux SE 1.8 его нет.
+    # Аудит — встроенный Astra (PARSEC) + лог медленных запросов.
     command: >
       postgres
-        -c shared_preload_libraries=pgaudit,pg_stat_statements
+        -c shared_preload_libraries=pg_stat_statements
         -c pg_stat_statements.track=all
         -c log_min_duration_statement=1000
-        -c logging_collector=on
-        -c log_directory=/var/lib/postgresql/data/pg_log
-        -c log_filename='postgresql-%Y-%m-%d.log'
-        -c log_rotation_age=1d
-        -c log_rotation_size=100MB
-        -c log_line_prefix='%m [%p] %q%u@%d '
-        -c log_statement=none
+        -c log_statement=ddl
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_SUPERUSER:-postgres} -d ${DB_NAME:-afina_db}"]
       interval: 10s
