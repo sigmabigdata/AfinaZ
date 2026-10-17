@@ -47,6 +47,23 @@ public class SecurityConfig {
         return repo;
     }
 
+    /**
+     * Реальный IP клиента с учётом X-Forwarded-For (Angie/Nginx).
+     * Без этого из Docker-контейнера виден только IP прокси (172.18.0.x).
+     */
+    private static String clientIp(HttpServletRequest req) {
+        String xff = req.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            return comma > 0 ? xff.substring(0, comma).trim() : xff.trim();
+        }
+        String xRealIp = req.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isBlank()) {
+            return xRealIp.trim();
+        }
+        return req.getRemoteAddr();
+    }
+
     private Filter adminIpFilter() {
         List<String> allowed = Arrays.stream(adminIpWhitelist.split(","))
                 .map(String::trim).filter(s -> !s.isEmpty()).toList();
@@ -54,7 +71,7 @@ public class SecurityConfig {
             @Override
             public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
                     throws IOException, ServletException {
-                String ip = ((HttpServletRequest) req).getRemoteAddr();
+                String ip = clientIp((HttpServletRequest) req);
                 if (!allowed.contains(ip)) {
                     log.warn("Blocked admin access from IP: {}", ip);
                     ((HttpServletResponse) res).sendError(HttpServletResponse.SC_FORBIDDEN,
