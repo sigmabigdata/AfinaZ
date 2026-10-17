@@ -67,10 +67,23 @@ public class SecurityConfig {
     private Filter adminIpFilter() {
         List<String> allowed = Arrays.stream(adminIpWhitelist.split(","))
                 .map(String::trim).filter(s -> !s.isEmpty()).toList();
+
+        // Специальное значение "*" отключает проверку IP (только для отладки/демо!).
+        // TODO(CERTIFICATION): вернуть строгий whitelist перед боевой сдачей.
+        boolean allowAll = allowed.contains("*");
+        if (allowAll) {
+            log.warn("⚠️  ADMIN_IP_WHITELIST=* — админка открыта с ЛЮБОГО IP. " +
+                    "Это допустимо только для отладки/демо, НЕ для прода!");
+        }
+
         return new Filter() {
             @Override
             public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
                     throws IOException, ServletException {
+                if (allowAll) {
+                    chain.doFilter(req, res);
+                    return;
+                }
                 String ip = clientIp((HttpServletRequest) req);
                 if (!allowed.contains(ip)) {
                     log.warn("Blocked admin access from IP: {}", ip);
