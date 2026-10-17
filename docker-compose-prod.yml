@@ -9,7 +9,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-postgres
-    image: afina-postgres:16-pgaudit
+    image: afinaz-postgres:15-astra
     container_name: afina-postgres
     environment:
       POSTGRES_DB: ${DB_NAME:-afina_db}
@@ -48,7 +48,7 @@ services:
     extra_hosts:
       - "host.docker.internal:172.18.0.1"
       - "mail.afinasystems.ru:172.18.0.1"
-    image: afina-app:latest
+    image: afinaz-app:latest
     container_name: afina-app
     env_file:
       - .env.prod
