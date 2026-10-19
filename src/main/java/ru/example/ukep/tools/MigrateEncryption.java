@@ -41,7 +41,7 @@ public class MigrateEncryption implements ApplicationRunner {
     }
 
     /** Шифрует один документ: читает plaintext, пишет .enc, обновляет БД. */
-    private void migrateOne(Document doc) throws Exception {
+    private void migrateOne(Document doc) throws java.io.IOException {
         Path p = storageRoot.resolve(doc.getStoredName());
         byte[] plain = Files.readAllBytes(p);
         FileEncryptor.Encrypted enc = encryptor.encrypt(plain);

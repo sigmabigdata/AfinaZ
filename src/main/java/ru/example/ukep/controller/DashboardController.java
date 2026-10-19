@@ -10,7 +10,6 @@ import ru.example.ukep.entity.User;
 import ru.example.ukep.repository.DocumentRepository;
 import ru.example.ukep.repository.UserRepository;
 import ru.example.ukep.security.PiiEncryptor;
-import ru.example.ukep.service.DocumentService;
 import ru.example.ukep.service.FolderService;
 
 import java.util.LinkedHashMap;
@@ -20,18 +19,15 @@ import java.util.Map;
 @Controller
 public class DashboardController {
 
-    private final DocumentService documentService;
     private final UserRepository userRepository;
     private final PiiEncryptor pii;
     private final FolderService folderService;
     private final DocumentRepository documentRepository;
 
-    public DashboardController(DocumentService documentService,
-                               UserRepository userRepository,
+    public DashboardController(UserRepository userRepository,
                                PiiEncryptor pii,
                                FolderService folderService,
                                DocumentRepository documentRepository) {
-        this.documentService = documentService;
         this.userRepository = userRepository;
         this.pii = pii;
         this.folderService = folderService;

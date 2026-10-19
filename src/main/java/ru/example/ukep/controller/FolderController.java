@@ -14,7 +14,6 @@ import ru.example.ukep.security.PiiEncryptor;
 import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.FolderService;
 
-import java.util.Map;
 
 /**
  * Управление разделами (папками) документов.
@@ -58,6 +57,7 @@ public class FolderController {
         try {
             DocumentFolder f = folderService.create(user, name);
             log.info("Клиент {} создал раздел '{}'", user.getEmail(), f.getName());
+            audit.folderCreate(user.getEmail(), f.getId(), f.getName());
             ra.addFlashAttribute("ok", "Раздел создан: " + f.getName());
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("err", e.getMessage());
@@ -74,6 +74,7 @@ public class FolderController {
         User user = current(p);
         try {
             folderService.rename(id, user, name);
+            audit.folderRename(user.getEmail(), id, name);
             ra.addFlashAttribute("ok", "Раздел переименован");
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("err", e.getMessage());
@@ -88,7 +89,11 @@ public class FolderController {
                          RedirectAttributes ra) {
         User user = current(p);
         try {
+            DocumentFolder f = folderService.getOwned(id, user);
+            String name = f.getName();
+            long signedCount = folderService.countSignedInFolder(id, user);
             folderService.delete(id, user);
+            audit.folderDelete(user.getEmail(), id, name, signedCount);
             ra.addFlashAttribute("ok", "Раздел удалён");
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("err", e.getMessage());

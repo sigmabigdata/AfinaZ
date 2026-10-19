@@ -50,7 +50,9 @@ public class AuditEventWriter {
             }
 
             repo.save(e);
-            log.debug("audit: {} {}", entry.type(), entry.result());
+            if (log.isDebugEnabled()) {
+                log.debug("audit: {} {}", entry.type(), entry.result());
+            }
         } catch (Exception ex) {
             log.warn("audit failed: {} — {}", entry.type(), ex.getMessage());
         }

@@ -28,6 +28,7 @@ public class AuditService {
         this.writer = writer;
     }
 
+    @SuppressWarnings("java:S107")  // 8 параметров — рефакторинг в builder отложен
     private void write(String type, String result, String actorEmail, String actorRole,
                        String targetType, String targetId, String targetInfo, String details) {
         writer.write(new AuditEntry(type, result, actorEmail, actorRole,
@@ -119,6 +120,26 @@ public class AuditService {
     }
 
     // ============ Keys ============
+
+    // ============ Folders ============
+
+    public void folderCreate(String actor, Long folderId, String name) {
+        write("FOLDER_CREATE", OK, actor, null,
+                "FOLDER", String.valueOf(folderId), name, null);
+    }
+
+    public void folderRename(String actor, Long folderId, String newName) {
+        write("FOLDER_RENAME", OK, actor, null,
+                "FOLDER", String.valueOf(folderId), newName, null);
+    }
+
+    public void folderDelete(String actor, Long folderId, String name, long signedCount) {
+        String details = signedCount > 0
+                ? "Удалён раздел с " + signedCount + " подписанными документами"
+                : null;
+        write("FOLDER_DELETE", signedCount > 0 ? WARN : OK, actor, null,
+                "FOLDER", String.valueOf(folderId), name, details);
+    }
 
     public void keysDownload(String actor, String fileName) {
         write("KEYS_DOWNLOAD", WARN, actor, ROLE_ADMIN,

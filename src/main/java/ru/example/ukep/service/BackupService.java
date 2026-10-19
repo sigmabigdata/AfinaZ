@@ -23,18 +23,15 @@ public class BackupService {
     private static final String ENV_PGPASSWORD = "PGPASSWORD";
     private static final String PSQL_ON_ERROR_STOP = "ON_ERROR_STOP=1";
     private static final String MSG_FILE_NOT_FOUND = "Файл не найден: ";
-    /**
-     * Ограниченный PATH для дочерних процессов (psql, pg_dump).
-     * Sonar java:S4036: гарантируем, что бинарь берётся из системного
-     * каталога, а не из унаследованного окружения.
-     */
-    private static final String SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
     private static final String LOG_STREAM_INTERRUPTED = "stream read interrupted: {}";
 
-    private static ProcessBuilder safePb(String... command) {
+    @Value("${app.safe-path:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}")
+    private String safePath;
+
+    private ProcessBuilder safePb(String... command) {
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.environment().clear();
-        pb.environment().put("PATH", SAFE_PATH);
+        pb.environment().put("PATH", safePath);
         return pb;
     }
 

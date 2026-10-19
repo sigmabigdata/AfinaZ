@@ -83,21 +83,23 @@ public class FileEncryptor {
     /**
      * Результат шифрования: ciphertext + IV в Base64.
      *
-     * Это не record, потому что record генерирует equals/hashCode по ссылке
-     * на массив, а не по содержимому (Sonar java:S6218). Здесь мы просто
-     * храним пару значений без семантики «равенства», поэтому record
-     * не подходит.
+     * <p>Record + явные equals/hashCode по содержимому массива
+     * (Sonar java:S6206 + java:S6218).</p>
      */
-    public static final class Encrypted {
-        private final byte[] bytes;
-        private final String ivBase64;
+    public record Encrypted(byte[] bytes, String ivBase64) {
 
-        public Encrypted(byte[] bytes, String ivBase64) {
-            this.bytes = bytes;
-            this.ivBase64 = ivBase64;
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Encrypted other)) return false;
+            return java.util.Arrays.equals(bytes, other.bytes)
+                    && java.util.Objects.equals(ivBase64, other.ivBase64);
         }
 
-        public byte[] bytes() { return bytes; }
-        public String ivBase64() { return ivBase64; }
+        @Override
+        public int hashCode() {
+            return 31 * java.util.Arrays.hashCode(bytes)
+                    + java.util.Objects.hashCode(ivBase64);
+        }
     }
 }

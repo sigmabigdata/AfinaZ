@@ -133,8 +133,10 @@ public class SignatureVerifier {
 
         // 3) Построение цепочки (вручную)
         List<X509Certificate> chain = buildChain(leaf, cms);
-        log.info("Chain built: {} certificates (leaf={})", chain.size(),
-                leaf.getSubjectX500Principal());
+        if (log.isInfoEnabled()) {
+            log.info("Chain built: {} certificates (leaf={})", chain.size(),
+                    leaf.getSubjectX500Principal());
+        }
 
         // 4) Корень в truststore
         X509Certificate root = chain.get(chain.size() - 1);
@@ -342,7 +344,7 @@ public class SignatureVerifier {
 
     private boolean isTrustedRoot(X509Certificate root, Set<X509Certificate> truststore) {
         byte[] rootFp = fingerprint(root);
-        if (rootFp == null) return false;
+        if (rootFp.length == 0) return false;
 
         String rootCn = extractCn(root.getSubjectX500Principal().getName());
         String rootSerial = root.getSerialNumber().toString(16);
@@ -355,7 +357,7 @@ public class SignatureVerifier {
             String trustedSerial = trusted.getSerialNumber().toString(16);
 
             // 1) точное совпадение по SHA-256
-            if (trustedFp != null && Arrays.equals(rootFp, trustedFp)) {
+            if (trustedFp.length > 0 && Arrays.equals(rootFp, trustedFp)) {
                 log.info("isTrustedRoot: MATCH on fingerprint — {}", trustedCn);
                 return true;
             }
@@ -395,7 +397,7 @@ public class SignatureVerifier {
                     .digest(cert.getEncoded());
         } catch (Exception e) {
             log.warn("Failed to compute fingerprint: {}", e.getMessage());
-            return null;
+            return new byte[0];
         }
     }
 

@@ -137,14 +137,6 @@ public class DocumentService {
         };
     }
 
-    /**
-     * @deprecated используйте {@link #getBytes(Document)} — возвращает
-     *             расшифрованные байты, не путь к зашифрованному файлу.
-     *             Будет удалён в следующем мажоре.
-     */
-    @Deprecated(since = "1.0.0", forRemoval = true)
-    public Path getPath(Document doc) { return storageRoot.resolve(doc.getStoredName()); }
-
     /** Добавить новую подпись документу (неограниченное количество). */
     @Transactional
     public DocumentSignature addSignature(Long docId, User signer,
@@ -195,18 +187,6 @@ public class DocumentService {
     public void deleteSignature(Long signatureId) {
         throw new IllegalArgumentException(
                 "Удаление подписей невозможно — юридически значимая информация");
-    }
-
-    /** Legacy-метод для совместимости. */
-    /**
-     * @deprecated используйте {@link #addSignature(Long, User, String, String, String)}.
-     *             Метод оставлен для обратной совместимости, будет удалён.
-     */
-    @Deprecated(since = "1.0.0", forRemoval = true)
-    @Transactional
-    public void saveSignature(Long docId, User owner, String signatureBase64,
-                              String signerSubject, String signerSerial) {
-        addSignature(docId, owner, signatureBase64, signerSubject, signerSerial);
     }
 
     private String sanitize(String n) { return n == null ? "file" : n.replaceAll("[^a-zA-Z0-9._-]", "_"); }

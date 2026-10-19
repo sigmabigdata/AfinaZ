@@ -53,6 +53,7 @@ public class AdminController {
 
     private final ru.example.ukep.service.FolderService folderService;
 
+    @SuppressWarnings("java:S107")  // 8 зависимостей — рефакторинг в builder отложен
     public AdminController(UserRepository userRepository,
                            DocumentRepository documentRepository,
                            DocumentService documentService,

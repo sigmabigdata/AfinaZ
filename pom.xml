@@ -25,8 +25,11 @@
         <!-- Единый ключ SonarQube (иначе Maven использует groupId:artifactId).
              host.url/sources/binaries задаются при запуске скана, не здесь:
              иначе на сервере без SonarQube mvn sonar:sonar упадёт. -->
-        <sonar.projectKey>ukep-sign-service</sonar.projectKey>
-        <sonar.projectName>Афина</sonar.projectName>
+        <sonar.coverage.jacoco.xmlReportPaths>
+            ${project.build.directory}/site/jacoco/jacoco.xml
+        </sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.projectKey>afinaz</sonar.projectKey>
+        <sonar.projectName>AfinaZ</sonar.projectName>
         <cryptopro.version>5.0.49800</cryptopro.version>
         <bouncycastle.version>1.70</bouncycastle.version>
     </properties>
@@ -207,6 +210,21 @@
                 <groupId>org.sonarsource.scanner.maven</groupId>
                 <artifactId>sonar-maven-plugin</artifactId>
                 <version>5.8.0.7211</version>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <goals><goal>prepare-agent</goal></goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals><goal>report</goal></goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

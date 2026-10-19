@@ -80,8 +80,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return true;
         }
         long retryAfter = rateLimit.retryAfterSeconds(key);
-        log.warn("429 {} from {} (retry-after {}s)", req.getRequestURI(),
-                clientIp(req), retryAfter);
+        if (log.isWarnEnabled()) {
+            log.warn("429 {} from {} (retry-after {}s)", req.getRequestURI(),
+                    clientIp(req), retryAfter);
+        }
         resp.setStatus(429);
         resp.setHeader("Retry-After", String.valueOf(retryAfter));
         resp.setContentType("application/json;charset=UTF-8");

@@ -35,6 +35,7 @@ public class FolderService {
 
     private static final Logger log = LoggerFactory.getLogger(FolderService.class);
     private static final String DEFAULT_FOLDER_NAME = "Без раздела";
+    private static final String FOLDER_NOT_FOUND = "Раздел не найден";
 
     private final DocumentFolderRepository folderRepository;
     private final DocumentRepository documentRepository;
@@ -60,13 +61,19 @@ public class FolderService {
     /** Получить раздел, проверив что он принадлежит owner. */
     public DocumentFolder getOwned(Long id, User owner) {
         return folderRepository.findByIdAndOwner(id, owner)
-                .orElseThrow(() -> new IllegalArgumentException("Раздел не найден"));
+                .orElseThrow(() -> new IllegalArgumentException(FOLDER_NOT_FOUND));
     }
 
     /** Для админа: получить раздел без проверки владельца. */
     public DocumentFolder getById(Long id) {
         return folderRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Раздел не найден"));
+                .orElseThrow(() -> new IllegalArgumentException(FOLDER_NOT_FOUND));
+    }
+
+    /** Сколько подписанных документов в разделе. Для аудита перед удалением. */
+    public long countSignedInFolder(Long folderId, User owner) {
+        DocumentFolder folder = getOwned(folderId, owner);
+        return documentRepository.countByFolderAndSignedTrue(folder);
     }
 
     // ==================== Создание / переименование ====================
@@ -115,7 +122,7 @@ public class FolderService {
     @Transactional
     public void delete(Long folderId, User actor) {
         DocumentFolder folder = folderRepository.findById(folderId)
-                .orElseThrow(() -> new IllegalArgumentException("Раздел не найден"));
+                .orElseThrow(() -> new IllegalArgumentException(FOLDER_NOT_FOUND));
 
         boolean isOwner = folder.getOwner().getId().equals(actor.getId());
         boolean isAdmin = actor.getRole() == Role.ROLE_ADMIN;
