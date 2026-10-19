@@ -54,6 +54,7 @@ services:
       - .env.prod
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-afina_db}
       APP_STORAGE_PATH: /app/storage/documents
       ADMINS_FILE: /app/admins.env
