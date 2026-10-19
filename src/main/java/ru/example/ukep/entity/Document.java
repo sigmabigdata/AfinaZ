@@ -55,6 +55,10 @@ public class Document {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     private User owner;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "folder_id")
+    private DocumentFolder folder;
+
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("signedAt ASC")
     private List<DocumentSignature> signatures = new ArrayList<>();
@@ -76,6 +80,7 @@ public class Document {
     public boolean isEncrypted() { return encrypted; }
     public Instant getUploadedAt() { return uploadedAt; }
     public User getOwner() { return owner; }
+    public DocumentFolder getFolder() { return folder; }
     public List<DocumentSignature> getSignatures() { return signatures; }
 
     /** Есть ли подпись указанного пользователя на этом документе. */
@@ -103,5 +108,6 @@ public class Document {
     public void setEncrypted(boolean encrypted) { this.encrypted = encrypted; }
     public void setUploadedAt(Instant uploadedAt) { this.uploadedAt = uploadedAt; }
     public void setOwner(User owner) { this.owner = owner; }
+    public void setFolder(DocumentFolder folder) { this.folder = folder; }
     public void setSignatures(List<DocumentSignature> signatures) { this.signatures = signatures; }
 }

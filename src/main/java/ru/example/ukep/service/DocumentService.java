@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import ru.example.ukep.entity.Document;
+import ru.example.ukep.entity.DocumentFolder;
 import ru.example.ukep.entity.User;
 import ru.example.ukep.entity.DocumentSignature;
 import ru.example.ukep.repository.DocumentRepository;
@@ -75,8 +76,15 @@ public class DocumentService {
     }
 
     @Transactional
-    public Document upload(MultipartFile file, User owner) throws IOException {
+    public Document upload(MultipartFile file, User owner, DocumentFolder folder) throws IOException {
         if (file.isEmpty()) throw new IllegalArgumentException("Файл пустой");
+        if (folder == null) {
+            throw new IllegalArgumentException("Не выбран раздел для документа");
+        }
+        if (!folder.getOwner().getId().equals(owner.getId())) {
+            throw new IllegalArgumentException(
+                    "Раздел принадлежит другому клиенту");
+        }
         byte[] original = file.getBytes();
         FileEncryptor.Encrypted enc = encryptor.encrypt(original);
 
@@ -96,6 +104,7 @@ public class DocumentService {
         doc.setKeyVersion("v1");
         doc.setEncrypted(true);
         doc.setOwner(owner);
+        doc.setFolder(folder);
         doc.setUploadedAt(Instant.now());
         return documentRepository.save(doc);
     }

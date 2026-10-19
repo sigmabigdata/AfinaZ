@@ -129,77 +129,164 @@
     <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
     <div th:if="${err}" class="alert err" th:text="${err}"></div>
 
-    <h2>Документы клиента</h2>
+    <h2>Разделы и документы клиента</h2>
 
-    <form method="post"
-          th:action="@{'/admin/users/' + ${user.id} + '/documents/upload'}"
-          enctype="multipart/form-data"
-          class="upload-form">
-        <input type="file" name="file" required/>
-        <button type="submit">Загрузить за клиента</button>
+    <!-- Создать раздел клиенту -->
+    <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/folders/create'}"
+          class="upload-form" style="margin-bottom:24px;">
+        <input type="text" name="name" required
+               placeholder="Название нового раздела для клиента"
+               style="flex:1; padding:10px 12px; border:1px solid #cfd6e4; border-radius:8px; font-size:14px;"/>
+        <button type="submit">+ Создать раздел</button>
     </form>
 
-    <table class="docs">
-        <thead><tr>
-            <th>ID</th><th>Документ</th><th>Размер</th><th>Загружен</th>
-            <th>Статус</th><th>Подпись</th><th></th>
-        </tr></thead>
-        <tbody>
-        <tr th:each="d : ${documents}">
-            <td th:text="${d.id}">1</td>
-            <td th:text="${d.originalName}">file.pdf</td>
-            <td th:text="${#numbers.formatDecimal(d.size/1024.0,1,1)} + ' KB'">0</td>
-            <td th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</td>
-            <td>
-                <span th:if="${d.signed}" class="badge ok">Подписан</span>
-                <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
-            </td>
-            <td>
-                <div th:if="${not #lists.isEmpty(d.signatures)}">
-                    <div th:each="sig, st : ${d.signatures}" class="sig-item small">
-                        <div>
-                            <b th:text="${st.index + 1} + '. '">1. </b>
-                            <span th:text="${sig.signerSubject}">ФИО</span>
-                        </div>
-                        <div class="muted small"
-                             th:text="${#temporals.format(sig.signedAt,'dd.MM.yyyy HH:mm')}">—</div>
-                        <div style="margin-top:4px">
-                            <a th:href="@{'/admin/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/download'}"
-                               class="btn-sig btn-sm" title="Скачать подпись">⬇ .sig</a>
-                            
+    <div th:if="${#lists.isEmpty(folders)}" class="empty">
+        Разделов пока нет. Создайте первый раздел, чтобы загружать документы.
+    </div>
+
+    <!-- Плитки разделов -->
+    <div th:each="f : ${folders}" class="panel" style="margin-bottom:20px; padding:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center;
+                    padding:16px 22px; border-bottom:1px solid #eef1f6; background:#f8faff;">
+            <div>
+                <div style="font-weight:700; font-size:16px;" th:text="${f.name}">Раздел</div>
+                <div class="muted small" style="margin-top:2px;">
+                    <span th:text="${#lists.size(documentsByFolder.get(f.id))}">0</span> документ(ов)
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <button type="button" class="btn-ghost btn-sm btn-rename-folder"
+                        th:attr="data-folder-id=${f.id}, data-folder-name=${f.name}">✎ Переименовать</button>
+                <form method="post"
+                      th:action="@{'/admin/users/' + ${user.id} + '/folders/' + ${f.id} + '/delete'}"
+                      onsubmit="return confirm('ВНИМАНИЕ! Удалить раздел со всеми документами и подписями?');"
+                      style="display:inline">
+                    <button type="submit" class="btn-danger btn-sm">🗑 Удалить раздел</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Форма загрузки -->
+        <form method="post"
+              th:action="@{'/admin/users/' + ${user.id} + '/documents/upload'}"
+              enctype="multipart/form-data"
+              class="upload-form" style="margin:12px 22px;">
+            <input type="hidden" name="folderId" th:value="${f.id}"/>
+            <input type="file" name="file" required/>
+            <button type="submit">Загрузить за клиента</button>
+        </form>
+
+        <!-- Документы в разделе -->
+        <div th:if="${#lists.isEmpty(documentsByFolder.get(f.id))}"
+             class="muted small" style="padding:16px 22px;">
+            Документов в этом разделе пока нет.
+        </div>
+
+        <table th:if="${not #lists.isEmpty(documentsByFolder.get(f.id))}"
+               class="docs" style="margin:0 22px 16px; width:calc(100% - 44px);">
+            <thead><tr>
+                <th>ID</th><th>Документ</th><th>Размер</th><th>Загружен</th>
+                <th>Статус</th><th>Подпись</th><th></th>
+            </tr></thead>
+            <tbody>
+            <tr th:each="d : ${documentsByFolder.get(f.id)}">
+                <td th:text="${d.id}">1</td>
+                <td th:text="${d.originalName}">file.pdf</td>
+                <td th:text="${#numbers.formatDecimal(d.size/1024.0,1,1)} + ' KB'">0</td>
+                <td th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</td>
+                <td>
+                    <span th:if="${d.signed}" class="badge ok">Подписан</span>
+                    <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
+                </td>
+                <td>
+                    <div th:if="${not #lists.isEmpty(d.signatures)}">
+                        <div th:each="sig, st : ${d.signatures}" class="sig-item small">
+                            <div>
+                                <b th:text="${st.index + 1} + '. '">1. </b>
+                                <span th:text="${sig.signerSubject}">ФИО</span>
+                            </div>
+                            <div class="muted small"
+                                 th:text="${#temporals.format(sig.signedAt,'dd.MM.yyyy HH:mm')}">—</div>
+                            <div style="margin-top:4px">
+                                <a th:href="@{'/admin/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/download'}"
+                                   class="btn-sig btn-sm" title="Скачать подпись">⬇ .sig</a>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <span th:if="${#lists.isEmpty(d.signatures)}" class="muted small">—</span>
-            </td>
-            <td class="actions">
-                <a th:href="@{'/admin/documents/' + ${d.id} + '/view'}"
-                   target="_blank" title="Просмотреть">👁</a>
-                <a th:href="@{'/admin/documents/' + ${d.id} + '/download'}"
-                   title="Скачать документ">⬇</a>
-                <button th:if="${not d.hasSignatureByUser(currentAdminId)}" type="button" class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
-                <a th:if="${d.signed}"
-                   th:href="@{'/admin/documents/' + ${d.id} + '/signature/download'}"
-                   title="Скачать подпись">📎</a>
+                    <span th:if="${#lists.isEmpty(d.signatures)}" class="muted small">—</span>
+                </td>
+                <td class="actions">
+                    <a th:href="@{'/admin/documents/' + ${d.id} + '/view'}"
+                       target="_blank" title="Просмотреть">👁</a>
+                    <a th:href="@{'/admin/documents/' + ${d.id} + '/download'}"
+                       title="Скачать документ">⬇</a>
+                    <button th:if="${not d.hasSignatureByUser(currentAdminId)}" type="button"
+                            class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
+                    <a th:if="${d.signed}"
+                       th:href="@{'/admin/documents/' + ${d.id} + '/signature/download'}"
+                       title="Скачать подпись">📎</a>
 
-                <form method="post"
-                      th:action="@{'/admin/documents/' + ${d.id} + '/delete'}"
-                      th:onsubmit="${d.signed}
-                          ? 'return confirm(\'ВНИМАНИЕ! Документ подписан. Удаление приведёт к потере всех подписей. Продолжить?\');'
-                          : 'return confirm(\'Удалить документ?\');'"
-                      style="display:inline">
-                    <button type="submit" class="link danger"
-                            th:title="${d.signed} ? 'Удалить подписанный документ (аудит)' : 'Удалить'"
-                            th:text="${d.signed} ? '🗑⚠' : '🗑'">🗑</button>
-                </form>
-            </td>
-        </tr>
-        <tr th:if="${#lists.isEmpty(documents)}">
-            <td colspan="7" class="muted center">У этого клиента пока нет документов</td>
-        </tr>
-        </tbody>
-    </table>
+                    <form method="post"
+                          th:action="@{'/admin/documents/' + ${d.id} + '/delete'}"
+                          th:onsubmit="${d.signed}
+                              ? 'return confirm(\'ВНИМАНИЕ! Документ подписан. Удаление приведёт к потере всех подписей. Продолжить?\');'
+                              : 'return confirm(\'Удалить документ?\');'"
+                          style="display:inline">
+                        <button type="submit" class="link danger"
+                                th:title="${d.signed} ? 'Удалить подписанный документ (аудит)' : 'Удалить'"
+                                th:text="${d.signed} ? '🗑⚠' : '🗑'">🗑</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Модалка переименования раздела -->
+    <div id="modal-rename-folder" class="modal" style="display:none">
+        <div class="modal-card">
+            <h2>Переименовать раздел</h2>
+            <form method="post" id="rename-folder-form" style="margin-top:16px;">
+                <input type="text" name="name" id="rename-folder-name" required
+                       style="width:100%; padding:10px 12px; border:1px solid #cbd5e1;
+                              border-radius:8px; font-size:14px; margin-bottom:16px;"/>
+                <div class="modal-actions">
+                    <button type="button" class="btn-ghost" id="rename-folder-cancel">Отмена</button>
+                    <button type="submit" class="btn">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </main>
+
+<script>
+(function () {
+    var modal = document.getElementById('modal-rename-folder');
+    var form = document.getElementById('rename-folder-form');
+    var input = document.getElementById('rename-folder-name');
+    var cancel = document.getElementById('rename-folder-cancel');
+
+    document.querySelectorAll('.btn-rename-folder').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.dataset.folderId;
+            var name = btn.dataset.folderName;
+            form.action = '/admin/users/' + USER_ID + '/folders/' + id + '/rename';
+            input.value = name || '';
+            modal.style.display = 'flex';
+            setTimeout(function () { input.focus(); input.select(); }, 30);
+        });
+    });
+
+    cancel.addEventListener('click', function () { modal.style.display = 'none'; });
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) modal.style.display = 'none';
+    });
+})();
+</script>
+
+<script th:inline="javascript">
+    const USER_ID = /*[[${user.id}]]*/ 0;
+</script>
 
 <script type="module" th:src="@{/js/sign.js}"></script>
 </body>

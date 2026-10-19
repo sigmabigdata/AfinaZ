@@ -34,12 +34,15 @@ public class DocumentController {
     private final DocumentService documentService;
     private final UserRepository userRepository;
     private final PiiEncryptor pii;
+    private final ru.example.ukep.service.FolderService folderService;
 
     public DocumentController(DocumentService documentService, UserRepository userRepository,
-                            PiiEncryptor pii) {
+                              PiiEncryptor pii,
+                              ru.example.ukep.service.FolderService folderService) {
         this.documentService = documentService;
         this.userRepository = userRepository;
         this.pii = pii;
+        this.folderService = folderService;
     }
 
     private User current(UserDetails p) {
@@ -48,8 +51,11 @@ public class DocumentController {
 
     @PostMapping("/upload")
     public String upload(@RequestParam("file") MultipartFile file,
+                         @RequestParam("folderId") Long folderId,
                          @AuthenticationPrincipal UserDetails p) throws IOException {
-        documentService.upload(file, current(p));
+        User owner = current(p);
+        var folder = folderService.getOwned(folderId, owner);
+        documentService.upload(file, owner, folder);
         return REDIR_DASHBOARD;
     }
 

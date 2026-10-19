@@ -193,16 +193,18 @@ public class SignatureVerifier {
             return result;
         }
         try (Stream<Path> stream = Files.list(certsDir)) {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            CertificateFactory cf = CertificateFactory.getInstance("X.509", "BC");
             stream.filter(Files::isRegularFile).forEach(f -> {
                 String name = f.getFileName().toString().toLowerCase();
                 if (!name.endsWith(".cer") && !name.endsWith(".crt") && !name.endsWith(".pem")) {
                     return;
                 }
                 try (InputStream is = Files.newInputStream(f)) {
-                    result.add((X509Certificate) cf.generateCertificate(is));
+                    X509Certificate cert = (X509Certificate) cf.generateCertificate(is);
+                    result.add(cert);
+                    log.info("Truststore: loaded {} — Subject: {}", f.getFileName(), cert.getSubjectX500Principal());
                 } catch (Exception ex) {
-                    log.debug(LOG_SKIP_CERT, ex.getMessage());
+                    log.warn("Truststore: FAILED to load {}: {}", f.getFileName(), ex.getMessage());
                 }
             });
         } catch (Exception e) {
@@ -228,7 +230,7 @@ public class SignatureVerifier {
         int failed = 0;
 
         try (Stream<Path> stream = Files.list(crlsDir)) {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            CertificateFactory cf = CertificateFactory.getInstance("X.509", "BC");
             java.util.List<Path> files = stream
                     .filter(Files::isRegularFile)
                     .filter(f -> f.getFileName().toString().endsWith(".crl"))
@@ -339,20 +341,62 @@ public class SignatureVerifier {
     }
 
     private boolean isTrustedRoot(X509Certificate root, Set<X509Certificate> truststore) {
+        byte[] rootFp = fingerprint(root);
+        if (rootFp == null) return false;
+
+        String rootCn = extractCn(root.getSubjectX500Principal().getName());
+        String rootSerial = root.getSerialNumber().toString(16);
+        log.info("isTrustedRoot: chain root CN={}, serial={}, fp={}",
+                rootCn, rootSerial, hex16(rootFp));
+
         for (X509Certificate trusted : truststore) {
-            if (root.getSubjectX500Principal().equals(trusted.getSubjectX500Principal())) {
-                try {
-                    if (Arrays.equals(
-                            root.getPublicKey().getEncoded(),
-                            trusted.getPublicKey().getEncoded())) {
-                        return true;
-                    }
-                } catch (Exception ex) {
-                    log.debug(LOG_SKIP_CERT, ex.getMessage());
-                }
+            byte[] trustedFp = fingerprint(trusted);
+            String trustedCn = extractCn(trusted.getSubjectX500Principal().getName());
+            String trustedSerial = trusted.getSerialNumber().toString(16);
+
+            // 1) точное совпадение по SHA-256
+            if (trustedFp != null && Arrays.equals(rootFp, trustedFp)) {
+                log.info("isTrustedRoot: MATCH on fingerprint — {}", trustedCn);
+                return true;
+            }
+            // 2) совпадение по Subject + Issuer (оба self-signed) — ГОСТ fallback
+            if (root.getSubjectX500Principal().equals(trusted.getSubjectX500Principal())
+                    && root.getIssuerX500Principal().equals(trusted.getIssuerX500Principal())
+                    && isSelfSigned(trusted)) {
+                log.warn("isTrustedRoot: MATCH by DN (fingerprint differs!) — " +
+                        "chain root serial={}, trusted serial={}, CN={}. " +
+                        "Скорее всего, это перевыпуск корневого — считаем trusted.",
+                        rootSerial, trustedSerial, trustedCn);
+                return true;
             }
         }
+        log.warn("isTrustedRoot: NOT TRUSTED — chain root CN={}, serial={} не найден в truststore ({} сертификатов)",
+                rootCn, rootSerial, truststore.size());
         return false;
+    }
+
+    private static String hex16(byte[] fp) {
+        if (fp == null) return "null";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(fp.length, 8); i++) {
+            sb.append(String.format("%02x", fp[i]));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * SHA-256 отпечаток всего сертификата (getEncoded).
+     * Надёжнее, чем сравнивать getPublicKey().getEncoded() для ГОСТ — у BC
+     * бывает разная DER-кодировка SubjectPublicKeyInfo для одного ключа.
+     */
+    private static byte[] fingerprint(X509Certificate cert) {
+        try {
+            return java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(cert.getEncoded());
+        } catch (Exception e) {
+            log.warn("Failed to compute fingerprint: {}", e.getMessage());
+            return null;
+        }
     }
 
     private void checkNotRevoked(List<X509Certificate> chain, Set<X509CRL> crls) {

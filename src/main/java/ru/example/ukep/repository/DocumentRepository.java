@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.example.ukep.entity.Document;
+import ru.example.ukep.entity.DocumentFolder;
 import ru.example.ukep.entity.User;
 
 import java.util.List;
@@ -51,4 +52,19 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     long countByOwner(User owner);
     long countByOwnerAndSignedTrue(User owner);
+
+    // ============ Разделы ============
+
+    @EntityGraph(attributePaths = {"signatures", "signatures.signerUser"})
+    List<Document> findAllByFolderOrderByUploadedAtDesc(DocumentFolder folder);
+
+    long countByFolder(DocumentFolder folder);
+    long countByFolderAndSignedTrue(DocumentFolder folder);
+
+    /** Документы клиента без папки (legacy). */
+    @Query("select d from Document d where d.owner = :owner and d.folder is null " +
+           "order by d.uploadedAt desc")
+    List<Document> findUnfiledByOwner(@Param("owner") User owner);
+
+    boolean existsByOwnerAndFolderIsNull(User owner);
 }

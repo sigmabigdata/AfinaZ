@@ -51,13 +51,16 @@ public class AdminController {
     @org.springframework.beans.factory.annotation.Value("${app.base-url}")
     private String baseUrl;
 
+    private final ru.example.ukep.service.FolderService folderService;
+
     public AdminController(UserRepository userRepository,
                            DocumentRepository documentRepository,
                            DocumentService documentService,
                            UserService userService,
                            EmailService emailService,
                            PiiEncryptor pii,
-                           AuditService audit) {
+                           AuditService audit,
+                           ru.example.ukep.service.FolderService folderService) {
         this.userRepository = userRepository;
         this.pii = pii;
         this.documentRepository = documentRepository;
@@ -65,6 +68,7 @@ public class AdminController {
         this.userService = userService;
         this.emailService = emailService;
         this.audit = audit;
+        this.folderService = folderService;
     }
 
     // ==================== ДАШБОРД ====================
@@ -121,8 +125,21 @@ public class AdminController {
                 .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
         User admin = userRepository.findByEmailHash(pii.hash(principal.getName()))
                 .orElse(null);
+
+        // Legacy: документы без раздела → перенести в «Без раздела»
+        folderService.migrateUnfiled(user);
+
+        var folders = folderService.listForOwner(user);
+        var byFolder = new java.util.LinkedHashMap<Long, java.util.List<Document>>();
+        for (var f : folders) {
+            byFolder.put(f.getId(),
+                    documentRepository.findAllByFolderOrderByUploadedAtDesc(f));
+        }
+
         model.addAttribute("user", user);
         model.addAttribute("currentAdminId", admin != null ? admin.getId() : null);
+        model.addAttribute("folders", folders);
+        model.addAttribute("documentsByFolder", byFolder);
         model.addAttribute("documents",
                 documentRepository.findAllByOwnerOrderByUploadedAtDesc(user));
         model.addAttribute("docsTotal", documentRepository.countByOwner(user));
@@ -344,12 +361,14 @@ public class AdminController {
     @PostMapping("/users/{userId}/documents/upload")
     public String uploadForUser(@PathVariable Long userId,
                                 @RequestParam("file") MultipartFile file,
+                                @RequestParam("folderId") Long folderId,
                                 java.security.Principal principal,
                                 RedirectAttributes ra) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
         try {
-            Document doc = documentService.upload(file, user);
+            var folder = folderService.getOwned(folderId, user);
+            Document doc = documentService.upload(file, user, folder);
             audit.documentUpload(principal != null ? principal.getName() : UNKNOWN,
                     doc.getId(), doc.getOriginalName());
             ra.addFlashAttribute("ok", "Документ загружен: " + doc.getOriginalName());
