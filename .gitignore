@@ -70,3 +70,4 @@ sonar-cnes-report.jar
 
 # Axiom JDK (скачивается из ЛК)
 axiom-dist/
+target
