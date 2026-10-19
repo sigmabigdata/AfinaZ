@@ -39,6 +39,7 @@ class RateLimitServiceTest {
         assertThat(service.tryConsume("b", 2, window)).isFalse();
     }
 
+    @SuppressWarnings("java:S2925")  // sleep обязателен для теста истечения окна
     @Test
     void windowResets() throws Exception {
         String key = "challenge:1.2.3.4";
@@ -65,6 +66,6 @@ class RateLimitServiceTest {
     void retryAfterMinimumOneSecond() {
         String key = "confirm:1.2.3.4";
         service.tryConsume(key, 1, Duration.ofMillis(500));
-        assertThat(service.retryAfterSeconds(key)).isGreaterThanOrEqualTo(1L);
+        assertThat(service.retryAfterSeconds(key)).isPositive();
     }
 }

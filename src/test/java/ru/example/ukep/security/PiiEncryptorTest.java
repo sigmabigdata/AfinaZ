@@ -102,14 +102,16 @@ class PiiEncryptorTest {
         Path badKey = tempDir.resolve("bad.key");
         Files.writeString(badKey, Base64.getEncoder().encodeToString(new byte[16]),
                 StandardCharsets.UTF_8);
-        assertThatThrownBy(() -> new PiiEncryptor(badKey.toString()))
+        String badKeyPath = badKey.toString();
+        assertThatThrownBy(() -> new PiiEncryptor(badKeyPath))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("32 байта");
     }
 
     @Test
     void missingKeyThrows() {
-        assertThatThrownBy(() -> new PiiEncryptor(tempDir.resolve("absent.key").toString()))
+        String absentPath = tempDir.resolve("absent.key").toString();
+        assertThatThrownBy(() -> new PiiEncryptor(absentPath))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("не найден");
     }
