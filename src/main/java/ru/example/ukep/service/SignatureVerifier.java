@@ -66,12 +66,14 @@ public class SignatureVerifier {
         log.info("SignatureVerifier: certs={}, crls={}", certsDir, crlsDir);
     }
 
-    public Map<String, Object> verifyDetached(Path contentPath, String signatureBase64) throws Exception {
+    public Map<String, Object> verifyDetached(Path contentPath, String signatureBase64)
+            throws java.io.IOException, org.bouncycastle.cms.CMSException, java.security.cert.CertificateException {
         byte[] data = Files.readAllBytes(contentPath);
         return verifyDetached(data, signatureBase64);
     }
 
-    public Map<String, Object> verifyDetached(byte[] data, String signatureBase64) throws Exception {
+    public Map<String, Object> verifyDetached(byte[] data, String signatureBase64)
+            throws org.bouncycastle.cms.CMSException, java.security.cert.CertificateException {
         String cleaned = signatureBase64
                 .replaceAll("-----BEGIN[^-]*-----", "")
                 .replaceAll("-----END[^-]*-----", "")
@@ -123,13 +125,17 @@ public class SignatureVerifier {
     private SignerMeta verifyOneSigner(SignerInformation signer, X509Certificate leaf,
                                        CMSSignedData cms,
                                        Set<X509Certificate> truststore,
-                                       Set<X509CRL> crls) throws Exception {
+                                       Set<X509CRL> crls) {
         // 1) Криптопроверка подписи (BC, fallback JCSP для ГОСТ)
         if (!verifySignerCrypto(signer, leaf)) {
             throw new IllegalStateException("Подпись недействительна");
         }
         // 2) Срок действия листа
-        leaf.checkValidity();
+        try {
+            leaf.checkValidity();
+        } catch (java.security.cert.CertificateException e) {
+            throw new IllegalStateException("Срок действия сертификата истёк", e);
+        }
 
         // 3) Построение цепочки (вручную)
         List<X509Certificate> chain = buildChain(leaf, cms);
@@ -148,7 +154,11 @@ public class SignatureVerifier {
         verifyChainSignatures(chain);
         // 6) Срок действия всех звеньев
         for (X509Certificate c : chain) {
-            c.checkValidity();
+            try {
+                c.checkValidity();
+            } catch (java.security.cert.CertificateException e) {
+                throw new IllegalStateException("Срок действия звена цепочки истёк", e);
+            }
         }
         // 7) Отзыв по CRL
         checkNotRevoked(chain, crls);
@@ -178,7 +188,7 @@ public class SignatureVerifier {
     }
 
     /** Извлекает все встроенные сертификаты из CMS (лист + промежуточные). */
-        private X509Certificate getSignerCert(SignerInformation signer, CMSSignedData cms) throws Exception {
+    private X509Certificate getSignerCert(SignerInformation signer, CMSSignedData cms) throws java.security.cert.CertificateException {
         Store<X509CertificateHolder> certStore = cms.getCertificates();
         Collection<X509CertificateHolder> matches = certStore.getMatches(signer.getSID());
         if (matches.isEmpty()) {
@@ -240,17 +250,7 @@ public class SignatureVerifier {
                     .toList();
             for (Path f : files) {
                 total++;
-                try (InputStream is = Files.newInputStream(f)) {
-                    X509CRL crl = (X509CRL) cf.generateCRL(is);
-                    String issuer = crl.getIssuerX500Principal().getName();
-                    X509CRL existing = byIssuer.get(issuer);
-                    if (existing == null || crl.getThisUpdate().after(existing.getThisUpdate())) {
-                        byIssuer.put(issuer, crl);
-                    }
-                } catch (Exception e) {
-                    failed++;
-                    log.debug("CRL parse failed: {} — {}", f.getFileName(), e.getMessage());
-                }
+                if (!loadOneCrl(f, cf, byIssuer)) failed++;
             }
         } catch (Exception e) {
             log.error("loadAllCrls error", e);
@@ -261,7 +261,24 @@ public class SignatureVerifier {
         return new HashSet<>(byIssuer.values());
     }
 
-    private List<X509Certificate> buildChain(X509Certificate leaf, CMSSignedData cms) throws Exception {
+    /** Парсит один CRL-файл и кладёт в map (самый свежий по issuer). Возвращает true при успехе. */
+    private boolean loadOneCrl(Path f, CertificateFactory cf,
+                               java.util.Map<String, X509CRL> byIssuer) {
+        try (InputStream is = Files.newInputStream(f)) {
+            X509CRL crl = (X509CRL) cf.generateCRL(is);
+            String issuer = crl.getIssuerX500Principal().getName();
+            X509CRL existing = byIssuer.get(issuer);
+            if (existing == null || crl.getThisUpdate().after(existing.getThisUpdate())) {
+                byIssuer.put(issuer, crl);
+            }
+            return true;
+        } catch (Exception e) {
+            log.debug("CRL parse failed: {} — {}", f.getFileName(), e.getMessage());
+            return false;
+        }
+    }
+
+    private List<X509Certificate> buildChain(X509Certificate leaf, CMSSignedData cms) {
         List<X509Certificate> chain = new ArrayList<>();
         chain.add(leaf);
 
@@ -348,8 +365,10 @@ public class SignatureVerifier {
 
         String rootCn = extractCn(root.getSubjectX500Principal().getName());
         String rootSerial = root.getSerialNumber().toString(16);
-        log.info("isTrustedRoot: chain root CN={}, serial={}, fp={}",
-                rootCn, rootSerial, hex16(rootFp));
+        if (log.isInfoEnabled()) {
+            log.info("isTrustedRoot: chain root CN={}, serial={}, fp={}",
+                    rootCn, rootSerial, hex16(rootFp));
+        }
 
         for (X509Certificate trusted : truststore) {
             byte[] trustedFp = fingerprint(trusted);

@@ -93,7 +93,8 @@ public class CrlRefreshService {
     }
 
     /** Извлекает все сертификаты из CAdES-BES подписи. */
-    private Set<X509Certificate> extractCerts(String signatureBase64) throws Exception {
+    private Set<X509Certificate> extractCerts(String signatureBase64)
+            throws java.security.cert.CertificateException, org.bouncycastle.cms.CMSException {
         Set<X509Certificate> result = new HashSet<>();
         if (signatureBase64 == null || signatureBase64.isBlank()) return result;
 

@@ -106,27 +106,30 @@ public class SystemInfoService {
     private long cpuPercent() {
         try {
             long[] s1 = readCpuStat();
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                return 0;
-            }
+            if (!sleepQuietly(200)) return 0;
             long[] s2 = readCpuStat();
             long idle  = s2[3] - s1[3];
             long total = 0;
             for (int i = 0; i < s2.length; i++) total += s2[i] - s1[i];
             if (total <= 0) return 0;
             return (total - idle) * 100 / total;
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            return 0;
         } catch (Exception e) {
             return 0;
         }
     }
 
-    private long[] readCpuStat() throws Exception {
+    /** Спит ms, не падая на InterruptedException. Возвращает false, если прерван. */
+    private boolean sleepQuietly(long ms) {
+        try {
+            Thread.sleep(ms);
+            return true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private long[] readCpuStat() throws java.io.IOException {
         List<String> lines = Files.readAllLines(Path.of("/proc/stat"));
         for (String line : lines) {
             if (line.startsWith("cpu ")) {

@@ -69,7 +69,7 @@ public class SecurityConfig {
                 .map(String::trim).filter(s -> !s.isEmpty()).toList();
 
         // Специальное значение "*" отключает проверку IP (только для отладки/демо!).
-        // TODO(CERTIFICATION): вернуть строгий whitelist перед боевой сдачей.
+        // CERTIFICATION: вернуть строгий whitelist перед боевой сдачей.
         boolean allowAll = allowed.contains("*");
         if (allowAll) {
             log.warn("⚠️  ADMIN_IP_WHITELIST=* — админка открыта с ЛЮБОГО IP. " +

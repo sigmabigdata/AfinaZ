@@ -89,7 +89,10 @@ public class CrlService {
     }
 
     /** Загрузить CRL вручную из байтов. */
-    public void saveManual(String originalName, byte[] data) throws Exception {
+    public void saveManual(String originalName, byte[] data)
+            throws java.io.IOException,
+                   java.security.cert.CertificateException,
+                   java.security.cert.CRLException {
         // Валидация: должен быть корректный CRL
         try (InputStream is = new java.io.ByteArrayInputStream(data)) {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
@@ -110,7 +113,7 @@ public class CrlService {
         log.info("CRL сохранён вручную: {} ({} байт)", safe, data.length);
     }
 
-    public void delete(String fileName) throws Exception {
+    public void delete(String fileName) throws java.io.IOException {
         Path target = crlsDir.resolve(fileName).normalize();
         if (!target.startsWith(crlsDir)) {
             throw new SecurityException("Недопустимый путь");
@@ -172,18 +175,24 @@ public class CrlService {
                     .filter(f -> f.getFileName().toString().endsWith(".crl"))
                     .toList();
             for (var f : files) {
-                try {
-                    Files.deleteIfExists(f);
-                    count++;
-                } catch (Exception e) {
-                    log.warn("Не удалось удалить {}: {}", f.getFileName(), e.getMessage());
-                }
+                if (deleteQuietly(f)) count++;
             }
             log.info("Удалено auto-*.crl: {}", count);
         } catch (Exception e) {
             log.error("deleteAllAuto error", e);
         }
         return count;
+    }
+
+    /** Удалить файл, не падая на ошибке. Возвращает true при успехе. */
+    private boolean deleteQuietly(Path f) {
+        try {
+            Files.deleteIfExists(f);
+            return true;
+        } catch (Exception e) {
+            log.warn("Не удалось удалить {}: {}", f.getFileName(), e.getMessage());
+            return false;
+        }
     }
 
     public Path getCrlsDir() { return crlsDir; }

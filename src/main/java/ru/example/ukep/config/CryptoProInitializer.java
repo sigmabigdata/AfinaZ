@@ -139,19 +139,26 @@ public class CryptoProInitializer {
         };
         boolean done = false;
         for (String c : cfgClasses) {
+            done = invokeAllMethods(c, methods, done);
+        }
+        return done;
+    }
+
+    /** Пробует все методы у класса c; возвращает true, если хоть один сработал. */
+    private boolean invokeAllMethods(String className, String[] methods, boolean done) {
+        Class<?> cls;
+        try {
+            cls = Class.forName(className);
+        } catch (Exception e) {
+            return done;
+        }
+        for (String m : methods) {
             try {
-                Class<?> cls = Class.forName(c);
-                for (String m : methods) {
-                    try {
-                        cls.getMethod(m, boolean.class).invoke(null, false);
-                        log.info("{}#{}(false) — OK", c, m);
-                        done = true;
-                    } catch (Exception ignored) {
-                        // метода нет — идём дальше
-                    }
-                }
+                cls.getMethod(m, boolean.class).invoke(null, false);
+                log.info("{}#{}(false) — OK", className, m);
+                done = true;
             } catch (Exception ignored) {
-                // класса нет — идём дальше
+                // метода нет — идём дальше
             }
         }
         return done;

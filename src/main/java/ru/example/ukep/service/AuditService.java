@@ -20,6 +20,7 @@ public class AuditService {
     private static final String T_DOC = "DOCUMENT";
     private static final String T_EMAIL = "EMAIL";
     private static final String T_KEYS = "KEYS";
+    private static final String T_FOLDER = "FOLDER";
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
 
     private final AuditEventWriter writer;
@@ -125,12 +126,12 @@ public class AuditService {
 
     public void folderCreate(String actor, Long folderId, String name) {
         write("FOLDER_CREATE", OK, actor, null,
-                "FOLDER", String.valueOf(folderId), name, null);
+                T_FOLDER, String.valueOf(folderId), name, null);
     }
 
     public void folderRename(String actor, Long folderId, String newName) {
         write("FOLDER_RENAME", OK, actor, null,
-                "FOLDER", String.valueOf(folderId), newName, null);
+                T_FOLDER, String.valueOf(folderId), newName, null);
     }
 
     public void folderDelete(String actor, Long folderId, String name, long signedCount) {
@@ -138,7 +139,7 @@ public class AuditService {
                 ? "Удалён раздел с " + signedCount + " подписанными документами"
                 : null;
         write("FOLDER_DELETE", signedCount > 0 ? WARN : OK, actor, null,
-                "FOLDER", String.valueOf(folderId), name, details);
+                T_FOLDER, String.valueOf(folderId), name, details);
     }
 
     public void keysDownload(String actor, String fileName) {

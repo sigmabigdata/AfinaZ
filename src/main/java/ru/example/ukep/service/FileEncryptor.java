@@ -101,5 +101,10 @@ public class FileEncryptor {
             return 31 * java.util.Arrays.hashCode(bytes)
                     + java.util.Objects.hashCode(ivBase64);
         }
+
+        @Override
+        public String toString() {
+            return "Encrypted[bytes=" + bytes.length + "B, ivBase64=" + ivBase64 + "]";
+        }
     }
 }

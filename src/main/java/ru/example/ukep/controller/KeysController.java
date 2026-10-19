@@ -109,7 +109,7 @@ public class KeysController {
     }
 
     /** Создаёт защищённый паролем ZIP в памяти. */
-    private byte[] buildEncryptedZip(Path fileKey, Path piiKey, String password) throws Exception {
+    private byte[] buildEncryptedZip(Path fileKey, Path piiKey, String password) throws java.io.IOException {
         // zip4j работает с файлами, поэтому соберём во временном каталоге.
         // Явно задаём права 0700 — только владелец (защита от подглядывания
         // через /tmp, Sonar java:S5443).

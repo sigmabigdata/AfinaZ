@@ -103,7 +103,7 @@ public class AuditController {
                           @RequestParam(required = false) String result,
                           @RequestParam(name = "from", required = false) String fromStr,
                           @RequestParam(name = "to", required = false) String toStr,
-                          HttpServletResponse resp) throws Exception {
+                          HttpServletResponse resp) throws java.io.IOException {
 
         LocalDate from = parseDate(fromStr);
         LocalDate to = parseDate(toStr);

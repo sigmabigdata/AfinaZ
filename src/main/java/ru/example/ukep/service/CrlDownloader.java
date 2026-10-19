@@ -3,7 +3,6 @@ package ru.example.ukep.service;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1OctetString;
 import org.bouncycastle.asn1.ASN1Primitive;
-import org.bouncycastle.asn1.DERIA5String;
 import org.bouncycastle.asn1.x509.CRLDistPoint;
 import org.bouncycastle.asn1.x509.DistributionPoint;
 import org.bouncycastle.asn1.x509.DistributionPointName;
@@ -54,7 +53,7 @@ public class CrlDownloader {
 
     public CrlDownloader(
             @Value("${app.crl-path:/app/crls}") String crlPath,
-            @Value("${app.crl-max-age-hours:24}") long maxAgeHours) throws Exception {
+            @Value("${app.crl-max-age-hours:24}") long maxAgeHours) throws java.io.IOException {
         this.crlDir = Paths.get(crlPath).toAbsolutePath().normalize();
         Files.createDirectories(crlDir);
         this.maxAgeHours = maxAgeHours;
@@ -102,7 +101,7 @@ public class CrlDownloader {
     }
 
     /** Парсит ASN.1-обёртку расширения CDP → CRLDistPoint. */
-    private CRLDistPoint parseCdpExtension(byte[] ext) throws Exception {
+    private CRLDistPoint parseCdpExtension(byte[] ext) throws java.io.IOException {
         try (ASN1InputStream aIn = new ASN1InputStream(ext)) {
             ASN1OctetString octet = (ASN1OctetString) aIn.readObject();
             try (ASN1InputStream innerIn = new ASN1InputStream(octet.getOctets())) {
@@ -121,7 +120,7 @@ public class CrlDownloader {
             GeneralNames gns = GeneralNames.getInstance(name.getName());
             for (GeneralName gn : gns.getNames()) {
                 if (gn.getTagNo() != GeneralName.uniformResourceIdentifier) continue;
-                String url = DERIA5String.getInstance(gn.getName()).getString();
+                String url = org.bouncycastle.asn1.ASN1IA5String.getInstance(gn.getName()).getString();
                 if (url.startsWith("http://") || url.startsWith("https://")) {
                     urls.add(url);
                 }
@@ -131,7 +130,11 @@ public class CrlDownloader {
     }
 
     /** Скачивает URL, если файла нет или он старше maxAgeHours. */
-    private boolean downloadIfStale(String url) throws Exception {
+    private boolean downloadIfStale(String url)
+            throws java.io.IOException,
+                   java.security.cert.CertificateException,
+                   java.security.cert.CRLException,
+                   java.security.NoSuchAlgorithmException {
         // Скачиваем во временный файл, потом разберём issuer
         Path tmp = Files.createTempFile(crlDir, "dl-", ".crl.tmp");
         try {
@@ -160,7 +163,7 @@ public class CrlDownloader {
     }
 
     /** true, если target существует и его mtime свежее maxAgeHours. */
-    private boolean isExistingFresh(Path target) throws Exception {
+    private boolean isExistingFresh(Path target) throws java.io.IOException {
         if (!Files.isRegularFile(target)) return false;
         long ageMs = System.currentTimeMillis() - Files.getLastModifiedTime(target).toMillis();
         long ageHours = ageMs / 3_600_000L;
@@ -180,38 +183,47 @@ public class CrlDownloader {
                     .filter(f -> f.getFileName().toString().endsWith(CRL_SUFFIX))
                     .toList();
             for (var f : files) {
-                String name = f.getFileName().toString();
-                if (name.equals(AUTO_PREFIX + currentIssuerKey + CRL_SUFFIX)) continue;
-                try {
-                    // Проверяем, тот ли это issuer
-                    X509CRL other = parseCrl(f);
-                    String otherKey = issuerKey(other);
-                    if (otherKey.equals(currentIssuerKey)) {
-                        Files.deleteIfExists(f);
-                        log.info("Удалён устаревший CRL: {}", name);
-                    }
-                } catch (Exception parseEx) {
-                    log.debug("CRL parse failed for {}: {}",
-                            name, parseEx.getMessage());
-                    // Файл не парсится — удалим, если он старый
-                    long ageMs = System.currentTimeMillis()
-                            - Files.getLastModifiedTime(f).toMillis();
-                    if (ageMs > 7 * 24 * 3_600_000L) {
-                        try {
-                            Files.deleteIfExists(f);
-                            log.warn("Удалён невалидный старый CRL: {}", name);
-                        } catch (Exception e) {
-                            log.warn("Не удалось удалить {}: {}", name, e.getMessage());
-                        }
-                    }
-                }
+                tryDeleteOldCrl(f, currentIssuerKey);
             }
         } catch (Exception e) {
             log.warn("deleteOldFilesForIssuer error: {}", e.getMessage());
         }
     }
 
-    private X509CRL parseCrl(Path file) throws Exception {
+    /** Удалить один устаревший/невалидный CRL-файл. */
+    private void tryDeleteOldCrl(Path f, String currentIssuerKey) {
+        String name = f.getFileName().toString();
+        if (name.equals(AUTO_PREFIX + currentIssuerKey + CRL_SUFFIX)) return;
+
+        try {
+            X509CRL other = parseCrl(f);
+            String otherKey = issuerKey(other);
+            if (otherKey.equals(currentIssuerKey)) {
+                Files.deleteIfExists(f);
+                log.info("Удалён устаревший CRL: {}", name);
+                return;
+            }
+        } catch (Exception parseEx) {
+            log.debug("CRL parse failed for {}: {}", name, parseEx.getMessage());
+        }
+
+        // Файл не парсится — удалим, если он старый
+        try {
+            long ageMs = System.currentTimeMillis()
+                    - Files.getLastModifiedTime(f).toMillis();
+            if (ageMs > 7 * 24 * 3_600_000L) {
+                Files.deleteIfExists(f);
+                log.warn("Удалён невалидный старый CRL: {}", name);
+            }
+        } catch (Exception e) {
+            log.warn("Не удалось удалить {}: {}", name, e.getMessage());
+        }
+    }
+
+    private X509CRL parseCrl(Path file)
+            throws java.io.IOException,
+                   java.security.cert.CertificateException,
+                   java.security.cert.CRLException {
         try (InputStream is = Files.newInputStream(file)) {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             return (X509CRL) cf.generateCRL(is);
@@ -219,14 +231,14 @@ public class CrlDownloader {
     }
 
     /** Хеш от issuer DN → короткий ключ (16 hex-символов). */
-    private String issuerKey(X509CRL crl) throws Exception {
+    private String issuerKey(X509CRL crl) throws java.security.NoSuchAlgorithmException {
         String issuer = crl.getIssuerX500Principal().getName();
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         byte[] h = md.digest(issuer.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(h).substring(0, 16);
     }
 
-    private void downloadToFile(String url, Path target) throws Exception {
+    private void downloadToFile(String url, Path target) throws java.io.IOException {
         HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
         conn.setConnectTimeout(10_000);
         conn.setReadTimeout(30_000);
