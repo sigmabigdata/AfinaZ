@@ -49,6 +49,9 @@ public class Document {
     @Column(nullable = false)
     private boolean encrypted = false;
 
+    @Column(name = "apply_poa", nullable = false)
+    private boolean applyPoa = false;
+
     @Column(nullable = false)
     private Instant uploadedAt = Instant.now();
 
@@ -78,6 +81,7 @@ public class Document {
     public String getEncryptionIv() { return encryptionIv; }
     public String getKeyVersion() { return keyVersion; }
     public boolean isEncrypted() { return encrypted; }
+    public boolean isApplyPoa() { return applyPoa; }
     public Instant getUploadedAt() { return uploadedAt; }
     public User getOwner() { return owner; }
     public DocumentFolder getFolder() { return folder; }
@@ -106,6 +110,7 @@ public class Document {
     public void setEncryptionIv(String encryptionIv) { this.encryptionIv = encryptionIv; }
     public void setKeyVersion(String keyVersion) { this.keyVersion = keyVersion; }
     public void setEncrypted(boolean encrypted) { this.encrypted = encrypted; }
+    public void setApplyPoa(boolean applyPoa) { this.applyPoa = applyPoa; }
     public void setUploadedAt(Instant uploadedAt) { this.uploadedAt = uploadedAt; }
     public void setOwner(User owner) { this.owner = owner; }
     public void setFolder(DocumentFolder folder) { this.folder = folder; }
