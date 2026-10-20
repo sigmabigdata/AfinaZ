@@ -5,9 +5,16 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.bouncycastle.asn1.ASN1Primitive;
+import org.bouncycastle.asn1.cms.Attribute;
+import org.bouncycastle.asn1.cms.AttributeTable;
+import org.bouncycastle.asn1.cms.CMSAttributes;
+import org.bouncycastle.asn1.x509.Time;
+import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cms.CMSProcessableByteArray;
 import org.bouncycastle.cms.CMSSignedData;
+import org.bouncycastle.cms.SignerInformation;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +42,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,20 +50,7 @@ import java.util.Optional;
 
 /**
  * Визуализация подписи — синий штамп в нижнем колонтитуле каждой страницы PDF.
- *
- * <p>Стиль как в Контур.Диадок: тёмно-синий текст + синяя рамка на всю ширину.</p>
- *
- * <p>Блок одной подписи:
- * <pre>
- *   Документ подписан электронной подписью
- *   Дата подписания: 20.10.2026 09:47:11
- *   Сведения о сертификате электронной подписи
- *   Серийный номер: 18EA034CC60693A14C4F3B1E019F1834
- *   Срок действия: с 30.06.2026 по 30.06.2027
- *   Владелец:
- *     Голендеева Светлана Дмитриевна
- *   Доверенность № GUID от ... действ. до ... | Доверенность не требуется
- * </pre>
+ * Cert подписанта и signingTime извлекаются из CMS-подписи (по SID), не из БД.
  */
 @Service
 public class SignatureVisualizationService {
@@ -64,14 +59,14 @@ public class SignatureVisualizationService {
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
     private static final DateTimeFormatter D_FMT  = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
-    // Стиль штампа (как в Контур.Диадок)
-    private static final float FONT_SIZE = 7f;
-    private static final float LINE_HEIGHT = 9f;
-    private static final float MARGIN = 20f;
-    private static final float BOX_MARGIN_X = 5f;   // рамка от края страницы
-    private static final float BOX_PADDING = 4f;    // зазор между рамкой и текстом
+    // Компактный стиль (в 2 раза ниже): 4.5pt вместо 7pt, line-height 4.5 вместо 9
+    private static final float FONT_SIZE = 4.5f;
+    private static final float LINE_HEIGHT = 4.5f;
+    private static final float MARGIN = 6f;          // текст от края страницы
+    private static final float BOX_MARGIN_X = 3f;    // рамка от края страницы
+    private static final float BOX_PADDING = 2f;     // зазор между рамкой и текстом
 
-    // Цвета (RGB 0..1): #003399 — тёмно-синий, как в Диадоке
+    // Цвет #003399 (тёмно-синий, как в Диадоке)
     private static final float[] COLOR_BLUE = {0.0f, 0.20f, 0.60f};
     private static final float[] COLOR_BLACK = {0f, 0f, 0f};
 
@@ -166,9 +161,10 @@ public class SignatureVisualizationService {
         return visRepo.findByDocument(document);
     }
 
-    // ============ ядро: наложение штампов ============
+    // ============ ядро ============
 
-    private record CertInfo(String serialHex, Instant notBefore, Instant notAfter, String ownerFio) {}
+    private record CertInfo(String serialHex, Instant notBefore, Instant notAfter,
+                            String ownerFio, Instant signingTime) {}
 
     private byte[] stampPdf(byte[] original, Document document) throws IOException {
         List<DocumentSignature> sigs = new ArrayList<>(document.getSignatures());
@@ -198,32 +194,31 @@ public class SignatureVisualizationService {
             for (int pageNum = 0; pageNum < pdf.getNumberOfPages(); pageNum++) {
                 PDPage page = pdf.getPage(pageNum);
                 float pageWidth = page.getMediaBox().getWidth();
-                float stampHeight = calculateStampHeight(sigs.size(), document.isApplyPoa());
+                float stampHeight = calculateStampHeight(sigs.size(), document.isApplyPoa(), poaMap.size());
                 float boxTopY = MARGIN + stampHeight + BOX_PADDING;
                 float boxBotY = MARGIN - BOX_PADDING;
 
                 try (PDPageContentStream cs = new PDPageContentStream(
                         pdf, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
 
-                    // 1. Синяя рамка на всю ширину страницы (с небольшим отступом от края)
+                    // Синяя рамка
                     cs.setStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
-                    cs.setLineWidth(0.8f);
+                    cs.setLineWidth(0.6f);
                     cs.addRect(BOX_MARGIN_X, boxBotY,
                             pageWidth - 2 * BOX_MARGIN_X, boxTopY - boxBotY);
                     cs.stroke();
 
-                    // 2. Текст штампа — синий
+                    // Синий текст
                     cs.setNonStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
 
                     float y = boxTopY - LINE_HEIGHT;
                     boolean first = true;
                     for (var sig : sigs) {
                         if (!first) {
-                            // Тонкий разделитель между подписями
                             cs.setStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
-                            cs.setLineWidth(0.3f);
-                            cs.moveTo(MARGIN + 4f, y + LINE_HEIGHT / 2f);
-                            cs.lineTo(pageWidth - MARGIN - 4f, y + LINE_HEIGHT / 2f);
+                            cs.setLineWidth(0.25f);
+                            cs.moveTo(MARGIN + 2f, y + LINE_HEIGHT / 2f);
+                            cs.lineTo(pageWidth - MARGIN - 2f, y + LINE_HEIGHT / 2f);
                             cs.stroke();
                             y -= LINE_HEIGHT / 2f;
                         }
@@ -235,7 +230,6 @@ public class SignatureVisualizationService {
                         y -= LINE_HEIGHT / 2f;
                     }
 
-                    // 3. Восстановить чёрный (на всякий случай, для дальнейших надписей)
                     cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
                 }
             }
@@ -245,7 +239,8 @@ public class SignatureVisualizationService {
         }
     }
 
-    private float calculateStampHeight(int sigCount, boolean applyPoa) {
+    private float calculateStampHeight(int sigCount, boolean applyPoa, int poaCount) {
+        // По умолчанию: 7 строк. Если apply_poa=true → 8 строк (при наличии POA) или 7 (строка "не требуется")
         float linesPerBlock = applyPoa ? 8f : 7f;
         float between = (sigCount > 1) ? (sigCount - 1) * (LINE_HEIGHT / 2f) : 0f;
         return sigCount * linesPerBlock * LINE_HEIGHT + between + LINE_HEIGHT;
@@ -258,8 +253,12 @@ public class SignatureVisualizationService {
         drawLine(cs, font, "Документ подписан электронной подписью", x, y);
         y -= LINE_HEIGHT;
 
-        String signedAt = sig.getSignedAt() != null
-                ? TS_FMT.format(sig.getSignedAt().atZone(ZoneId.systemDefault()))
+        // Дата подписания: из CMS signingTime, fallback — из БД
+        Instant signTime = certInfo.signingTime() != null
+                ? certInfo.signingTime()
+                : sig.getSignedAt();
+        String signedAt = signTime != null
+                ? TS_FMT.format(signTime.atZone(ZoneId.systemDefault()))
                 : "—";
         drawLine(cs, font, "Дата подписания: " + signedAt, x, y);
         y -= LINE_HEIGHT;
@@ -281,20 +280,26 @@ public class SignatureVisualizationService {
         drawLine(cs, font, "Владелец:", x, y);
         y -= LINE_HEIGHT;
 
-        drawLine(cs, font, nvl(certInfo.ownerFio()), x + 10f, y);
+        drawLine(cs, font, nvl(certInfo.ownerFio()), x + 6f, y);
         y -= LINE_HEIGHT;
 
         if (applyPoa) {
-            String poaLine;
             if (poa != null) {
-                poaLine = "Доверенность № " + nvl(poa.getStampNumber())
-                        + " от " + (poa.getDocDate() != null ? D_FMT.format(poa.getDocDate()) : "—")
-                        + ", действ. до " + (poa.getValidUntil() != null ? D_FMT.format(poa.getValidUntil()) : "—");
+                drawLine(cs, font, "Доверенность №" + nvl(poa.getStampNumber()), x, y);
+                y -= LINE_HEIGHT;
+                String poaValidity = "—";
+                if (poa.getValidFrom() != null && poa.getValidUntil() != null) {
+                    poaValidity = "с " + D_FMT.format(poa.getValidFrom())
+                                + " по " + D_FMT.format(poa.getValidUntil());
+                } else if (poa.getValidUntil() != null) {
+                    poaValidity = "по " + D_FMT.format(poa.getValidUntil());
+                }
+                drawLine(cs, font, "Срок действия " + poaValidity, x, y);
+                y -= LINE_HEIGHT;
             } else {
-                poaLine = "Доверенность не требуется";
+                drawLine(cs, font, "Доверенность не требуется", x, y);
+                y -= LINE_HEIGHT;
             }
-            drawLine(cs, font, poaLine, x, y);
-            y -= LINE_HEIGHT;
         }
 
         return y;
@@ -325,6 +330,10 @@ public class SignatureVisualizationService {
         return m.find() ? m.group(1).replace("\"", "").trim() : subject;
     }
 
+    /**
+     * Извлекает leaf-сертификат подписанта по SID из CMS (а не первый non-self-signed),
+     * его serial/validity/CN и signingTime из CMS signed attributes.
+     */
     private CertInfo extractCertInfo(DocumentSignature sig, byte[] content) {
         try {
             String cleaned = sig.getSignatureBase64()
@@ -341,28 +350,56 @@ public class SignatureVisualizationService {
                 cms = new CMSSignedData(raw);
             }
 
-            JcaX509CertificateConverter conv = new JcaX509CertificateConverter().setProvider("BC");
-            for (var holder : cms.getCertificates().getMatches(null)) {
-                X509Certificate cert;
-                try {
-                    cert = conv.getCertificate(holder);
-                } catch (Exception ex) {
-                    continue;
-                }
-                if (cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal())) continue;
-                return new CertInfo(
-                        cert.getSerialNumber().toString(16).toUpperCase(),
-                        cert.getNotBefore().toInstant(),
-                        cert.getNotAfter().toInstant(),
-                        extractCn(cert.getSubjectX500Principal().getName()));
+            // Первый signer (в подавляющем большинстве случаев — единственный)
+            Collection<SignerInformation> signerInfos = cms.getSignerInfos().getSigners();
+            if (signerInfos.isEmpty()) {
+                throw new IllegalStateException("CMS не содержит signerInfos");
             }
+            SignerInformation signer = signerInfos.iterator().next();
+
+            // Cert подписанта по SID — это leaf, не промежуточный CA
+            Collection<X509CertificateHolder> matches = cms.getCertificates().getMatches(signer.getSID());
+            if (matches.isEmpty()) {
+                throw new IllegalStateException("Cert подписанта не найден по SID");
+            }
+            X509Certificate cert = new JcaX509CertificateConverter().setProvider("BC")
+                    .getCertificate(matches.iterator().next());
+
+            // signingTime из CMS signed attributes
+            Instant signingTime = extractSigningTime(signer);
+
+            return new CertInfo(
+                    cert.getSerialNumber().toString(16).toUpperCase(),
+                    cert.getNotBefore().toInstant(),
+                    cert.getNotAfter().toInstant(),
+                    extractCn(cert.getSubjectX500Principal().getName()),
+                    signingTime);
+
         } catch (Exception e) {
             log.debug("extractCertInfo failed for sig {}: {}", sig.getId(), e.getMessage());
         }
+
+        // Fallback на данные из БД
         return new CertInfo(
                 sig.getSignerSerial() != null ? sig.getSignerSerial().toUpperCase() : "—",
                 null, null,
-                extractCn(sig.getSignerSubject()));
+                extractCn(sig.getSignerSubject()),
+                null);
+    }
+
+    /** Извлечь signingTime из CMS signed attributes (RFC 5652). */
+    private Instant extractSigningTime(SignerInformation signer) {
+        try {
+            AttributeTable signedAttrs = signer.getSignedAttributes();
+            if (signedAttrs == null) return null;
+            Attribute attr = signedAttrs.get(CMSAttributes.signingTime);
+            if (attr == null) return null;
+            ASN1Primitive value = attr.getAttrValues().getObjectAt(0).toASN1Primitive();
+            return Time.getInstance(value).getDate().toInstant();
+        } catch (Exception e) {
+            log.debug("extractSigningTime failed: {}", e.getMessage());
+            return null;
+        }
     }
 
     private PDFont loadFont(PDDocument pdf) throws IOException {
