@@ -71,3 +71,15 @@ sonar-cnes-report.jar
 # Axiom JDK (скачивается из ЛК)
 axiom-dist/
 target
+
+# Sonar artifacts (после аудита 20.10.2026)
+sonar-*.json
+sonar-project.properties
+reports/
+make-report.sh
+sonar-cnes-report.jar
+
+# Локальные бэкапы IDE/файлов
+*.yml.bak
+*.xml.bak
+{{HOMEBREW_PREFIX}}/

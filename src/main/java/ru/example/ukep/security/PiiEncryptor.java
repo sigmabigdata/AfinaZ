@@ -38,7 +38,7 @@ public class PiiEncryptor {
     private final SecureRandom random = new SecureRandom();
 
     public PiiEncryptor(
-            @Value("${app.pii-key-path:/opt/afina/secrets/pii.key}") String keyPath) {
+            @Value("${app.pii-key-path:/opt/afinaz/secrets/pii.key}") String keyPath) {
         try {
             Path p = Path.of(keyPath);
             if (!Files.isReadable(p)) {

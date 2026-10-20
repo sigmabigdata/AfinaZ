@@ -27,9 +27,9 @@ public class KeysService {
     private final SettingsService settings;
 
     public KeysService(
-            @Value("${app.file-encryption-key-path:/opt/afina/secrets/file.key}")
+            @Value("${app.file-encryption-key-path:/opt/afinaz/secrets/file.key}")
             String fileKey,
-            @Value("${app.pii-key-path:/opt/afina/secrets/pii.key}")
+            @Value("${app.pii-key-path:/opt/afinaz/secrets/pii.key}")
             String piiKey,
             SettingsService settings) {
         this.fileKeyPath = Path.of(fileKey);

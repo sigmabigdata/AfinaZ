@@ -60,7 +60,7 @@ services:
       ADMINS_FILE: /app/admins.env
       CRL_DIR: /app/crls
       LOG_PATH: /var/log/afina/app.log
-      FILE_ENCRYPTION_KEY_PATH: /opt/afina/secrets/file.key
+      FILE_ENCRYPTION_KEY_PATH: /opt/afinaz/secrets/file.key
       TZ: Europe/Moscow
       JAVA_OPTS: "-Xms256m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
     volumes:
@@ -71,7 +71,7 @@ services:
       - ./admins.env:/app/admins.env:ro
       - ./crls:/app/crls
       - ./certs:/app/certs:ro
-      - ./secrets:/opt/afina/secrets:ro
+      - ./secrets:/opt/afinaz/secrets:ro
     depends_on:
       postgres:
         condition: service_healthy

@@ -37,8 +37,8 @@
            │ (подпись локально                                │
            │  на токене)                                      ▼
            │                                       ┌──────────────────┐
-           ▼                                       │   PostgreSQL 16  │
-    ┌─────────────┐                                │   + pgAudit      │
+           ▼                                       │   PostgreSQL 15  │
+    ┌─────────────┐                                │   + PARSEC-аудит      │
     │   Токен     │                                │   + pg_stat_stmt │
     │ (Рутокен)   │                                └──────────────────┘
     └─────────────┘                                         │
@@ -87,10 +87,10 @@
 | `SettingsService` | Key-value настройки (`app_settings`) |
 | `KeysService` | Информация о ключах шифрования |
 
-### 2. PostgreSQL 16
+### 2. PostgreSQL 15
 
 Контейнер `afina-postgres`, порт 5432 (наружу не публикуется).
-Образ `afina-postgres:16-pgaudit` — PostgreSQL + pgAudit.
+Образ `afinaz-postgres:15-astra` — PostgreSQL 15 (Astra).
 
 Расширения:
 - `pg_stat_statements` — мониторинг запросов
@@ -139,14 +139,14 @@ Angie — форк Nginx от Ростелекома, развивается а�
 
 | Путь | Содержимое | Формат |
 |---|---|---|
-| `/opt/afina/storage/documents/` | Файлы документов | `<uuid>_<orig>.enc`, AES-256-GCM |
-| `/opt/afina/secrets/file.key` | Ключ для файлов (AES-256-GCM) | base64, 32 байта |
-| `/opt/afina/secrets/pii.key` | Ключ для PII (AES-256-GCM) | base64, 32 байта |
-| `/opt/afina/secrets/backup.pass` | Ключ для бэкапов (AES-256-CBC) | base64, 32 байта |
-| `/opt/afina/certs/` | Truststore | X.509 .cer/.crt/.pem |
-| `/opt/afina/crls/` | CRL | `auto-*.crl` + вручную |
-| `/opt/afina/backups/` | Бэкапы (AES-256-CBC) | `.sql.gz.enc` + `storage_*.tar.gz.enc` |
-| `/opt/afina/logs/` | Логи приложения | `app.log` |
+| `/opt/afinaz/storage/documents/` | Файлы документов | `<uuid>_<orig>.enc`, AES-256-GCM |
+| `/opt/afinaz/secrets/file.key` | Ключ для файлов (AES-256-GCM) | base64, 32 байта |
+| `/opt/afinaz/secrets/pii.key` | Ключ для PII (AES-256-GCM) | base64, 32 байта |
+| `/opt/afinaz/secrets/backup.pass` | Ключ для бэкапов (AES-256-CBC) | base64, 32 байта |
+| `/opt/afinaz/certs/` | Truststore | X.509 .cer/.crt/.pem |
+| `/opt/afinaz/crls/` | CRL | `auto-*.crl` + вручную |
+| `/opt/afinaz/backups/` | Бэкапы (AES-256-CBC) | `.sql.gz.enc` + `storage_*.tar.gz.enc` |
+| `/opt/afinaz/logs/` | Логи приложения | `app.log` |
 
 ---
 
@@ -322,7 +322,7 @@ stateless magic-link для клиентов).
 ### Файлы документов
 
 - **Шифр:** AES-256-GCM (`AES/GCM/NoPadding`, SunJCE)
-- **Ключ:** 32 байта, base64 в `/opt/afina/secrets/file.key`
+- **Ключ:** 32 байта, base64 в `/opt/afinaz/secrets/file.key`
 - **IV:** 12 байт, случайные для каждого файла
 - **AuthTag:** 16 байт (128 бит), автоматически от GCM
 - **Формат на диске:** `[IV 12 байт][ciphertext][authTag 16 байт]`
@@ -342,7 +342,7 @@ stateless magic-link для клиентов).
 | `document_signatures.signer_subject` | `signer_subject_enc` | AES-256-GCM |
 
 Реализация — `PiiStringConverter` (JPA `AttributeConverter<String, String>`).
-`PiiEncryptor` — AES-256-GCM, ключ `/opt/afina/secrets/pii.key`.
+`PiiEncryptor` — AES-256-GCM, ключ `/opt/afinaz/secrets/pii.key`.
 
 **Особенность `decrypt()`:** если строка не похожа на base64 от нашего
 формата (короткая или не парсится) — возвращается как есть. Это
@@ -351,7 +351,7 @@ legacy-fallback для строк, оставшихся в plaintext до миг
 ### Бэкапы БД и storage
 
 - **Шифр:** AES-256-CBC + PBKDF2-HMAC-SHA256 (100 000 итераций)
-- **Ключ:** `/opt/afina/secrets/backup.pass` (0600, root)
+- **Ключ:** `/opt/afinaz/secrets/backup.pass` (0600, root)
 - **Формат:** `afina_*.sql.gz.enc`, `storage_*.tar.gz.enc`
 - **Инструмент:** `openssl enc -aes-256-cbc -pbkdf2 -iter 100000`
 - Скрипты: `backup-prod.sh` (шифрует), `restore-prod.sh` (расшифровывает)
@@ -645,7 +645,7 @@ Superuser (`postgres`) — только для restore и init-скриптов.
 Если УЦ не даёт стабильный CDP URL или он недоступен:
 
 1. Скачать `.crl` вручную с сайта УЦ
-2. Положить в `/opt/afina/crls/`
+2. Положить в `/opt/afinaz/crls/`
 3. `chmod 644`, `chown 999:999`
 4. `afina restart`
 
@@ -1066,9 +1066,9 @@ PII, бэкап, диск, память, перезагрузка.
 ## Ссылки
 
 - Spring Boot: https://docs.spring.io/spring-boot/docs/3.2.5/reference/html/
-- PostgreSQL 16: https://www.postgresql.org/docs/16/
+- PostgreSQL 15: https://www.postgresql.org/docs/15/
 - Flyway: https://documentation.red-gate.com/flyway
-- pgAudit: https://github.com/pgaudit/pgaudit
+- PARSEC-аудит: https://wiki.astralinux.ru/
 - Angie: https://angie.software/ru/docs/
 - BouncyCastle: https://www.bouncycastle.org/documentation.html
 - КриптоПро CSP: https://www.cryptopro.ru/products/csp

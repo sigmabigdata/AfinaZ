@@ -11,7 +11,7 @@ G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[0;34m'
 C='\033[0;36m'; N='\033[0m'; BOLD='\033[1m'; DIM='\033[2m'
 
 # ---- Константы ----
-APP_DIR="/opt/afina"
+APP_DIR="/opt/afinaz"
 COMPOSE_FILE="docker-compose-prod.yml"
 ENV_FILE=".env.prod"
 

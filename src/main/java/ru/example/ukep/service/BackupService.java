@@ -54,7 +54,7 @@ public class BackupService {
     private String superPassword;
 
     /** Путь к файлу с паролем шифрования бэкапов (внутри контейнера). */
-    @Value("${app.backups-pass-file:/opt/afina/secrets/backup.pass}")
+    @Value("${app.backups-pass-file:/opt/afinaz/secrets/backup.pass}")
     private String backupPassFile;
 
     public record BackupFile(String name, long size, Instant createdAt,
@@ -196,7 +196,7 @@ public class BackupService {
         if (name.endsWith(".enc")) {
             throw new IOException(
                     "Зашифрованный бэкап нельзя восстановить через UI. "
-                    + "На сервере: cd /opt/afina && ./restore-prod.sh backups/" + name);
+                    + "На сервере: cd /opt/afinaz && ./restore-prod.sh backups/" + name);
         }
 
         log.warn("Restoring database from {}...", name);

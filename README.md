@@ -70,7 +70,7 @@
 | Слой | Технология |
 |---|---|
 | Backend | Java 17, Spring Boot 3.2.5 |
-| БД | PostgreSQL 16 + Flyway + pgAudit + pg_stat_statements |
+| БД | PostgreSQL 15 (Astra Linux SE 1.8) + Flyway + pg_stat_statements |
 | ORM | Spring Data JPA, Hibernate 6 |
 | Криптография УКЭП | BouncyCastle (chain, CRL), КриптоПро JCSP (ГОСТ) |
 | Шифрование данных | AES-256-GCM (JCE SunJCE) — `file.key`, `pii.key` |
@@ -80,7 +80,7 @@
 | Frontend | Thymeleaf, ванильный JS, плагин CryptoPro CAdES |
 | Мониторинг | Spring @Scheduled + shell-cron `monitor.sh` |
 | Инфраструктура | Docker Compose, Angie (форк Nginx, ФСТЭК) |
-| ОС | Ubuntu 22.04 / 24.04 LTS, x86_64 |
+| ОС | Debian 10 (Buster) + Astra Linux SE 1.8, x86_64 |
 | CLI | bash (`afina.sh`) |
 
 ---
@@ -91,7 +91,7 @@
 
 | Параметр | Значение |
 |---|---|
-| ОС | Ubuntu 22.04 / 24.04 LTS |
+| ОС | Debian 10 (Buster) + Astra Linux SE 1.8 |
 | Архитектура | **x86_64** (ARM не подойдёт из-за CryptoPro) |
 | CPU | 2 vCPU минимум |
 | RAM | 4 GB минимум |
@@ -103,7 +103,7 @@
 
 ### Что подготовить заранее
 
-Обязательные файлы (положить в `/opt/afina/` до развёртывания):
+Обязательные файлы (положить в `/opt/afinaz/` до развёртывания):
 
 | Файл | Что | Где взять |
 |---|---|---|
@@ -138,14 +138,14 @@
 
 **3. Склонировать репозиторий:**
 
-    git clone git@github.com:sigmabigdata/Afina_bank.git /opt/afina
+    git clone git@github.com:sigmabigdata/AfinaZ.git /opt/afina
     cd /opt/afina
 
 **4. Скопировать 3 обязательных файла** (с локальной машины):
 
-    scp admins.env         afina-vps:/opt/afina/
-    scp -r certs/          afina-vps:/opt/afina/
-    scp -r cryptopro-dist/ afina-vps:/opt/afina/
+    scp admins.env         afina-vps:/opt/afinaz/
+    scp -r certs/          afina-vps:/opt/afinaz/
+    scp -r cryptopro-dist/ afina-vps:/opt/afinaz/
 
 **5. Запустить:**
 
@@ -172,14 +172,14 @@ cron; поставит CLI `afina`.
 
     mkdir -p /opt/afina
     cd /opt/afina
-    git clone git@github.com:sigmabigdata/Afina_bank.git .
+    git clone git@github.com:sigmabigdata/AfinaZ.git .
 
 **3. Разложить секреты** (с MacBook):
 
-    scp .env.prod          afina-vps:/opt/afina/
-    scp admins.env         afina-vps:/opt/afina/
-    scp -r certs/          afina-vps:/opt/afina/
-    scp -r cryptopro-dist/ afina-vps:/opt/afina/
+    scp .env.prod          afina-vps:/opt/afinaz/
+    scp admins.env         afina-vps:/opt/afinaz/
+    scp -r certs/          afina-vps:/opt/afinaz/
+    scp -r cryptopro-dist/ afina-vps:/opt/afinaz/
 
 **4. Заполнить `.env.prod`:**
 
@@ -292,8 +292,8 @@ fail2ban → параметры ядра → каталоги → сборка �
 
     docker compose -f docker-compose-prod.yml --env-file .env.prod logs app | \
       grep -iE 'FileEncryptor|PiiEncryptor'
-    # FileEncryptor: ключ загружен из /opt/afina/secrets/file.key
-    # PiiEncryptor:  ключ загружен из /opt/afina/secrets/pii.key
+    # FileEncryptor: ключ загружен из /opt/afinaz/secrets/file.key
+    # PiiEncryptor:  ключ загружен из /opt/afinaz/secrets/pii.key
 
 ### 4. Проверить SMTP
 
@@ -348,7 +348,7 @@ fail2ban → параметры ядра → каталоги → сборка �
 
 ### Ключи шифрования
 
-Два ключа в `/opt/afina/secrets/`:
+Два ключа в `/opt/afinaz/secrets/`:
 
 | Ключ | Что шифрует | Потеря = |
 |---|---|---|
@@ -463,7 +463,7 @@ Retention: `audit.retention_days` (по умолчанию 365), автоочи�
 
     afina backup
     # или
-    cd /opt/afina && ./backup-prod.sh
+    cd /opt/afinaz && ./backup-prod.sh
 
 Создаёт в `backups/` (оба файла — **AES-256-CBC**):
 - `afina_YYYYMMDD_HHMMSS.sql.gz.enc` — дамп БД, зашифрован
@@ -611,7 +611,7 @@ Flyway применит новые миграции автоматически.
 
 ### «Ключ шифрования не найден»
 
-    java.lang.IllegalStateException: Ключ шифрования не найден: /opt/afina/secrets/file.key
+    java.lang.IllegalStateException: Ключ шифрования не найден: /opt/afinaz/secrets/file.key
 
 **Причина:** контейнер (uid=999) не может прочитать файл.
 
@@ -658,7 +658,7 @@ Flyway применит новые миграции автоматически.
 
 **Решение:**
 1. Получить корневой `.cer` от УЦ
-2. Положить в `/opt/afina/certs/`
+2. Положить в `/opt/afinaz/certs/`
 3. `afina restart`
 
 Проверить, какой issuer нужен:
@@ -758,4 +758,4 @@ macOS:
 ## Контакты
 
 - Разработка: sigmabigdata
-- Репозиторий: https://github.com/sigmabigdata/Afina_bank
+- Репозиторий: https://github.com/sigmabigdata/AfinaZ

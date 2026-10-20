@@ -29,7 +29,7 @@ public class FileEncryptor {
     private final SecureRandom random = new SecureRandom();
 
     public FileEncryptor(
-            @Value("${app.file-encryption-key-path:/opt/afina/secrets/file.key}") String keyPath) {
+            @Value("${app.file-encryption-key-path:/opt/afinaz/secrets/file.key}") String keyPath) {
         try {
             Path p = Path.of(keyPath);
             if (!Files.isReadable(p)) {
