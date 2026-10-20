@@ -57,7 +57,7 @@ RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && \
 # Системные утилиты + библиотеки для КриптоПро + pg-клиент
 RUN apt-get update -o Acquire::Retries=10 && \
     apt-get install -y --no-install-recommends \
-        ca-certificates curl gnupg tzdata locales \
+        ca-certificates fonts-dejavu-core curl gnupg tzdata locales \
         pcscd libpcsclite1 openssl \
         postgresql-client-15 \
         libparsec-base3 libparsec-mac3 \

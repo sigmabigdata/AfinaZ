@@ -168,6 +168,12 @@ public class AuditService {
                 T_DOC, String.valueOf(docId), signerSubject, "Подпись загружена вручную");
     }
 
+    /** Универсальный метод для произвольного события (визуализация, произвольные действия). */
+    public void event(String type, String result, String actor,
+                      String targetType, String targetId, String targetInfo, String details) {
+        write(type, result, actor, null, targetType, targetId, targetInfo, details);
+    }
+
     public void keysDownload(String actor, String fileName) {
         write("KEYS_DOWNLOAD", WARN, actor, ROLE_ADMIN,
                 T_KEYS, "file.key+pii.key", fileName,
