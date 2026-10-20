@@ -71,7 +71,7 @@
             <tr>
                 <th>ФИО</th>
                 <th>Организация</th>
-                <th>Номер / дата</th>
+                <th>Номер для штампа / дата</th>
                 <th>Действительна до</th>
                 <th>Статус</th>
                 <th style="width:160px">Действия</th>
@@ -89,8 +89,12 @@
                     <div class="muted small" th:text="'ИНН ' + ${p.orgInn}">ИНН</div>
                 </td>
                 <td>
-                    <div th:text="${p.docNumber}">41/26-319</div>
-                    <div class="muted small" th:text="${#temporals.format(p.docDate,'dd.MM.yyyy')}">—</div>
+                    <div><b th:if="${p.stampNumber != null}" th:text="${p.stampNumber}">GUID</b>
+                         <b th:if="${p.stampNumber == null}" class="muted">—</b></div>
+                    <div class="muted small" th:if="${p.docNumber != null}"
+                         th:text="'внутр. ' + ${p.docNumber}">41/26-319</div>
+                    <div class="muted small" th:if="${p.docDate != null}"
+                         th:text="${#temporals.format(p.docDate,'dd.MM.yyyy')}">—</div>
                 </td>
                 <td>
                     <b th:text="${#temporals.format(p.validUntil,'dd.MM.yyyy')}">—</b>
