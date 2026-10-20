@@ -20,6 +20,7 @@ import java.util.Map;
 @RequestMapping("/api/sign")
 public class SignApiController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SignApiController.class);
     private static final String K_ERROR = "error";
 
     private final DocumentService documentService;
@@ -28,19 +29,22 @@ public class SignApiController {
     private final UserRepository userRepository;
     private final PiiEncryptor pii;
     private final DocumentRepository documentRepository;
+    private final ru.example.ukep.service.SignatureVisualizationService visualizationService;
 
     public SignApiController(DocumentService documentService,
                              SignatureVerifier signatureVerifier,
                              AuditService audit,
                              UserRepository userRepository,
                              DocumentRepository documentRepository,
-                            PiiEncryptor pii) {
+                             PiiEncryptor pii,
+                             ru.example.ukep.service.SignatureVisualizationService visualizationService) {
         this.documentService = documentService;
         this.signatureVerifier = signatureVerifier;
         this.audit = audit;
         this.userRepository = userRepository;
         this.pii = pii;
         this.documentRepository = documentRepository;
+        this.visualizationService = visualizationService;
     }
 
     private User current(UserDetails p) {
@@ -53,7 +57,7 @@ public class SignApiController {
                                         @AuthenticationPrincipal UserDetails p) {
         User user = current(p);
         Document doc = documentService.getOwned(req.getDocumentId(), user);
-        return doAccept(doc, user, req.getSignatureBase64());
+        return doAccept(doc, user, user, req.getSignatureBase64());
     }
 
     /** Админ подписывает документ любого клиента. */
@@ -66,27 +70,47 @@ public class SignApiController {
         }
         Document doc = documentRepository.findByIdWithOwner(req.getDocumentId())
                 .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
-        return doAccept(doc, doc.getOwner(), req.getSignatureBase64());
+        // signer = admin (кто подписывает), owner = doc.getOwner() (чей документ)
+        return doAccept(doc, admin, doc.getOwner(), req.getSignatureBase64());
     }
 
-    private ResponseEntity<Map<String, Object>> doAccept(Document doc, User owner, String sig) {
-        String ownerEmail = safeOwnerEmail(owner);
+    /**
+     * @param doc    документ
+     * @param signer кто подписывает (клиент или админ) — привязывается к подписи
+     * @param owner  владелец документа — для аудита
+     * @param sig    base64 CAdES-BES
+     */
+    private ResponseEntity<Map<String, Object>> doAccept(Document doc, User signer, User owner, String sig) {
+        String signerEmail = safeOwnerEmail(signer);
+        String signerRole = signer != null && signer.getRole() != null ? signer.getRole().name() : "?";
         try {
             Map<String, Object> result = signatureVerifier.verifyDetached(
                     documentService.getBytes(doc), sig);
             String subject = String.valueOf(result.getOrDefault("signerSubject", ""));
             String serial = String.valueOf(result.getOrDefault("signerSerial", ""));
-            documentService.addSignature(doc.getId(), owner, sig, subject, serial);
-            audit.signSuccess(ownerEmail, doc.getId(), subject);
+            // signer — не owner! у админа и клиента разные подписи
+            documentService.addSignature(doc.getId(), signer, sig, subject, serial);
+            audit.signSuccess(signerEmail, doc.getId(), subject + " (" + signerRole + ")");
+
+            // Пересоздать визуализацию: новый штамп сверху
+            try {
+                if (visualizationService.findFor(doc).isPresent()) {
+                    visualizationService.generate(doc);
+                    log.info("Визуализация документа {} пересоздана после подписи", doc.getId());
+                }
+            } catch (Exception e) {
+                log.warn("Не удалось пересоздать визуализацию: {}", e.getMessage());
+            }
+
             return ResponseEntity.ok(Map.of(
                     "valid", true,
                     "signersCount", result.get("signersCount"),
                     "signersInfo", result.get("signersInfo")));
         } catch (IllegalArgumentException e) {
-            audit.signFail(ownerEmail, doc.getId(), e.getMessage());
+            audit.signFail(signerEmail, doc.getId(), e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(K_ERROR, e.getMessage()));
         } catch (Exception e) {
-            audit.signFail(ownerEmail, doc.getId(), e.getMessage());
+            audit.signFail(signerEmail, doc.getId(), e.getMessage());
             return ResponseEntity.internalServerError()
                     .body(Map.of(K_ERROR, "Ошибка проверки подписи: " + e.getMessage()));
         }
