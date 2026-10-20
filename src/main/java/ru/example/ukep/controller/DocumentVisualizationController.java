@@ -114,49 +114,58 @@ public class DocumentVisualizationController {
 
     /** Toggle: применить доверенность к визуализации (или нет). */
     @PostMapping("/apply-poa")
-    @ResponseBody
-    public ResponseEntity<?> applyPoa(@PathVariable Long id,
-                                       @RequestParam boolean apply,
-                                       java.security.Principal principal) {
+    public String applyPoa(@PathVariable Long id,
+                           @RequestParam boolean apply,
+                           java.security.Principal principal,
+                           org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         Document doc = documentRepository.findByIdWithSignatures(id)
                 .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
+        Long ownerId = doc.getOwner().getId();
+
         doc.setApplyPoa(apply);
         documentRepository.save(doc);
-
-        java.util.Map<String, Object> response = new java.util.HashMap<>();
-        response.put("applyPoa", apply);
-
-        if (apply && !doc.getSignatures().isEmpty()) {
-            var first = doc.getSignatures().get(0);
-            String fio = extractCn(first.getSignerSubject());
-            response.put("certFio", fio);
-            var poa = poaService.findEffectiveByFio(fio);
-            response.put("poaFound", poa.isPresent());
-            if (poa.isPresent()) {
-                response.put("poaNumber", poa.get().getStampNumber());
-                response.put("poaValidUntil",
-                        poa.get().getValidUntil() != null ? poa.get().getValidUntil().toString() : null);
-            } else {
-                response.put("message",
-                        "Доверенность для ФИО '" + fio + "' не найдена. "
-                        + "Проверьте, что ФИО в сертификате совпадает с ФИО в доверенности.");
-            }
-        }
 
         audit.event("DOC_APPLY_POA", "SUCCESS",
                 principal != null ? principal.getName() : "unknown",
                 "DOCUMENT", String.valueOf(id), null,
                 apply ? "Доверенность применяется" : "Доверенность отключена");
 
-        try {
-            if (visualizationService.findFor(doc).isPresent()) {
-                visualizationService.generate(doc);
+        // Проверить, есть ли POA для подписантов
+        if (apply && !doc.getSignatures().isEmpty()) {
+            boolean anyPoaFound = false;
+            for (var sig : doc.getSignatures()) {
+                String fio = extractCn(sig.getSignerSubject());
+                if (poaService.findEffectiveByFio(fio).isPresent()) {
+                    anyPoaFound = true;
+                    break;
+                }
             }
-        } catch (Exception e) {
-            log.warn("Не удалось пересоздать визуализацию: {}", e.getMessage());
-            response.put("regenError", e.getMessage());
+            if (!anyPoaFound) {
+                ra.addFlashAttribute("err",
+                        "Доверенность не найдена ни для одного подписанта. "
+                        + "Проверьте, что ФИО в сертификате совпадает с ФИО в доверенности.");
+            }
         }
-        return ResponseEntity.ok(response);
+
+        // Пересоздать визуализацию (создать, если ещё нет)
+        if ("application/pdf".equalsIgnoreCase(doc.getContentType())
+                && doc.getSignatureBase64() != null) {
+            try {
+                visualizationService.generate(doc);
+                ra.addFlashAttribute("ok",
+                        apply ? "Доверенность применена, визуализация обновлена"
+                              : "Доверенность отключена, визуализация обновлена");
+            } catch (Exception e) {
+                log.warn("Regenerate visualization failed: {}", e.getMessage());
+                ra.addFlashAttribute("warn",
+                        "Доверенность сохранена, но визуализация не обновилась: " + e.getMessage());
+            }
+        } else {
+            ra.addFlashAttribute("ok",
+                    apply ? "Доверенность применена" : "Доверенность отключена");
+        }
+
+        return "redirect:/admin/users/" + ownerId;
     }
 
     /** Загрузка .sig файла и проверка соответствия документу. */
