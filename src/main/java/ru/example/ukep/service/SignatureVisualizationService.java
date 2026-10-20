@@ -41,17 +41,21 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Наложение штампов подписантов в нижний колонтитул каждой страницы PDF.
+ * Визуализация подписи — синий штамп в нижнем колонтитуле каждой страницы PDF.
  *
- * <p>Штамп — 3 строки мелким шрифтом (8pt):
- * <ul>
- *   <li>ФИО и роль подписанта</li>
- *   <li>Номер доверенности (GUID) + срок действия</li>
- *   <li>Дата и время подписания</li>
- * </ul>
+ * <p>Стиль как в Контур.Диадок: тёмно-синий текст + синяя рамка на всю ширину.</p>
  *
- * <p>Если у документа стоит {@code apply_poa=true} и есть действующая доверенность
- * по ФИО первого подписанта — добавляется 4-я строка с реквизитами ЭМЧД.
+ * <p>Блок одной подписи:
+ * <pre>
+ *   Документ подписан электронной подписью
+ *   Дата подписания: 20.10.2026 09:47:11
+ *   Сведения о сертификате электронной подписи
+ *   Серийный номер: 18EA034CC60693A14C4F3B1E019F1834
+ *   Срок действия: с 30.06.2026 по 30.06.2027
+ *   Владелец:
+ *     Голендеева Светлана Дмитриевна
+ *   Доверенность № GUID от ... действ. до ... | Доверенность не требуется
+ * </pre>
  */
 @Service
 public class SignatureVisualizationService {
@@ -60,9 +64,16 @@ public class SignatureVisualizationService {
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
     private static final DateTimeFormatter D_FMT  = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
+    // Стиль штампа (как в Контур.Диадок)
     private static final float FONT_SIZE = 7f;
     private static final float LINE_HEIGHT = 9f;
     private static final float MARGIN = 20f;
+    private static final float BOX_MARGIN_X = 5f;   // рамка от края страницы
+    private static final float BOX_PADDING = 4f;    // зазор между рамкой и текстом
+
+    // Цвета (RGB 0..1): #003399 — тёмно-синий, как в Диадоке
+    private static final float[] COLOR_BLUE = {0.0f, 0.20f, 0.60f};
+    private static final float[] COLOR_BLACK = {0f, 0f, 0f};
 
     static {
         if (Security.getProvider("BC") == null) {
@@ -89,14 +100,8 @@ public class SignatureVisualizationService {
         Files.createDirectories(storageRoot.resolve("visualizations"));
     }
 
-    /**
-     * Сгенерировать (или пересоздать) визуализацию.
-     * Возвращает обновлённый {@link DocumentVisualization}.
-     */
     @Transactional
     public DocumentVisualization generate(Document document) throws IOException {
-        // Перезагружаем документ в текущей транзакции с eager-загрузкой signatures,
-        // иначе на detached-сущности из контроллера будет LazyInitializationException.
         Document doc = documentRepository.findByIdWithSignatures(document.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
 
@@ -112,7 +117,6 @@ public class SignatureVisualizationService {
 
         byte[] original = documentService.getBytes(doc);
 
-        // Проверить, что PDF валиден
         try (PDDocument check = PDDocument.load(original)) {
             if (check.getNumberOfPages() == 0) {
                 throw new IllegalStateException("PDF не содержит страниц");
@@ -121,19 +125,16 @@ public class SignatureVisualizationService {
 
         byte[] withStamps = stampPdf(original, doc);
 
-        // Сохранить
         String storedName = "vis_" + doc.getId() + "_" + System.currentTimeMillis() + ".pdf";
         Path target = storageRoot.resolve("visualizations").resolve(storedName);
         Files.write(target, withStamps,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
 
-        // Upsert записи
         DocumentVisualization vis = visRepo.findByDocument(doc).orElseGet(() -> {
             DocumentVisualization v = new DocumentVisualization();
             v.setDocument(doc);
             return v;
         });
-        // Удалить старый файл, если был
         if (vis.getStoredName() != null && !vis.getStoredName().equals(storedName)) {
             try {
                 Files.deleteIfExists(storageRoot.resolve("visualizations").resolve(vis.getStoredName()));
@@ -153,7 +154,6 @@ public class SignatureVisualizationService {
         return saved;
     }
 
-    /** Загрузить готовый PDF визуализации. */
     public byte[] loadBytes(DocumentVisualization vis) throws IOException {
         Path p = storageRoot.resolve("visualizations").resolve(vis.getStoredName());
         if (!Files.isRegularFile(p)) {
@@ -162,18 +162,15 @@ public class SignatureVisualizationService {
         return Files.readAllBytes(p);
     }
 
-    /** Есть ли готовая визуализация? */
     public Optional<DocumentVisualization> findFor(Document document) {
         return visRepo.findByDocument(document);
     }
 
     // ============ ядро: наложение штампов ============
 
-    /** Метаданные сертификата подписанта, извлекаемые из CMS-подписи. */
     private record CertInfo(String serialHex, Instant notBefore, Instant notAfter, String ownerFio) {}
 
     private byte[] stampPdf(byte[] original, Document document) throws IOException {
-        // Порядок: свежие подписи сверху
         List<DocumentSignature> sigs = new ArrayList<>(document.getSignatures());
         sigs.sort((a, b) -> {
             if (a.getSignedAt() == null && b.getSignedAt() == null) return 0;
@@ -182,7 +179,6 @@ public class SignatureVisualizationService {
             return b.getSignedAt().compareTo(a.getSignedAt());
         });
 
-        // Предварительно извлечь cert info и (если включено) доверенности
         Map<Long, CertInfo> certInfoMap = new HashMap<>();
         Map<Long, PowerOfAttorney> poaMap = new HashMap<>();
         for (var sig : sigs) {
@@ -203,25 +199,31 @@ public class SignatureVisualizationService {
                 PDPage page = pdf.getPage(pageNum);
                 float pageWidth = page.getMediaBox().getWidth();
                 float stampHeight = calculateStampHeight(sigs.size(), document.isApplyPoa());
-                float yTop = MARGIN + stampHeight;
+                float boxTopY = MARGIN + stampHeight + BOX_PADDING;
+                float boxBotY = MARGIN - BOX_PADDING;
 
                 try (PDPageContentStream cs = new PDPageContentStream(
                         pdf, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
 
-                    // Верхняя линия штампа
-                    cs.setLineWidth(0.5f);
-                    cs.moveTo(MARGIN, yTop);
-                    cs.lineTo(pageWidth - MARGIN, yTop);
+                    // 1. Синяя рамка на всю ширину страницы (с небольшим отступом от края)
+                    cs.setStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
+                    cs.setLineWidth(0.8f);
+                    cs.addRect(BOX_MARGIN_X, boxBotY,
+                            pageWidth - 2 * BOX_MARGIN_X, boxTopY - boxBotY);
                     cs.stroke();
 
-                    float y = yTop - LINE_HEIGHT;
+                    // 2. Текст штампа — синий
+                    cs.setNonStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
+
+                    float y = boxTopY - LINE_HEIGHT;
                     boolean first = true;
                     for (var sig : sigs) {
                         if (!first) {
-                            // Разделитель между подписями
+                            // Тонкий разделитель между подписями
+                            cs.setStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
                             cs.setLineWidth(0.3f);
-                            cs.moveTo(MARGIN, y + LINE_HEIGHT / 2f);
-                            cs.lineTo(pageWidth - MARGIN, y + LINE_HEIGHT / 2f);
+                            cs.moveTo(MARGIN + 4f, y + LINE_HEIGHT / 2f);
+                            cs.lineTo(pageWidth - MARGIN - 4f, y + LINE_HEIGHT / 2f);
                             cs.stroke();
                             y -= LINE_HEIGHT / 2f;
                         }
@@ -232,6 +234,9 @@ public class SignatureVisualizationService {
                                 document.isApplyPoa(), MARGIN, y);
                         y -= LINE_HEIGHT / 2f;
                     }
+
+                    // 3. Восстановить чёрный (на всякий случай, для дальнейших надписей)
+                    cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
                 }
             }
 
@@ -240,14 +245,12 @@ public class SignatureVisualizationService {
         }
     }
 
-    /** Высота штампа: 7-8 строк на подпись + разделители + отступы. */
     private float calculateStampHeight(int sigCount, boolean applyPoa) {
         float linesPerBlock = applyPoa ? 8f : 7f;
         float between = (sigCount > 1) ? (sigCount - 1) * (LINE_HEIGHT / 2f) : 0f;
         return sigCount * linesPerBlock * LINE_HEIGHT + between + LINE_HEIGHT;
     }
 
-    /** Рисует блок одной подписи, возвращает y-координату после блока. */
     private float drawSignatureBlock(PDPageContentStream cs, PDFont font,
                                       DocumentSignature sig, CertInfo certInfo,
                                       PowerOfAttorney poa, boolean applyPoa,
@@ -297,11 +300,31 @@ public class SignatureVisualizationService {
         return y;
     }
 
-    /**
-     * Извлекает из CAdES-BES подписи сертификат подписанта (leaf, не self-signed)
-     * и возвращает его serial / notBefore / notAfter / CN.
-     * Fallback: signerSerial и signerSubject из БД.
-     */
+    private static void drawLine(PDPageContentStream cs, PDFont font,
+                                 String text, float x, float y) throws IOException {
+        if (text == null || text.isBlank()) return;
+        String safe = truncate(text, 140);
+        cs.beginText();
+        cs.setFont(font, FONT_SIZE);
+        cs.newLineAtOffset(x, y);
+        cs.showText(safe);
+        cs.endText();
+    }
+
+    private static String truncate(String s, int max) {
+        return s.length() > max ? s.substring(0, max - 3) + "..." : s;
+    }
+
+    private static String nvl(String s) { return s != null && !s.isBlank() ? s : "—"; }
+
+    private static String extractCn(String subject) {
+        if (subject == null) return "—";
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("CN=([^,]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(subject);
+        return m.find() ? m.group(1).replace("\"", "").trim() : subject;
+    }
+
     private CertInfo extractCertInfo(DocumentSignature sig, byte[] content) {
         try {
             String cleaned = sig.getSignatureBase64()
@@ -326,7 +349,6 @@ public class SignatureVisualizationService {
                 } catch (Exception ex) {
                     continue;
                 }
-                // Leaf = не self-signed
                 if (cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal())) continue;
                 return new CertInfo(
                         cert.getSerialNumber().toString(16).toUpperCase(),
@@ -337,42 +359,13 @@ public class SignatureVisualizationService {
         } catch (Exception e) {
             log.debug("extractCertInfo failed for sig {}: {}", sig.getId(), e.getMessage());
         }
-        // Fallback
         return new CertInfo(
                 sig.getSignerSerial() != null ? sig.getSignerSerial().toUpperCase() : "—",
                 null, null,
                 extractCn(sig.getSignerSubject()));
     }
 
-    private static void drawLine(PDPageContentStream cs, PDFont font,
-                                 String text, float x, float y) throws IOException {
-        if (text == null || text.isBlank()) return;
-        // Обрезка длинных строк по ширине листа
-        String safe = truncate(text, 140);
-        cs.beginText();
-        cs.setFont(font, FONT_SIZE);
-        cs.newLineAtOffset(x, y);
-        cs.showText(safe);
-        cs.endText();
-    }
-
-    private static String truncate(String s, int max) {
-        return s.length() > max ? s.substring(0, max - 3) + "..." : s;
-    }
-
-    private static String nvl(String s) { return s != null ? s : "—"; }
-
-    /** Извлечь CN из X.500 DN. */
-    private static String extractCn(String subject) {
-        if (subject == null) return "—";
-        java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("CN=([^,]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
-                .matcher(subject);
-        return m.find() ? m.group(1).replace("\"", "").trim() : subject;
-    }
-
     private PDFont loadFont(PDDocument pdf) throws IOException {
-        // Попробовать DejaVu из системы, потом — fallback на Helvetica (без кириллицы)
         String[] paths = {
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/dejavu/DejaVuSans.ttf",
@@ -386,7 +379,6 @@ public class SignatureVisualizationService {
             }
         }
         log.warn("DejaVuSans.ttf не найден — используется Helvetica (кириллица не отобразится)");
-        // PDFBox 2.0.x: готовый статический экземпляр PDType1Font.HELVETICA (без конструктора)
         return org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA;
     }
 }
