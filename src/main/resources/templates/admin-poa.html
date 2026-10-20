@@ -79,7 +79,7 @@
             </thead>
             <tbody>
             <tr th:each="p : ${poas}"
-                th:classappend="${p.expired ? 'poa-row-expired' : (p.expiringWithin(30) ? 'poa-row-warning' : '')}">
+                th:classappend="${p.expired ? 'poa-row-expired' : (p.expiringSoon ? 'poa-row-warning' : '')}">
                 <td>
                     <b th:text="${p.fio}">Иванов</b>
                     <div class="muted small" th:text="${p.notaryName}">нотариус</div>
@@ -98,8 +98,8 @@
                 <td>
                     <span th:if="${p.expired}" class="badge err">Истекла</span>
                     <span th:if="${!p.expired and !p.active}" class="badge warn">Выключена</span>
-                    <span th:if="${p.expiringWithin(7) and p.active}" class="badge err">Истекает (≤7 дн.)</span>
-                    <span th:if="${p.expiringWithin(30) and !p.expiringWithin(7) and p.active}" class="badge warn">Истекает (≤30 дн.)</span>
+                    <span th:if="${p.expiringCritical and p.active}" class="badge err">Истекает (≤7 дн.)</span>
+                    <span th:if="${p.expiringSoon and !p.expiringCritical and p.active}" class="badge warn">Истекает (≤30 дн.)</span>
                     <span th:if="${p.effective}" class="badge ok">Действует</span>
                 </td>
                 <td>

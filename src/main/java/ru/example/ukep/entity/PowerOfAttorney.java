@@ -96,6 +96,16 @@ public class PowerOfAttorney {
         return validUntil.isBefore(LocalDate.now().plusDays(days));
     }
 
+    /** Истекает в течение 30 дней — без параметров, для SpEL/Thymeleaf. */
+    public boolean isExpiringSoon() {
+        return isExpiringWithin(30);
+    }
+
+    /** Истекает в течение 7 дней — без параметров, для SpEL/Thymeleaf. */
+    public boolean isExpiringCritical() {
+        return isExpiringWithin(7);
+    }
+
     // --- getters/setters ---
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
