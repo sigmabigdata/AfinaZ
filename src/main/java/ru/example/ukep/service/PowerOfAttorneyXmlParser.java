@@ -19,7 +19,9 @@ public class PowerOfAttorneyXmlParser {
     public record Parsed(
             String fio, String snils, String inn,
             String orgName, String orgInn,
-            String docNumber, String docGuid,
+            String docNumber,       // ВнНомДовер — внутренний номер банка
+            String stampNumber,     // НомДовер (GUID) — для штампа в визуализации
+            String docGuid,         // = stampNumber, для совместимости
             LocalDate docDate, LocalDate validFrom, LocalDate validUntil,
             String notaryName
     ) {}
@@ -50,9 +52,9 @@ public class PowerOfAttorneyXmlParser {
         // --- СвДов (атрибуты номера/даты/срока) ---
         Element svDov = findFirst(root, "СвДов");
         if (svDov == null) throw new ParseException("Не найден элемент СвДов");
-        String docNumber = attr(svDov, "ВнНомДовер");
-        if (docNumber == null || docNumber.isBlank()) docNumber = attr(svDov, "НомДовер");
-        String docGuid = attr(svDov, "НомДовер");
+        String docNumber = attr(svDov, "ВнНомДовер");     // внутренний номер банка
+        String stampNumber = attr(svDov, "НомДовер");      // GUID — для штампа
+        String docGuid = stampNumber;                       // совместимость с полем doc_guid
         LocalDate docDate = parseDate(attr(svDov, "ДатаВыдДовер"));
         LocalDate validUntil = parseDate(attr(svDov, "СрокДейст"));
         if (validUntil == null) throw new ParseException("Не найден срок действия доверенности (СрокДейст)");
@@ -92,7 +94,8 @@ public class PowerOfAttorneyXmlParser {
         }
 
         return new Parsed(fio, snils, inn, orgName, orgInn,
-                docNumber, docGuid, docDate, docDate, validUntil, notaryName);
+                docNumber, stampNumber, docGuid,
+                docDate, docDate, validUntil, notaryName);
     }
 
     private static String joinFio(String s, String n, String p) {

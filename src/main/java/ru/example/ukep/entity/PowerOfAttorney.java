@@ -44,6 +44,10 @@ public class PowerOfAttorney {
     @Column(name = "doc_guid", length = 100)
     private String docGuid;
 
+    /** GUID доверенности (НомДовер) — используется в штампе визуализации. */
+    @Column(name = "stamp_number", length = 100)
+    private String stampNumber;
+
     @Column(name = "doc_date")
     private LocalDate docDate;
 
@@ -125,6 +129,8 @@ public class PowerOfAttorney {
     public void setDocNumber(String docNumber) { this.docNumber = docNumber; }
     public String getDocGuid() { return docGuid; }
     public void setDocGuid(String docGuid) { this.docGuid = docGuid; }
+    public String getStampNumber() { return stampNumber; }
+    public void setStampNumber(String stampNumber) { this.stampNumber = stampNumber; }
     public LocalDate getDocDate() { return docDate; }
     public void setDocDate(LocalDate docDate) { this.docDate = docDate; }
     public LocalDate getValidFrom() { return validFrom; }

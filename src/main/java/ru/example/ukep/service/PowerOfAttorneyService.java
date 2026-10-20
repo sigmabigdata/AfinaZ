@@ -59,6 +59,7 @@ public class PowerOfAttorneyService {
         poa.setOrgName(p.orgName());
         poa.setOrgInn(p.orgInn());
         poa.setDocNumber(p.docNumber());
+        poa.setStampNumber(p.stampNumber());
         poa.setDocGuid(p.docGuid());
         poa.setDocDate(p.docDate());
         poa.setValidFrom(p.validFrom());
@@ -166,7 +167,7 @@ public class PowerOfAttorneyService {
                 Откройте /admin/poa для управления.
                 """,
                 poa.getFio(),
-                poa.getDocNumber(),
+                poa.getStampNumber(),
                 poa.getDocDate(),
                 poa.getValidFrom(),
                 poa.getValidUntil(),
