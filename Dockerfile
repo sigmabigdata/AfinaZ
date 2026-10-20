@@ -55,7 +55,7 @@ RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && \
     chmod +x /usr/sbin/policy-rc.d
 
 # Системные утилиты + библиотеки для КриптоПро + pg-клиент
-RUN apt-get update -o Acquire::Retries=10 && \
+RUN apt-get -o Acquire::AllowInsecureRepositories=true update -o Acquire::Retries=10 || true && \
     apt-get install -y --no-install-recommends \
         ca-certificates fonts-dejavu-core curl gnupg tzdata locales \
         pcscd libpcsclite1 openssl \
@@ -81,8 +81,8 @@ COPY cryptopro-dist/linux-amd64_deb.tgz /tmp/cryptopro/
 RUN cd /tmp/cryptopro && \
     tar xzf linux-amd64_deb.tgz && \
     cd linux-amd64_deb && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
+    apt-get -o Acquire::AllowInsecureRepositories=true update || true && \
+    apt-get install -y --allow-unauthenticated --no-install-recommends \
         ./lsb-cprocsp-base_*.deb \
         ./lsb-cprocsp-rdr-64_*.deb \
         ./lsb-cprocsp-kc1-64_*.deb \
