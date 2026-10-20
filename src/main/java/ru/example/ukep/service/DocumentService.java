@@ -145,8 +145,9 @@ public class DocumentService {
         Document doc = documentRepository.findById(docId)
                 .orElseThrow(() -> new IllegalArgumentException(DOC_NOT_FOUND));
 
-        // Проверка: этот пользователь уже подписал?
-        if (signatureRepository.existsByDocumentIdAndSignerUserId(docId, signer.getId())) {
+        // Проверка: этот пользователь уже подписал? (если signer != null — только он)
+        if (signer != null
+                && signatureRepository.existsByDocumentIdAndSignerUserId(docId, signer.getId())) {
             throw new IllegalArgumentException(
                     "Вы уже подписали этот документ. Повторное подписание невозможно.");
         }

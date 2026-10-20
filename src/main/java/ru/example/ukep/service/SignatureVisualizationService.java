@@ -62,9 +62,9 @@ public class SignatureVisualizationService {
     // Компактный стиль (в 2 раза ниже): 4.5pt вместо 7pt, line-height 4.5 вместо 9
     private static final float FONT_SIZE = 4.5f;
     private static final float LINE_HEIGHT = 4.5f;
-    private static final float MARGIN = 6f;          // текст от края страницы
-    private static final float BOX_MARGIN_X = 3f;    // рамка от края страницы
-    private static final float BOX_PADDING = 2f;     // зазор между рамкой и текстом
+    private static final float MARGIN = 20f;         // текст от низа страницы
+    private static final float BOX_MARGIN_X = 10f;   // рамка от боков страницы
+    private static final float BOX_PADDING = 3f;     // зазор между рамкой и текстом
 
     // Цвет #003399 (тёмно-синий, как в Диадоке)
     private static final float[] COLOR_BLUE = {0.0f, 0.20f, 0.60f};
@@ -368,11 +368,14 @@ public class SignatureVisualizationService {
             // signingTime из CMS signed attributes
             Instant signingTime = extractSigningTime(signer);
 
+            String ownerFio = extractCn(cert.getSubjectX500Principal().getName());
+            log.info("extractCertInfo: sig={}, serial={}, ownerFio='{}', signingTime={}",
+                    sig.getId(), cert.getSerialNumber().toString(16), ownerFio, signingTime);
             return new CertInfo(
                     cert.getSerialNumber().toString(16).toUpperCase(),
                     cert.getNotBefore().toInstant(),
                     cert.getNotAfter().toInstant(),
-                    extractCn(cert.getSubjectX500Principal().getName()),
+                    ownerFio,
                     signingTime);
 
         } catch (Exception e) {

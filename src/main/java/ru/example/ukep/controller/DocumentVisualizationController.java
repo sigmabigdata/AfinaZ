@@ -34,15 +34,21 @@ public class DocumentVisualizationController {
     private final DocumentService documentService;
     private final SignatureVisualizationService visualizationService;
     private final AuditService audit;
+    private final ru.example.ukep.service.SignatureVerifier signatureVerifier;
+    private final ru.example.ukep.service.PowerOfAttorneyService poaService;
 
     public DocumentVisualizationController(DocumentRepository documentRepository,
                                             DocumentService documentService,
                                             SignatureVisualizationService visualizationService,
-                                            AuditService audit) {
+                                            AuditService audit,
+                                            ru.example.ukep.service.SignatureVerifier signatureVerifier,
+                                            ru.example.ukep.service.PowerOfAttorneyService poaService) {
         this.documentRepository = documentRepository;
         this.documentService = documentService;
         this.visualizationService = visualizationService;
         this.audit = audit;
+        this.signatureVerifier = signatureVerifier;
+        this.poaService = poaService;
     }
 
     /** Скачать существующую или сгенерировать визуализацию и сразу отдать. */
@@ -112,23 +118,100 @@ public class DocumentVisualizationController {
     public ResponseEntity<?> applyPoa(@PathVariable Long id,
                                        @RequestParam boolean apply,
                                        java.security.Principal principal) {
-        Document doc = documentRepository.findById(id)
+        Document doc = documentRepository.findByIdWithSignatures(id)
                 .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
         doc.setApplyPoa(apply);
         documentRepository.save(doc);
+
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("applyPoa", apply);
+
+        if (apply && !doc.getSignatures().isEmpty()) {
+            var first = doc.getSignatures().get(0);
+            String fio = extractCn(first.getSignerSubject());
+            response.put("certFio", fio);
+            var poa = poaService.findEffectiveByFio(fio);
+            response.put("poaFound", poa.isPresent());
+            if (poa.isPresent()) {
+                response.put("poaNumber", poa.get().getStampNumber());
+                response.put("poaValidUntil",
+                        poa.get().getValidUntil() != null ? poa.get().getValidUntil().toString() : null);
+            } else {
+                response.put("message",
+                        "Доверенность для ФИО '" + fio + "' не найдена. "
+                        + "Проверьте, что ФИО в сертификате совпадает с ФИО в доверенности.");
+            }
+        }
+
         audit.event("DOC_APPLY_POA", "SUCCESS",
                 principal != null ? principal.getName() : "unknown",
                 "DOCUMENT", String.valueOf(id), null,
                 apply ? "Доверенность применяется" : "Доверенность отключена");
-        // Пересоздать визуализацию, если она уже была
+
         try {
             if (visualizationService.findFor(doc).isPresent()) {
                 visualizationService.generate(doc);
             }
         } catch (Exception e) {
-            log.warn("Не удалось пересоздать визуализацию после смены POA: {}", e.getMessage());
+            log.warn("Не удалось пересоздать визуализацию: {}", e.getMessage());
+            response.put("regenError", e.getMessage());
         }
-        return ResponseEntity.ok(java.util.Map.of("applyPoa", apply));
+        return ResponseEntity.ok(response);
+    }
+
+    /** Загрузка .sig файла и проверка соответствия документу. */
+    @PostMapping("/upload-signature")
+    public String uploadSignature(@PathVariable Long id,
+                                   @org.springframework.web.bind.annotation.RequestParam("file")
+                                   org.springframework.web.multipart.MultipartFile file,
+                                   java.security.Principal principal,
+                                   org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        Document doc = documentRepository.findByIdWithSignatures(id)
+                .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
+        Long ownerId = doc.getOwner().getId();
+
+        try {
+            if (file.isEmpty()) throw new IllegalArgumentException("Файл пустой");
+            byte[] sigBytes = file.getBytes();
+            String sigBase64 = java.util.Base64.getEncoder().encodeToString(sigBytes);
+
+            // Верификация: подпись должна соответствовать содержимому документа
+            java.util.Map<String, Object> result = signatureVerifier.verifyDetached(
+                    documentService.getBytes(doc), sigBase64);
+            String subject = String.valueOf(result.getOrDefault("signerSubject", "—"));
+            String serial = String.valueOf(result.getOrDefault("signerSerial", "—"));
+
+            // signer = null (не привязываем к пользователю — это подпись из файла)
+            documentService.addSignature(id, null, sigBase64, subject, serial);
+            audit.documentUploadSignature(
+                    principal != null ? principal.getName() : "unknown", id, subject);
+
+            // Пересоздать визуализацию
+            try {
+                visualizationService.generate(doc);
+            } catch (Exception e) {
+                log.warn("Регенерация визуализации после upload-signature: {}", e.getMessage());
+            }
+
+            ra.addFlashAttribute("ok",
+                    "Подпись проверена и добавлена. Подписант: " + subject
+                    + (serial != null && !"null".equals(serial) ? " (serial " + serial + ")" : ""));
+
+        } catch (IllegalArgumentException e) {
+            ra.addFlashAttribute("err", "Подпись не принята: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("upload-signature failed for doc {}", id, e);
+            ra.addFlashAttribute("err", "Ошибка: " + e.getMessage());
+        }
+        return "redirect:/admin/users/" + ownerId;
+    }
+
+    private static String extractCn(String subject) {
+        if (subject == null) return "—";
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("CN=([^,]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(subject);
+        return m.find() ? m.group(1).replace("\"", "").trim() : subject;
     }
 
     private static String stripExtension(String name) {

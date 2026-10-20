@@ -100,10 +100,30 @@ public class PowerOfAttorneyService {
 
     /** Найти действующую доверенность по ФИО (сопоставление с подписантом). */
     public Optional<PowerOfAttorney> findEffectiveByFio(String fio) {
-        if (fio == null || fio.isBlank()) return Optional.empty();
-        String hash = pii.hash(PowerOfAttorneyXmlParser.normalizeFio(fio));
-        return repo.findFirstByFioHashAndActiveTrueAndValidUntilGreaterThanEqualOrderByValidUntilDesc(
-                hash, LocalDate.now());
+        if (fio == null || fio.isBlank()) {
+            log.warn("findEffectiveByFio: fio is null/blank");
+            return Optional.empty();
+        }
+        String normalized = PowerOfAttorneyXmlParser.normalizeFio(fio);
+        String hash = pii.hash(normalized);
+        log.info("findEffectiveByFio: fio='{}', normalized='{}', hash='{}'",
+                fio, normalized, hash);
+        Optional<PowerOfAttorney> found = repo
+                .findFirstByFioHashAndActiveTrueAndValidUntilGreaterThanEqualOrderByValidUntilDesc(
+                        hash, LocalDate.now());
+        if (found.isEmpty()) {
+            log.warn("findEffectiveByFio: NOT FOUND for hash='{}' (fio='{}')", hash, fio);
+            // Вывести все доступные hash в БД для отладки
+            for (PowerOfAttorney poa : repo.findAll()) {
+                log.warn("  POA id={}, hash='{}', active={}, validUntil={}, fioSet={}",
+                        poa.getId(), poa.getFioHash(), poa.isActive(),
+                        poa.getValidUntil(), poa.getFio() != null);
+            }
+        } else {
+            log.info("findEffectiveByFio: FOUND POA id={}, fio='{}', validUntil={}",
+                    found.get().getId(), found.get().getFio(), found.get().getValidUntil());
+        }
+        return found;
     }
 
     // ============ Оповещения о сроке действия ============
