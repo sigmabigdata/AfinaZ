@@ -138,7 +138,7 @@ public class SignatureVerifier {
         }
 
         // 3) Построение цепочки (вручную)
-        List<X509Certificate> chain = buildChain(leaf, cms);
+        List<X509Certificate> chain = buildChain(leaf, cms, truststore);
         if (log.isInfoEnabled()) {
             log.info("Chain built: {} certificates (leaf={})", chain.size(),
                     leaf.getSubjectX500Principal());
@@ -278,7 +278,8 @@ public class SignatureVerifier {
         }
     }
 
-    private List<X509Certificate> buildChain(X509Certificate leaf, CMSSignedData cms) {
+    private List<X509Certificate> buildChain(X509Certificate leaf, CMSSignedData cms,
+                                              Set<X509Certificate> truststore) {
         List<X509Certificate> chain = new ArrayList<>();
         chain.add(leaf);
 
@@ -287,7 +288,7 @@ public class SignatureVerifier {
         X509Certificate current = leaf;
         int maxDepth = 10;
         while (!isSelfSigned(current) && maxDepth-- > 0) {
-            X509Certificate issuer = findIssuer(current, candidates);
+            X509Certificate issuer = findIssuer(current, candidates, truststore);
             if (issuer == null) {
                 throw new IllegalStateException(
                         "Не найден issuer для " + current.getSubjectX500Principal());
@@ -316,16 +317,45 @@ public class SignatureVerifier {
         return candidates;
     }
 
-    /** Ищет issuer для cert среди candidates с проверкой подписи. */
-    private X509Certificate findIssuer(X509Certificate cert, Set<X509Certificate> candidates) {
+    /** Ищет issuer для cert: сначала в candidates (CMS), затем в truststore. */
+    private X509Certificate findIssuer(X509Certificate cert,
+                                        Set<X509Certificate> candidates,
+                                        Set<X509Certificate> truststore) {
+        String wantedIssuer = cert.getIssuerX500Principal().getName();
+        String leafCn = extractCn(cert.getSubjectX500Principal().getName());
+        log.info("findIssuer[{}]: wanted issuer DN = {}", leafCn, wantedIssuer);
+        log.info("findIssuer[{}]: candidates CMS ({}):", leafCn, candidates.size());
+        for (X509Certificate cand : candidates) {
+            log.info("  CMS subject={}", cand.getSubjectX500Principal().getName());
+        }
+        if (truststore != null) {
+            log.info("findIssuer[{}]: truststore ({}):", leafCn, truststore.size());
+            for (X509Certificate cand : truststore) {
+                log.info("  TRUST subject={}", cand.getSubjectX500Principal().getName());
+            }
+        }
+
+        // 1) CMS
         for (X509Certificate candidate : candidates) {
             if (!cert.getIssuerX500Principal().equals(candidate.getSubjectX500Principal())) {
                 continue;
             }
-            if (verifySignature(cert, candidate)) {
-                return candidate;
+            boolean ok = verifySignature(cert, candidate);
+            log.info("findIssuer[{}]: DN match in CMS, verify={}", leafCn, ok);
+            if (ok) return candidate;
+        }
+        // 2) fallback: truststore
+        if (truststore != null) {
+            for (X509Certificate candidate : truststore) {
+                if (!cert.getIssuerX500Principal().equals(candidate.getSubjectX500Principal())) {
+                    continue;
+                }
+                boolean ok = verifySignature(cert, candidate);
+                log.info("findIssuer[{}]: DN match in TRUSTSTORE, verify={}", leafCn, ok);
+                if (ok) return candidate;
             }
         }
+        log.warn("findIssuer[{}]: issuer NOT FOUND ни в CMS, ни в truststore", leafCn);
         return null;
     }
 
@@ -346,12 +376,17 @@ public class SignatureVerifier {
             cert.verify(issuer.getPublicKey(), "BC");
             return true;
         } catch (Exception bcError) {
-            try {
-                cert.verify(issuer.getPublicKey(), "JCSP");
-                return true;
-            } catch (Exception jcspError) {
-                return false;
-            }
+            log.debug("verifySignature: BC failed ({}): {}", bcError.getClass().getSimpleName(), bcError.getMessage());
+        }
+        try {
+            cert.verify(issuer.getPublicKey(), "JCSP");
+            return true;
+        } catch (Exception jcspError) {
+            log.warn("verifySignature: BOTH BC and JCSP failed for '{}' <- '{}': {}",
+                    extractCn(cert.getSubjectX500Principal().getName()),
+                    extractCn(issuer.getSubjectX500Principal().getName()),
+                    jcspError.getMessage());
+            return false;
         }
     }
 
