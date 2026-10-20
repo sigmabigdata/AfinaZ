@@ -180,9 +180,14 @@ public class SignatureVisualizationService {
         for (var sig : sigs) {
             CertInfo info = extractCertInfo(sig, original);
             certInfoMap.put(sig.getId(), info);
-            if (document.isApplyPoa()) {
-                poaService.findEffectiveByFio(info.ownerFio())
-                        .ifPresent(poa -> poaMap.put(sig.getId(), poa));
+            // POA применяется per-signature
+            if (sig.isApplyPoa()) {
+                Optional<PowerOfAttorney> poa = poaService.findEffectiveByFio(info.ownerFio());
+                poa.ifPresent(p -> poaMap.put(sig.getId(), p));
+                log.info("Visualization: sig={}, applyPoa=true, ownerFio='{}', poaFound={}",
+                        sig.getId(), info.ownerFio(), poa.isPresent());
+            } else {
+                log.debug("Visualization: sig={}, applyPoa=false", sig.getId());
             }
         }
 
@@ -194,7 +199,7 @@ public class SignatureVisualizationService {
             for (int pageNum = 0; pageNum < pdf.getNumberOfPages(); pageNum++) {
                 PDPage page = pdf.getPage(pageNum);
                 float pageWidth = page.getMediaBox().getWidth();
-                float stampHeight = calculateStampHeight(sigs.size(), document.isApplyPoa(), poaMap.size());
+                float stampHeight = calculateStampHeight(sigs);
                 float boxTopY = MARGIN + stampHeight + BOX_PADDING;
                 float boxBotY = MARGIN - BOX_PADDING;
 
@@ -226,7 +231,7 @@ public class SignatureVisualizationService {
                         y = drawSignatureBlock(cs, font, sig,
                                 certInfoMap.get(sig.getId()),
                                 poaMap.get(sig.getId()),
-                                document.isApplyPoa(), MARGIN, y);
+                                sig.isApplyPoa(), MARGIN, y);
                         y -= LINE_HEIGHT / 2f;
                     }
 
@@ -239,11 +244,15 @@ public class SignatureVisualizationService {
         }
     }
 
-    private float calculateStampHeight(int sigCount, boolean applyPoa, int poaCount) {
-        // По умолчанию: 7 строк. Если apply_poa=true → 8 строк (при наличии POA) или 7 (строка "не требуется")
-        float linesPerBlock = applyPoa ? 8f : 7f;
-        float between = (sigCount > 1) ? (sigCount - 1) * (LINE_HEIGHT / 2f) : 0f;
-        return sigCount * linesPerBlock * LINE_HEIGHT + between + LINE_HEIGHT;
+    private float calculateStampHeight(List<DocumentSignature> sigs) {
+        float total = 0f;
+        for (var sig : sigs) {
+            // 7 строк базовых + 2 строки POA (номер + срок) если applyPoa
+            float linesPerBlock = sig.isApplyPoa() ? 9f : 7f;
+            total += linesPerBlock * LINE_HEIGHT;
+        }
+        float between = (sigs.size() > 1) ? (sigs.size() - 1) * (LINE_HEIGHT / 2f) : 0f;
+        return total + between + LINE_HEIGHT;
     }
 
     private float drawSignatureBlock(PDPageContentStream cs, PDFont font,

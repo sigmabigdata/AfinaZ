@@ -32,6 +32,9 @@ public class DocumentSignature {
     @JoinColumn(name = "signer_user_id")
     private User signerUser;
 
+    @Column(name = "apply_poa", nullable = false)
+    private boolean applyPoa = false;
+
     public Long getId() { return id; }
     public Document getDocument() { return document; }
     public String getSignatureBase64() { return signatureBase64; }
@@ -39,6 +42,7 @@ public class DocumentSignature {
     public String getSignerSubject() { return signerSubject; }
     public String getSignerSerial() { return signerSerial; }
     public User getSignerUser() { return signerUser; }
+    public boolean isApplyPoa() { return applyPoa; }
 
     public void setId(Long id) { this.id = id; }
     public void setDocument(Document document) { this.document = document; }
@@ -47,4 +51,5 @@ public class DocumentSignature {
     public void setSignerSubject(String signerSubject) { this.signerSubject = signerSubject; }
     public void setSignerSerial(String signerSerial) { this.signerSerial = signerSerial; }
     public void setSignerUser(User signerUser) { this.signerUser = signerUser; }
+    public void setApplyPoa(boolean applyPoa) { this.applyPoa = applyPoa; }
 }
