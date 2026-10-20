@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Афина · Админ · Доверенности</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<header class="admin-header">
+    <a th:href="@{/admin}" class="brand">
+        <img src="/img/logo.png" alt="Афина" class="brand-logo">
+    </a>
+    <nav class="admin-nav">
+        <a th:href="@{/admin}">Дашборд</a>
+        <a th:href="@{/admin/users}">Клиенты</a>
+        <a th:href="@{/admin/system}">Система</a>
+        <a th:href="@{/admin/monitor}">Мониторинг</a>
+        <a th:href="@{/admin/crl}">CRL</a>
+        <a th:href="@{/admin/audit}">Аудит</a>
+        <a th:href="@{/admin/keys}">Ключи</a>
+        <a th:href="@{/admin/poa}" class="active">Доверенности</a>
+        <a th:href="@{/admin/settings}">Настройки</a>
+    </nav>
+    <form method="post" th:action="@{/admin/logout}" style="display:inline">
+        <button class="btn-ghost" type="submit">Выйти</button>
+    </form>
+</header>
+
+<main>
+    <h1>Доверенности (ЭМЧД)</h1>
+
+    <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
+    <div th:if="${err}" class="alert err" th:text="${err}"></div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-label">Всего</div>
+            <div class="metric-value" th:text="${total}">0</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Действующих</div>
+            <div class="metric-value" style="color:#1e7a3d" th:text="${active}">0</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Истекших</div>
+            <div class="metric-value" style="color:#a82323" th:text="${expired}">0</div>
+        </div>
+    </div>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2 style="margin:0">Загрузить доверенность</h2>
+        </div>
+        <form method="post" th:action="@{/admin/poa/upload}"
+              enctype="multipart/form-data"
+              style="display:flex; gap:10px; align-items:center;">
+            <input type="file" name="file" accept=".xml" required/>
+            <button type="submit">Загрузить ЭМЧД (.xml)</button>
+        </form>
+        <p class="muted small" style="margin-top:8px;">
+            XML-файл доверенности из ЕИС (нотариальной или УЦ). Формат: urn://x-artefacts/EMCHD_1.
+            ФИО, SNILS, INN и XML хранятся зашифрованными (AES-256-GCM).
+        </p>
+    </section>
+
+    <section class="panel">
+        <h2>Список доверенностей</h2>
+
+        <table class="docs">
+            <thead>
+            <tr>
+                <th>ФИО</th>
+                <th>Организация</th>
+                <th>Номер / дата</th>
+                <th>Действительна до</th>
+                <th>Статус</th>
+                <th style="width:160px">Действия</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="p : ${poas}"
+                th:classappend="${p.expired ? 'poa-row-expired' : (p.expiringWithin(30) ? 'poa-row-warning' : '')}">
+                <td>
+                    <b th:text="${p.fio}">Иванов</b>
+                    <div class="muted small" th:text="${p.notaryName}">нотариус</div>
+                </td>
+                <td>
+                    <div th:text="${p.orgName}">ПАО "НБД-Банк"</div>
+                    <div class="muted small" th:text="'ИНН ' + ${p.orgInn}">ИНН</div>
+                </td>
+                <td>
+                    <div th:text="${p.docNumber}">41/26-319</div>
+                    <div class="muted small" th:text="${#temporals.format(p.docDate,'dd.MM.yyyy')}">—</div>
+                </td>
+                <td>
+                    <b th:text="${#temporals.format(p.validUntil,'dd.MM.yyyy')}">—</b>
+                </td>
+                <td>
+                    <span th:if="${p.expired}" class="badge err">Истекла</span>
+                    <span th:if="${!p.expired and !p.active}" class="badge warn">Выключена</span>
+                    <span th:if="${p.expiringWithin(7) and p.active}" class="badge err">Истекает (≤7 дн.)</span>
+                    <span th:if="${p.expiringWithin(30) and !p.expiringWithin(7) and p.active}" class="badge warn">Истекает (≤30 дн.)</span>
+                    <span th:if="${p.effective}" class="badge ok">Действует</span>
+                </td>
+                <td>
+                    <form method="post" th:action="@{'/admin/poa/' + ${p.id} + '/toggle'}"
+                          style="display:inline">
+                        <input type="hidden" name="active" th:value="${!p.active}"/>
+                        <button type="submit"
+                                th:classappend="${p.active} ? 'btn-ghost btn-sm' : 'btn btn-sm'"
+                                th:text="${p.active ? 'Деактивировать' : 'Активировать'}">toggle</button>
+                    </form>
+                    <form method="post" th:action="@{'/admin/poa/' + ${p.id} + '/delete'}"
+                          onsubmit="return confirm('Удалить доверенность?');"
+                          style="display:inline">
+                        <button type="submit" class="btn-danger btn-sm">🗑</button>
+                    </form>
+                </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(poas)}">
+                <td colspan="6" class="muted center">
+                    Доверенностей нет. Загрузите ЭМЧД (.xml) выше.
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

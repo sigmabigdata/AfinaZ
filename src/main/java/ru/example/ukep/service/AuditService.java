@@ -142,6 +142,32 @@ public class AuditService {
                 T_FOLDER, String.valueOf(folderId), name, details);
     }
 
+    // ============ Доверенности (POA) ============
+
+    private static final String T_POA = "POA";
+
+    public void poaUpload(String actor, Long id, String fio, String validUntil) {
+        write("POA_UPLOAD", OK, actor, null,
+                T_POA, String.valueOf(id), fio,
+                "Действительна до " + validUntil);
+    }
+
+    public void poaToggle(String actor, Long id, boolean active) {
+        write("POA_TOGGLE", OK, actor, null,
+                T_POA, String.valueOf(id), null,
+                active ? "Активирована" : "Деактивирована");
+    }
+
+    public void poaDelete(String actor, Long id, String docNumber) {
+        write("POA_DELETE", WARN, actor, null,
+                T_POA, String.valueOf(id), docNumber, null);
+    }
+
+    public void documentUploadSignature(String actor, Long docId, String signerSubject) {
+        write("DOC_UPLOAD_SIG", OK, actor, null,
+                T_DOC, String.valueOf(docId), signerSubject, "Подпись загружена вручную");
+    }
+
     public void keysDownload(String actor, String fileName) {
         write("KEYS_DOWNLOAD", WARN, actor, ROLE_ADMIN,
                 T_KEYS, "file.key+pii.key", fileName,

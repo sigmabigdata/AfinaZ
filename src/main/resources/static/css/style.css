@@ -1121,3 +1121,6 @@ table.docs tr:hover td { background: #fafbff; }
     }
     .folder-actions { justify-content: flex-end; }
 }
+/* Подсветка строк доверенностей */
+.poa-row-expired td { background: #fdeaea !important; }
+.poa-row-warning td { background: #fff6e0 !important; }
