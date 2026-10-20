@@ -23,6 +23,14 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     @Query("select d from Document d where d.id = :id")
     Optional<Document> findByIdWithOwner(@Param("id") Long id);
 
+    /**
+     * Для визуализации и других операций, которым нужны подписи.
+     * Eager-загрузка owner + signatures + signerUser — иначе LazyInitializationException.
+     */
+    @EntityGraph(attributePaths = {"owner", "signatures", "signatures.signerUser"})
+    @Query("select d from Document d where d.id = :id")
+    Optional<Document> findByIdWithSignatures(@Param("id") Long id);
+
     @Query("select d from Document d join fetch d.owner order by d.uploadedAt desc")
     @EntityGraph(attributePaths = {"signatures", "signatures.signerUser"})
     List<Document> findAllWithOwner();

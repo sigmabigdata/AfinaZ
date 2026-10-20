@@ -81,17 +81,22 @@ public class SignatureVisualizationService {
      */
     @Transactional
     public DocumentVisualization generate(Document document) throws IOException {
-        if (document.getSignatureBase64() == null && document.getSignatures().isEmpty()) {
+        // Перезагружаем документ в текущей транзакции с eager-загрузкой signatures,
+        // иначе на detached-сущности из контроллера будет LazyInitializationException.
+        Document doc = documentRepository.findByIdWithSignatures(document.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
+
+        if (doc.getSignatureBase64() == null && doc.getSignatures().isEmpty()) {
             throw new IllegalStateException("Документ ещё не подписан — визуализация недоступна");
         }
 
-        String contentType = document.getContentType();
+        String contentType = doc.getContentType();
         if (contentType == null || !contentType.equalsIgnoreCase("application/pdf")) {
             throw new IllegalStateException(
                     "Визуализация поддерживается только для PDF. Тип: " + contentType);
         }
 
-        byte[] original = documentService.getBytes(document);
+        byte[] original = documentService.getBytes(doc);
 
         // Проверить, что PDF валиден
         try (PDDocument check = PDDocument.load(original)) {
@@ -100,18 +105,18 @@ public class SignatureVisualizationService {
             }
         }
 
-        byte[] withStamps = stampPdf(original, document);
+        byte[] withStamps = stampPdf(original, doc);
 
         // Сохранить
-        String storedName = "vis_" + document.getId() + "_" + System.currentTimeMillis() + ".pdf";
+        String storedName = "vis_" + doc.getId() + "_" + System.currentTimeMillis() + ".pdf";
         Path target = storageRoot.resolve("visualizations").resolve(storedName);
         Files.write(target, withStamps,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
 
         // Upsert записи
-        DocumentVisualization vis = visRepo.findByDocument(document).orElseGet(() -> {
+        DocumentVisualization vis = visRepo.findByDocument(doc).orElseGet(() -> {
             DocumentVisualization v = new DocumentVisualization();
-            v.setDocument(document);
+            v.setDocument(doc);
             return v;
         });
         // Удалить старый файл, если был
@@ -129,8 +134,8 @@ public class SignatureVisualizationService {
         DocumentVisualization saved = visRepo.save(vis);
 
         log.info("Визуализация документа id={}: {} байт, v{}, подписей: {}",
-                document.getId(), withStamps.length, saved.getVersion(),
-                document.getSignatures().size());
+                doc.getId(), withStamps.length, saved.getVersion(),
+                doc.getSignatures().size());
         return saved;
     }
 
