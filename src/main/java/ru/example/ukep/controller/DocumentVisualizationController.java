@@ -36,19 +36,22 @@ public class DocumentVisualizationController {
     private final AuditService audit;
     private final ru.example.ukep.service.SignatureVerifier signatureVerifier;
     private final ru.example.ukep.service.PowerOfAttorneyService poaService;
+    private final ru.example.ukep.repository.DocumentSignatureRepository signatureRepository;
 
     public DocumentVisualizationController(DocumentRepository documentRepository,
                                             DocumentService documentService,
                                             SignatureVisualizationService visualizationService,
                                             AuditService audit,
                                             ru.example.ukep.service.SignatureVerifier signatureVerifier,
-                                            ru.example.ukep.service.PowerOfAttorneyService poaService) {
+                                            ru.example.ukep.service.PowerOfAttorneyService poaService,
+                                            ru.example.ukep.repository.DocumentSignatureRepository signatureRepository) {
         this.documentRepository = documentRepository;
         this.documentService = documentService;
         this.visualizationService = visualizationService;
         this.audit = audit;
         this.signatureVerifier = signatureVerifier;
         this.poaService = poaService;
+        this.signatureRepository = signatureRepository;
     }
 
     /** Скачать существующую или сгенерировать визуализацию и сразу отдать. */
@@ -113,60 +116,6 @@ public class DocumentVisualizationController {
     }
 
     /** Toggle: применить доверенность к визуализации (или нет). */
-    @PostMapping("/apply-poa")
-    public String applyPoa(@PathVariable Long id,
-                           @RequestParam boolean apply,
-                           java.security.Principal principal,
-                           org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
-        Document doc = documentRepository.findByIdWithSignatures(id)
-                .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
-        Long ownerId = doc.getOwner().getId();
-
-        doc.setApplyPoa(apply);
-        documentRepository.save(doc);
-
-        audit.event("DOC_APPLY_POA", "SUCCESS",
-                principal != null ? principal.getName() : "unknown",
-                "DOCUMENT", String.valueOf(id), null,
-                apply ? "Доверенность применяется" : "Доверенность отключена");
-
-        // Проверить, есть ли POA для подписантов
-        if (apply && !doc.getSignatures().isEmpty()) {
-            boolean anyPoaFound = false;
-            for (var sig : doc.getSignatures()) {
-                String fio = extractCn(sig.getSignerSubject());
-                if (poaService.findEffectiveByFio(fio).isPresent()) {
-                    anyPoaFound = true;
-                    break;
-                }
-            }
-            if (!anyPoaFound) {
-                ra.addFlashAttribute("err",
-                        "Доверенность не найдена ни для одного подписанта. "
-                        + "Проверьте, что ФИО в сертификате совпадает с ФИО в доверенности.");
-            }
-        }
-
-        // Пересоздать визуализацию (создать, если ещё нет)
-        if ("application/pdf".equalsIgnoreCase(doc.getContentType())
-                && doc.getSignatureBase64() != null) {
-            try {
-                visualizationService.generate(doc);
-                ra.addFlashAttribute("ok",
-                        apply ? "Доверенность применена, визуализация обновлена"
-                              : "Доверенность отключена, визуализация обновлена");
-            } catch (Exception e) {
-                log.warn("Regenerate visualization failed: {}", e.getMessage());
-                ra.addFlashAttribute("warn",
-                        "Доверенность сохранена, но визуализация не обновилась: " + e.getMessage());
-            }
-        } else {
-            ra.addFlashAttribute("ok",
-                    apply ? "Доверенность применена" : "Доверенность отключена");
-        }
-
-        return "redirect:/admin/users/" + ownerId;
-    }
 
     /** Загрузка .sig файла и проверка соответствия документу. */
     @PostMapping("/upload-signature")
@@ -202,8 +151,10 @@ public class DocumentVisualizationController {
                 log.warn("Регенерация визуализации после upload-signature: {}", e.getMessage());
             }
 
+            boolean wasSigned = doc.isSigned();
             ra.addFlashAttribute("ok",
-                    "Подпись проверена и добавлена. Подписант: " + subject
+                    (wasSigned ? "Подпись добавлена. " : "Документ подписан. ")
+                    + "Подписант: " + subject
                     + (serial != null && !"null".equals(serial) ? " (serial " + serial + ")" : ""));
 
         } catch (IllegalArgumentException e) {
@@ -212,6 +163,64 @@ public class DocumentVisualizationController {
             log.error("upload-signature failed for doc {}", id, e);
             ra.addFlashAttribute("err", "Ошибка: " + e.getMessage());
         }
+        return "redirect:/admin/users/" + ownerId;
+    }
+
+
+    /** Toggle "применить доверенность" для конкретной подписи. */
+    @PostMapping("/signatures/{sigId}/apply-poa")
+    public String applyPoaSignature(@PathVariable Long id,
+                                     @PathVariable Long sigId,
+                                     @RequestParam boolean apply,
+                                     java.security.Principal principal,
+                                     org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        Document doc = documentRepository.findByIdWithSignatures(id)
+                .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
+        Long ownerId = doc.getOwner().getId();
+
+        var sigOpt = doc.getSignatures().stream().filter(s -> s.getId().equals(sigId)).findFirst();
+        if (sigOpt.isEmpty()) {
+            ra.addFlashAttribute("err", "Подпись не относится к документу");
+            return "redirect:/admin/users/" + ownerId;
+        }
+        var sig = sigOpt.get();
+
+        int updated = signatureRepository.updateApplyPoa(sigId, apply);
+        log.info("applyPoaSignature: doc={}, sig={}, apply={}, updated={}",
+                id, sigId, apply, updated);
+
+        audit.event("SIG_APPLY_POA", "SUCCESS",
+                principal != null ? principal.getName() : "unknown",
+                "SIGNATURE", String.valueOf(sigId), null,
+                apply ? "Доверенность применяется" : "Доверенность отключена");
+
+        // Проверка: если apply=true и POA не найдена — предупредить
+        if (apply) {
+            String fio = extractCn(sig.getSignerSubject());
+            var poa = poaService.findEffectiveByFio(fio);
+            if (poa.isEmpty()) {
+                ra.addFlashAttribute("warn",
+                        "Доверенность не найдена для ФИО '" + fio + "'. "
+                        + "Проверьте таблицу доверенностей.");
+            } else {
+                ra.addFlashAttribute("ok",
+                        "Доверенность применена: №" + poa.get().getStampNumber());
+            }
+        } else {
+            ra.addFlashAttribute("ok", "Доверенность отключена");
+        }
+
+        // Пересоздать визуализацию (обновит doc с новым apply_poa в подписи)
+        try {
+            Document fresh = documentRepository.findByIdWithSignatures(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
+            visualizationService.generate(fresh);
+            log.info("Визуализация пересоздана после toggle sig.applyPoa (doc={})", id);
+        } catch (Exception e) {
+            log.warn("Не удалось пересоздать визуализацию: {}", e.getMessage());
+            ra.addFlashAttribute("warn", "Визуализация не обновилась: " + e.getMessage());
+        }
+
         return "redirect:/admin/users/" + ownerId;
     }
 

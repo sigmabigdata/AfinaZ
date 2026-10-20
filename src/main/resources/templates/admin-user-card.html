@@ -226,9 +226,20 @@
                             </div>
                             <div class="muted small"
                                  th:text="${#temporals.format(sig.signedAt,'dd.MM.yyyy HH:mm')}">—</div>
-                            <div style="margin-top:4px">
+                            <div style="margin-top:4px; display:flex; gap:4px; flex-wrap:wrap; align-items:center;">
                                 <a th:href="@{'/admin/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/download'}"
                                    class="btn-sig btn-sm" title="Скачать подпись">⬇ .sig</a>
+                                <form method="post"
+                                      th:action="@{'/admin/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/apply-poa'}"
+                                      style="display:inline; margin:0;">
+                                    <input type="hidden" name="apply" th:value="${!sig.applyPoa}"/>
+                                    <button type="submit"
+                                            class="btn-ghost btn-sm"
+                                            th:style="${sig.applyPoa} ? 'background:#e6f7ec; color:#166534; border-color:#c2e7cd;' : ''"
+                                            th:text="${sig.applyPoa ? '✓ Доверенность' : 'Применить доверенность'}"
+                                            title="Применить/отключить доверенность для этой подписи">
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -264,6 +275,24 @@
                        target="_blank" title="Визуализация подписи (PDF)">📄</a>
                     <a th:href="@{'/admin/documents/' + ${d.id} + '/download'}"
                        title="Скачать документ">⬇</a>
+
+                    <!-- Загрузить .sig — доступно всегда, документ станет подписанным -->
+                    <form th:action="@{'/admin/documents/' + ${d.id} + '/upload-signature'}"
+                          method="post" enctype="multipart/form-data"
+                          style="display:inline; margin:0; padding:0;"
+                          onsubmit="return confirm('Загрузить .sig и добавить подпись к документу?');">
+                        <label title="Загрузить .sig (документ станет подписанным)"
+                               style="display:inline-flex; align-items:center; justify-content:center;
+                                      width:32px; height:32px; border-radius:6px; cursor:pointer;
+                                      color:#2454ff; font-size:16px;"
+                               onmouseover="this.style.background='#e6efff'"
+                               onmouseout="this.style.background=''">
+                            📎
+                            <input type="file" name="file" accept=".sig,.p7s,.der" required
+                                   onchange="this.form.submit()"
+                                   style="display:none;"/>
+                        </label>
+                    </form>
                     <button th:if="${not d.hasSignatureByUser(currentAdminId)}" type="button"
                             class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
                     <a th:if="${d.signed}"
