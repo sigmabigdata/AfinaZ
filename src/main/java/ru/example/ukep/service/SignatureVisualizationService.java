@@ -5,6 +5,10 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cms.CMSProcessableByteArray;
+import org.bouncycastle.cms.CMSSignedData;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +21,6 @@ import ru.example.ukep.entity.PowerOfAttorney;
 import ru.example.ukep.repository.DocumentRepository;
 import ru.example.ukep.repository.DocumentVisualizationRepository;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,10 +28,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.security.Security;
+import java.security.cert.X509Certificate;
 import java.time.Instant;
-import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -51,10 +60,15 @@ public class SignatureVisualizationService {
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
     private static final DateTimeFormatter D_FMT  = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
-    private static final float FONT_SIZE = 8f;
-    private static final float LINE_HEIGHT = 10f;
+    private static final float FONT_SIZE = 7f;
+    private static final float LINE_HEIGHT = 9f;
     private static final float MARGIN = 20f;
-    private static final float STAMP_HEIGHT = 40f;  // на 4 строки
+
+    static {
+        if (Security.getProvider("BC") == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+    }
 
     private final DocumentRepository documentRepository;
     private final DocumentVisualizationRepository visRepo;
@@ -155,61 +169,68 @@ public class SignatureVisualizationService {
 
     // ============ ядро: наложение штампов ============
 
-    private byte[] stampPdf(byte[] original, Document document) throws IOException {
-        List<DocumentSignature> sigs = document.getSignatures();
+    /** Метаданные сертификата подписанта, извлекаемые из CMS-подписи. */
+    private record CertInfo(String serialHex, Instant notBefore, Instant notAfter, String ownerFio) {}
 
-        // Реквизиты доверенности (если включено)
-        PowerOfAttorney poa = null;
-        if (document.isApplyPoa() && !sigs.isEmpty()) {
-            String firstSigner = sigs.get(0).getSignerSubject();
-            poa = poaService.findEffectiveByFio(extractCn(firstSigner)).orElse(null);
+    private byte[] stampPdf(byte[] original, Document document) throws IOException {
+        // Порядок: свежие подписи сверху
+        List<DocumentSignature> sigs = new ArrayList<>(document.getSignatures());
+        sigs.sort((a, b) -> {
+            if (a.getSignedAt() == null && b.getSignedAt() == null) return 0;
+            if (a.getSignedAt() == null) return 1;
+            if (b.getSignedAt() == null) return -1;
+            return b.getSignedAt().compareTo(a.getSignedAt());
+        });
+
+        // Предварительно извлечь cert info и (если включено) доверенности
+        Map<Long, CertInfo> certInfoMap = new HashMap<>();
+        Map<Long, PowerOfAttorney> poaMap = new HashMap<>();
+        for (var sig : sigs) {
+            CertInfo info = extractCertInfo(sig, original);
+            certInfoMap.put(sig.getId(), info);
+            if (document.isApplyPoa()) {
+                poaService.findEffectiveByFio(info.ownerFio())
+                        .ifPresent(poa -> poaMap.put(sig.getId(), poa));
+            }
         }
 
         try (PDDocument pdf = PDDocument.load(original);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
-            // Загрузить шрифт DejaVu (кириллица)
             PDFont font = loadFont(pdf);
 
             for (int pageNum = 0; pageNum < pdf.getNumberOfPages(); pageNum++) {
                 PDPage page = pdf.getPage(pageNum);
                 float pageWidth = page.getMediaBox().getWidth();
+                float stampHeight = calculateStampHeight(sigs.size(), document.isApplyPoa());
+                float yTop = MARGIN + stampHeight;
 
                 try (PDPageContentStream cs = new PDPageContentStream(
                         pdf, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
 
-                    // Линия-разделитель над штампом
+                    // Верхняя линия штампа
                     cs.setLineWidth(0.5f);
-                    cs.moveTo(MARGIN, MARGIN + STAMP_HEIGHT);
-                    cs.lineTo(pageWidth - MARGIN, MARGIN + STAMP_HEIGHT);
+                    cs.moveTo(MARGIN, yTop);
+                    cs.lineTo(pageWidth - MARGIN, yTop);
                     cs.stroke();
 
-                    float y = MARGIN + STAMP_HEIGHT - LINE_HEIGHT;
-
-                    // Строка 1: подписанты
-                    for (DocumentSignature sig : sigs) {
-                        String line1 = "Подписал: " + (sig.getSignerSubject() != null
-                                ? extractCn(sig.getSignerSubject()) : "—");
-                        drawLine(cs, font, line1, MARGIN, y);
-                        y -= LINE_HEIGHT;
-
-                        // Строка 2: доверенность (если применимо)
-                        if (poa != null && poa.getFio() != null
-                                && poa.getFio().equalsIgnoreCase(extractCn(sig.getSignerSubject()))) {
-                            String line2 = "Доверенность № " + nvl(poa.getStampNumber())
-                                    + " от " + (poa.getDocDate() != null ? poa.getDocDate().format(D_FMT) : "—")
-                                    + ", действ. до " + (poa.getValidUntil() != null ? poa.getValidUntil().format(D_FMT) : "—");
-                            drawLine(cs, font, line2, MARGIN, y);
-                            y -= LINE_HEIGHT;
+                    float y = yTop - LINE_HEIGHT;
+                    boolean first = true;
+                    for (var sig : sigs) {
+                        if (!first) {
+                            // Разделитель между подписями
+                            cs.setLineWidth(0.3f);
+                            cs.moveTo(MARGIN, y + LINE_HEIGHT / 2f);
+                            cs.lineTo(pageWidth - MARGIN, y + LINE_HEIGHT / 2f);
+                            cs.stroke();
+                            y -= LINE_HEIGHT / 2f;
                         }
-
-                        // Строка 3: время подписания
-                        String line3 = "Дата подписания: " + (sig.getSignedAt() != null
-                                ? sig.getSignedAt().atZone(java.time.ZoneId.systemDefault()).format(TS_FMT) : "—");
-                        drawLine(cs, font, line3, MARGIN, y);
-                        y -= LINE_HEIGHT;
-
-                        if (y < MARGIN) break;  // место кончилось — не выходим за поля
+                        first = false;
+                        y = drawSignatureBlock(cs, font, sig,
+                                certInfoMap.get(sig.getId()),
+                                poaMap.get(sig.getId()),
+                                document.isApplyPoa(), MARGIN, y);
+                        y -= LINE_HEIGHT / 2f;
                     }
                 }
             }
@@ -217,6 +238,110 @@ public class SignatureVisualizationService {
             pdf.save(out);
             return out.toByteArray();
         }
+    }
+
+    /** Высота штампа: 7-8 строк на подпись + разделители + отступы. */
+    private float calculateStampHeight(int sigCount, boolean applyPoa) {
+        float linesPerBlock = applyPoa ? 8f : 7f;
+        float between = (sigCount > 1) ? (sigCount - 1) * (LINE_HEIGHT / 2f) : 0f;
+        return sigCount * linesPerBlock * LINE_HEIGHT + between + LINE_HEIGHT;
+    }
+
+    /** Рисует блок одной подписи, возвращает y-координату после блока. */
+    private float drawSignatureBlock(PDPageContentStream cs, PDFont font,
+                                      DocumentSignature sig, CertInfo certInfo,
+                                      PowerOfAttorney poa, boolean applyPoa,
+                                      float x, float y) throws IOException {
+        drawLine(cs, font, "Документ подписан электронной подписью", x, y);
+        y -= LINE_HEIGHT;
+
+        String signedAt = sig.getSignedAt() != null
+                ? TS_FMT.format(sig.getSignedAt().atZone(ZoneId.systemDefault()))
+                : "—";
+        drawLine(cs, font, "Дата подписания: " + signedAt, x, y);
+        y -= LINE_HEIGHT;
+
+        drawLine(cs, font, "Сведения о сертификате электронной подписи", x, y);
+        y -= LINE_HEIGHT;
+
+        drawLine(cs, font, "Серийный номер: " + nvl(certInfo.serialHex()), x, y);
+        y -= LINE_HEIGHT;
+
+        String validity = "—";
+        if (certInfo.notBefore() != null && certInfo.notAfter() != null) {
+            validity = "с " + D_FMT.format(certInfo.notBefore().atZone(ZoneId.systemDefault()))
+                     + " по " + D_FMT.format(certInfo.notAfter().atZone(ZoneId.systemDefault()));
+        }
+        drawLine(cs, font, "Срок действия: " + validity, x, y);
+        y -= LINE_HEIGHT;
+
+        drawLine(cs, font, "Владелец:", x, y);
+        y -= LINE_HEIGHT;
+
+        drawLine(cs, font, nvl(certInfo.ownerFio()), x + 10f, y);
+        y -= LINE_HEIGHT;
+
+        if (applyPoa) {
+            String poaLine;
+            if (poa != null) {
+                poaLine = "Доверенность № " + nvl(poa.getStampNumber())
+                        + " от " + (poa.getDocDate() != null ? D_FMT.format(poa.getDocDate()) : "—")
+                        + ", действ. до " + (poa.getValidUntil() != null ? D_FMT.format(poa.getValidUntil()) : "—");
+            } else {
+                poaLine = "Доверенность не требуется";
+            }
+            drawLine(cs, font, poaLine, x, y);
+            y -= LINE_HEIGHT;
+        }
+
+        return y;
+    }
+
+    /**
+     * Извлекает из CAdES-BES подписи сертификат подписанта (leaf, не self-signed)
+     * и возвращает его serial / notBefore / notAfter / CN.
+     * Fallback: signerSerial и signerSubject из БД.
+     */
+    private CertInfo extractCertInfo(DocumentSignature sig, byte[] content) {
+        try {
+            String cleaned = sig.getSignatureBase64()
+                    .replaceAll("-----BEGIN[^-]*-----", "")
+                    .replaceAll("-----END[^-]*-----", "")
+                    .replaceAll("\\s+", "")
+                    .replaceAll("[^A-Za-z0-9+/=]", "");
+            byte[] raw = Base64.getDecoder().decode(cleaned);
+
+            CMSSignedData cms;
+            try {
+                cms = new CMSSignedData(new CMSProcessableByteArray(content), raw);
+            } catch (Exception e) {
+                cms = new CMSSignedData(raw);
+            }
+
+            JcaX509CertificateConverter conv = new JcaX509CertificateConverter().setProvider("BC");
+            for (var holder : cms.getCertificates().getMatches(null)) {
+                X509Certificate cert;
+                try {
+                    cert = conv.getCertificate(holder);
+                } catch (Exception ex) {
+                    continue;
+                }
+                // Leaf = не self-signed
+                if (cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal())) continue;
+                return new CertInfo(
+                        cert.getSerialNumber().toString(16).toUpperCase(),
+                        cert.getNotBefore().toInstant(),
+                        cert.getNotAfter().toInstant(),
+                        extractCn(cert.getSubjectX500Principal().getName()));
+            }
+        } catch (Exception e) {
+            log.debug("extractCertInfo failed for sig {}: {}", sig.getId(), e.getMessage());
+        }
+        // Fallback
+        return new CertInfo(
+                sig.getSignerSerial() != null ? sig.getSignerSerial().toUpperCase() : "—",
+                null, null,
+                extractCn(sig.getSignerSubject()));
     }
 
     private static void drawLine(PDPageContentStream cs, PDFont font,
