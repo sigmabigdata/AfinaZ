@@ -116,7 +116,7 @@
         <div class="alert info" style="margin-bottom:10px;">
             <b>🔒 Бэкапы зашифрованы AES-256</b> (с 09.10.2026).
             Скачать и удалить можно из UI, <b>восстановление</b> — только через CLI:
-            <code>ssh afina-vps &amp;&amp; cd /opt/afina &amp;&amp; ./restore-prod.sh backups/afina_*.sql.gz.enc</code>
+            <code>ssh afina-vps &amp;&amp; cd /opt/afinaz &amp;&amp; ./restore-prod.sh backups/afina_*.sql.gz.enc</code>
             <br>
             <span class="muted small">Пароль от бэкапа лежит в <code>secrets/backup.pass</code> и не покидает сервер.</span>
         </div>
@@ -410,7 +410,7 @@
     function buildCommand(fileName) {
         return [
             'ssh afina-vps',
-            'cd /opt/afina',
+            'cd /opt/afinaz',
             './restore-prod.sh backups/' + fileName
         ].join('\n');
     }

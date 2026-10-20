@@ -104,7 +104,7 @@ RUN groupadd -r afina 2>/dev/null || true && \
     useradd -r -g afina -m -d /home/afina afina 2>/dev/null || true && \
     mkdir -p /app/storage/documents /var/log/afina /opt/afinaz/secrets \
              /var/opt/cprocsp/tmp /var/opt/cprocsp/keys/afina && \
-    chown -R afina:afina /app /var/log/afina /var/opt/cprocsp /opt/afina && \
+    chown -R afina:afina /app /var/log/afina /var/opt/cprocsp /opt/afinaz && \
     chmod -R 775 /var/opt/cprocsp && \
     chmod 777 /var/opt/cprocsp/tmp
 

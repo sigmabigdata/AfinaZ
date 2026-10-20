@@ -94,7 +94,7 @@
 
 Расширения:
 - `pg_stat_statements` — мониторинг запросов
-- `pgaudit` — аудит DDL/DML
+- `PARSEC-аудит` — аудит DDL/DML
 - `pgcrypto` — криптография
 - `uuid-ossp` — UUID-генерация
 
