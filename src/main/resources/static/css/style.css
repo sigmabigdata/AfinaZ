@@ -944,3 +944,180 @@ table.docs tr:hover td { background: #fafbff; }
     margin-right: 4px;
 }
 .btn-sig:hover { background: #e0e7ff; }
+
+/* ============================================================
+   Разделы документов — карточки с цветовой маркировкой
+   Итерация 1: плитки, цвет, счётчики, пустое состояние
+   ============================================================ */
+
+.folder-card {
+    background: #fff;
+    border: 1px solid #e3e7ee;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
+    position: relative;
+}
+
+.folder-card:hover {
+    border-color: #cfd6e4;
+    box-shadow: 0 10px 28px rgba(30,40,80,.08);
+    transform: translateY(-1px);
+}
+
+/* Цветная полоска слева — по индексу папки */
+.folder-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-top-left-radius: 16px;
+    border-bottom-left-radius: 16px;
+}
+.folder-card.folder-color-0::before { background: #2454ff; }
+.folder-card.folder-color-1::before { background: #1e7a3d; }
+.folder-card.folder-color-2::before { background: #7a3fff; }
+.folder-card.folder-color-3::before { background: #a86a00; }
+.folder-card.folder-color-4::before { background: #0e7490; }
+.folder-card.folder-color-5::before { background: #a82323; }
+
+/* Шапка раздела */
+.folder-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 22px 16px 26px;
+    border-bottom: 1px solid #eef1f6;
+    background: linear-gradient(180deg, #fbfcff 0%, #f6f9ff 100%);
+    flex-wrap: wrap;
+}
+
+.folder-card-title-block {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.folder-icon {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #e6efff 0%, #f0f4ff 100%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: inset 0 0 0 1px rgba(36,84,255,.08);
+}
+
+.folder-card.folder-color-1 .folder-icon { background: linear-gradient(135deg,#e6f7ec,#f0faf3); }
+.folder-card.folder-color-2 .folder-icon { background: linear-gradient(135deg,#f0e6ff,#f7f0ff); }
+.folder-card.folder-color-3 .folder-icon { background: linear-gradient(135deg,#fff6e0,#fffbf0); }
+.folder-card.folder-color-4 .folder-icon { background: linear-gradient(135deg,#e0f5fb,#f0fbff); }
+.folder-card.folder-color-5 .folder-icon { background: linear-gradient(135deg,#fdeaea,#fff5f5); }
+
+.folder-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1f2430;
+    letter-spacing: -0.2px;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* Счётчики-бейджи */
+.folder-stats {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.folder-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #eef1f6;
+    color: #5a6478;
+    line-height: 1.6;
+}
+
+.folder-stat b { font-weight: 700; }
+
+.folder-stat.stat-total { background: #e6efff; color: #1e3d7a; }
+.folder-stat.stat-signed { background: #e6f7ec; color: #166534; }
+.folder-stat.stat-unsigned { background: #fff6e0; color: #a86a00; }
+
+/* Действия в шапке */
+.folder-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.folder-actions .btn-ghost,
+.folder-actions .btn-danger {
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 7px;
+}
+
+/* Форма загрузки внутри карточки */
+.folder-card .upload-form {
+    margin: 14px 22px;
+}
+
+/* Пустое состояние */
+.folder-empty {
+    margin: 0 22px 18px;
+    padding: 26px 20px;
+    border: 1.5px dashed #cfd6e4;
+    border-radius: 12px;
+    background: #fafbff;
+    text-align: center;
+    color: #6a7285;
+    font-size: 14px;
+    transition: border-color .15s, background .15s;
+}
+
+.folder-empty:hover {
+    border-color: #7fa9ff;
+    background: #f4f8ff;
+}
+
+.folder-empty-icon {
+    font-size: 28px;
+    display: block;
+    margin-bottom: 6px;
+    opacity: 0.85;
+}
+
+.folder-empty strong {
+    color: #1f2430;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+}
+
+@media (max-width: 720px) {
+    .folder-card-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .folder-actions { justify-content: flex-end; }
+}

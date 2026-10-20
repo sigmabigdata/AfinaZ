@@ -145,23 +145,40 @@
     </div>
 
     <!-- Плитки разделов -->
-    <div th:each="f : ${folders}" class="panel" style="margin-bottom:20px; padding:0;">
-        <div style="display:flex; justify-content:space-between; align-items:center;
-                    padding:16px 22px; border-bottom:1px solid #eef1f6; background:#f8faff;">
-            <div>
-                <div style="font-weight:700; font-size:16px;" th:text="${f.name}">Раздел</div>
-                <div class="muted small" style="margin-top:2px;">
-                    <span th:text="${#lists.size(documentsByFolder.get(f.id))}">0</span> документ(ов)
+    <div th:each="f, folderStat : ${folders}"
+         th:with="docs=${documentsByFolder.get(f.id)},
+                  total=${#lists.size(docs)},
+                  signed=${#lists.size(docs.?[signed])},
+                  unsigned=${total - signed}"
+         th:classappend="'folder-color-' + ${folderStat.index % 6}"
+         class="folder-card">
+
+        <div class="folder-card-header">
+            <div class="folder-card-title-block">
+                <div class="folder-icon">📁</div>
+                <div style="min-width:0;">
+                    <div class="folder-name" th:text="${f.name}">Раздел</div>
+                    <div class="folder-stats">
+                        <span class="folder-stat stat-total">
+                            <b th:text="${total}">0</b> всего
+                        </span>
+                        <span class="folder-stat stat-signed" th:if="${signed > 0}">
+                            ✅ <b th:text="${signed}">0</b>
+                        </span>
+                        <span class="folder-stat stat-unsigned" th:if="${unsigned > 0}">
+                            ⚠️ <b th:text="${unsigned}">0</b>
+                        </span>
+                    </div>
                 </div>
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
-                <button type="button" class="btn-ghost btn-sm btn-rename-folder"
+            <div class="folder-actions">
+                <button type="button" class="btn-ghost btn-rename-folder"
                         th:attr="data-folder-id=${f.id}, data-folder-name=${f.name}">✎ Переименовать</button>
                 <form method="post"
                       th:action="@{'/admin/users/' + ${user.id} + '/folders/' + ${f.id} + '/delete'}"
                       onsubmit="return confirm('ВНИМАНИЕ! Удалить раздел со всеми документами и подписями?');"
                       style="display:inline">
-                    <button type="submit" class="btn-danger btn-sm">🗑 Удалить раздел</button>
+                    <button type="submit" class="btn-danger">🗑 Удалить</button>
                 </form>
             </div>
         </div>
@@ -170,16 +187,17 @@
         <form method="post"
               th:action="@{'/admin/users/' + ${user.id} + '/documents/upload'}"
               enctype="multipart/form-data"
-              class="upload-form" style="margin:12px 22px;">
+              class="upload-form">
             <input type="hidden" name="folderId" th:value="${f.id}"/>
             <input type="file" name="file" required/>
             <button type="submit">Загрузить за клиента</button>
         </form>
 
-        <!-- Документы в разделе -->
-        <div th:if="${#lists.isEmpty(documentsByFolder.get(f.id))}"
-             class="muted small" style="padding:16px 22px;">
-            Документов в этом разделе пока нет.
+        <!-- Пустое состояние -->
+        <div th:if="${#lists.isEmpty(documentsByFolder.get(f.id))}" class="folder-empty">
+            <span class="folder-empty-icon">📂</span>
+            <strong>Документов пока нет</strong>
+            Загрузите первый файл в этот раздел от имени клиента.
         </div>
 
         <table th:if="${not #lists.isEmpty(documentsByFolder.get(f.id))}"
