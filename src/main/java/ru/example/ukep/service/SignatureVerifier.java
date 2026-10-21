@@ -44,6 +44,17 @@ import java.util.stream.Stream;
  */
 @Service
 public class SignatureVerifier {
+
+    /** Подпись не сходится с содержимым — файл .sig от другого документа. */
+    public static class SignatureMismatchException extends IllegalArgumentException {
+        public SignatureMismatchException(String msg) { super(msg); }
+    }
+
+    /** Ни BC, ни JCSP не смогли проверить подпись (алгоритм не поддерживается). */
+    public static class CryptoNotSupportedException extends IllegalStateException {
+        public CryptoNotSupportedException(String msg, Throwable cause) { super(msg, cause); }
+    }
+
     private static final String LOG_SKIP_CERT = "Skipping certificate: {}";
 
 
@@ -144,17 +155,36 @@ public class SignatureVerifier {
         for (SignerInformation signer : signers.getSigners()) {
             X509Certificate leaf = getSignerCert(signer, cms);
 
-            // 1) Криптопроверка подписи документа
-            if (!verifySignerCrypto(signer, leaf)) {
-                throw new IllegalStateException("Подпись недействительна (crypto verify failed)");
+            // 1) Быстрая проверка: digest из CMS == digest переданных данных?
+            Boolean digestMatches = checkSignedDigest(signer, data);
+            if (Boolean.FALSE.equals(digestMatches)) {
+                throw new SignatureMismatchException(
+                        "Файл подписи не соответствует документу. " +
+                        "Возможно, выбран .sig от другого файла.");
             }
 
-            // 2) Срок действия leaf
+            // 2) Криптографическая проверка (с fallback для ГОСТ 2012)
+            try {
+                if (!verifySignerCrypto(signer, leaf)) {
+                    throw new SignatureMismatchException(
+                            "Файл подписи не соответствует документу " +
+                            "(подпись не сходится с содержимым).");
+                }
+            } catch (CryptoNotSupportedException e) {
+                if (Boolean.TRUE.equals(digestMatches)) {
+                    log.warn("verifyDetachedBasic: digest OK, но провайдер не проверил " +
+                            "подпись ({}). Файл принят по digest.", e.getMessage());
+                } else {
+                    throw e;
+                }
+            }
+
+            // 3) Срок действия leaf
             try {
                 leaf.checkValidity();
             } catch (java.security.cert.CertificateException e) {
-                throw new IllegalStateException(
-                        "Срок действия сертификата истёк: " + leaf.getSubjectX500Principal(), e);
+                throw new IllegalArgumentException(
+                        "Срок действия сертификата подписанта истёк.");
             }
 
             String subject = leaf.getSubjectX500Principal().getName();
@@ -234,19 +264,123 @@ public class SignatureVerifier {
     }
 
     private boolean verifySignerCrypto(SignerInformation signer, X509Certificate leaf) {
-        // Пробуем BouncyCastle
+        Exception bcError = null, jcspError = null;
+
+        // 1) BouncyCastle
         try {
             return signer.verify(new JcaSimpleSignerInfoVerifierBuilder()
                     .setProvider("BC").build(leaf));
-        } catch (Exception bcError) {
-            log.debug("BC verify failed: {}, try JCSP", bcError.getMessage());
+        } catch (Exception e) {
+            bcError = e;
+            log.debug("BC verify threw: {}", e.getMessage());
         }
-        // Fallback на JCSP (для ГОСТ, если BC не справился)
+
+        // 2) JCSP
         try {
             return signer.verify(new JcaSimpleSignerInfoVerifierBuilder()
                     .setProvider("JCSP").build(leaf));
-        } catch (Exception jcspError) {
-            throw new IllegalStateException("Ошибка проверки подписи: " + jcspError.getMessage(), jcspError);
+        } catch (Exception e) {
+            jcspError = e;
+            log.debug("JCSP verify threw: {}", e.getMessage());
+        }
+
+        // 3) Ручной fallback: Signature.getInstance по OID / альтернативному имени
+        Boolean manual = tryManualVerify(signer, leaf);
+        if (manual != null) return manual;
+
+        String bcMsg = bcError != null ? bcError.getMessage() : "?";
+        String jcspMsg = jcspError != null ? jcspError.getMessage() : "?";
+        log.warn("verifySignerCrypto: BC: {} | JCSP: {}", bcMsg, jcspMsg);
+        throw new CryptoNotSupportedException(
+                "Криптопровайдер не поддерживает алгоритм подписи этого сертификата. " +
+                "Обратитесь к администратору.",
+                jcspError != null ? jcspError : bcError);
+    }
+
+    private Boolean tryManualVerify(SignerInformation signer, X509Certificate leaf) {
+        try {
+            byte[] signedData = signedAttrsOrContent(signer);
+            byte[] sigBytes = signer.getSignature();
+            if (signedData == null || sigBytes == null) return null;
+
+            String[] algos = {
+                signer.getEncryptionAlgOID(),
+                "1.2.643.7.1.1.3.2",   // GOST 2012-256
+                "1.2.643.7.1.1.3.3",   // GOST 2012-512
+                "1.2.643.2.2.3",       // GOST 2001
+                "GOST3411-2012-256withECGOST3410-2012-256",
+                "GOST3411-2012-512withECGOST3410-2012-512",
+                "GOST3411-2012-256WITHECGOST3410-2012-256",
+                "GOST3411withECGOST3410",
+            };
+            for (String alg : algos) {
+                if (alg == null || alg.isBlank()) continue;
+                for (String provider : new String[]{"JCSP", "BC", "JCP"}) {
+                    try {
+                        var s = java.security.Signature.getInstance(alg, provider);
+                        s.initVerify(leaf.getPublicKey());
+                        s.update(signedData);
+                        boolean ok = s.verify(sigBytes);
+                        log.debug("manual verify: alg={}, provider={}, ok={}", alg, provider, ok);
+                        return ok;
+                    } catch (Exception ignored) { /* try next */ }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("manual verify failed: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /** Signed attributes (DER) — то, что подписано. */
+    private static byte[] signedAttrsOrContent(SignerInformation signer) {
+        try {
+            var attrs = signer.getSignedAttributes();
+            if (attrs != null) {
+                return attrs.toASN1Structure()
+                        .getEncoded(org.bouncycastle.asn1.ASN1Encoding.DER);
+            }
+            // Без signed attributes content недоступен из SignerInformation
+            // (он живёт в CMSProcessable и передаётся при конструировании CMSSignedData).
+            // Для CAdES-BES signed attrs есть всегда; сюда не попадём.
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Быстрая, независимая от провайдера проверка: сравнивает digest
+     * переданных данных с messageDigest-атрибутом CMS.
+     *
+     * @return TRUE — совпадает, FALSE — не совпадает, NULL — невозможно проверить.
+     */
+    private Boolean checkSignedDigest(SignerInformation signer, byte[] data) {
+        try {
+            var attrs = signer.getSignedAttributes();
+            if (attrs == null) return null;
+            var mdAttr = attrs.get(org.bouncycastle.asn1.cms.CMSAttributes.messageDigest);
+            if (mdAttr == null) return null;
+            byte[] expected = ((org.bouncycastle.asn1.ASN1OctetString)
+                    mdAttr.getAttrValues().getObjectAt(0)).getOctets();
+
+            String[] algorithms = {
+                "GOST3411-2012-256", "GOST3411-2012-512", "GOST3411",
+                "SHA-256", "SHA-384", "SHA-512", "SHA-1"
+            };
+            for (String alg : algorithms) {
+                for (String provider : new String[]{"BC", "JCSP"}) {
+                    try {
+                        byte[] computed = java.security.MessageDigest
+                                .getInstance(alg, provider).digest(data);
+                        if (java.util.Arrays.equals(computed, expected)) return true;
+                    } catch (Exception ignored) {}
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            log.debug("checkSignedDigest failed: {}", e.getMessage());
+            return null;
         }
     }
 
