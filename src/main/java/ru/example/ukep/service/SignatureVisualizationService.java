@@ -283,8 +283,8 @@ public class SignatureVisualizationService {
             validity = "с " + D_FMT.format(certInfo.notBefore().atZone(ZoneId.systemDefault()))
                      + " по " + D_FMT.format(certInfo.notAfter().atZone(ZoneId.systemDefault()));
         }
-        drawLineLeft(cs, font, "Действителен: " + validity, left, y);
-        drawLineRight(cs, font, "Сертификат: " + nvl(certInfo.serialHex()), right, y);
+        drawLineRight(cs, font, "Действителен: " + validity, right, y);
+        drawLineLeft(cs, font, "Сертификат: " + nvl(certInfo.serialHex()), left, y);
         y -= LINE_HEIGHT;
 
         // Строка 4 (опц.): доверенность слева | срок справа
