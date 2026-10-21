@@ -30,15 +30,18 @@ public class SystemInfoController {
     private final BackupService backups;
     private final LogService logs;
     private final AuditService audit;
+    private final ru.example.ukep.service.CleanupService cleanup;
 
     public SystemInfoController(SystemInfoService sys,
                                 BackupService backups,
                                 LogService logs,
-                                AuditService audit) {
+                                AuditService audit,
+                                ru.example.ukep.service.CleanupService cleanup) {
         this.sys = sys;
         this.backups = backups;
         this.logs = logs;
         this.audit = audit;
+        this.cleanup = cleanup;
     }
 
     @GetMapping
@@ -159,6 +162,67 @@ public class SystemInfoController {
             System.exit(0);
         }, "restart-thread").start();
         return ResponseEntity.ok(Map.of("ok", true, "message", "Перезапуск через 1 сек"));
+    }
+
+    // ==================== ОЧИСТКА МУСОРА ====================
+
+    @GetMapping("/cleanup/analyze")
+    @ResponseBody
+    public java.util.Map<String, Object> cleanupAnalyze() {
+        var report = cleanup.analyze();
+        var list = new java.util.ArrayList<java.util.Map<String, Object>>();
+        for (var cat : report.categories()) {
+            var m = new java.util.LinkedHashMap<String, Object>();
+            m.put("key", cat.key());
+            m.put("title", cat.title());
+            m.put("bytes", cat.bytes());
+            m.put("sizePretty", ru.example.ukep.service.CleanupService.formatBytes(cat.bytes()));
+            m.put("count", cat.count());
+            m.put("note", cat.note());
+            list.add(m);
+        }
+        return java.util.Map.of(
+                "totalBytes", report.totalBytes(),
+                "totalPretty", ru.example.ukep.service.CleanupService.formatBytes(report.totalBytes()),
+                "categories", list);
+    }
+
+    @PostMapping("/cleanup/{type}")
+    @ResponseBody
+    public ResponseEntity<java.util.Map<String, Object>> cleanupRun(
+            @PathVariable String type,
+            java.security.Principal auth) {
+        String who = auth != null ? auth.getName() : UNKNOWN;
+        try {
+            ru.example.ukep.service.CleanupService.CleanResult r = switch (type) {
+                case "logs"      -> cleanup.cleanLogs();
+                case "crls"      -> cleanup.cleanCrls();
+                case "backups"   -> cleanup.cleanBackups();
+                case "orphans"   -> cleanup.cleanOrphanFiles();
+                case "orphanvis" -> cleanup.cleanOrphanVisualizations();
+                case "docker"    -> cleanup.cleanDocker();
+                default -> throw new IllegalArgumentException("Неизвестная категория: " + type);
+            };
+            audit.event("CLEANUP_" + type.toUpperCase(), "SUCCESS", who,
+                    "SYSTEM", type, null, r.message());
+            log.info("cleanup[{}] by {}: {} ({} байт)", type, who, r.message(), r.freedBytes());
+            return ResponseEntity.ok(java.util.Map.of(
+                    "ok", true,
+                    "category", r.category(),
+                    "freedBytes", r.freedBytes(),
+                    "freedPretty", ru.example.ukep.service.CleanupService.formatBytes(r.freedBytes()),
+                    "deletedCount", r.deletedCount(),
+                    "message", r.message()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "ok", false, "error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("cleanup[{}] failed", type, e);
+            audit.event("CLEANUP_" + type.toUpperCase(), "FAIL", who,
+                    "SYSTEM", type, null, e.getMessage());
+            return ResponseEntity.status(500).body(java.util.Map.of(
+                    "ok", false, "error", e.getMessage()));
+        }
     }
 
     private String formatDuration(long seconds) {

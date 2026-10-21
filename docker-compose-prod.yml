@@ -38,6 +38,11 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - afina
 
@@ -72,6 +77,13 @@ services:
       - ./crls:/app/crls
       - ./certs:/app/certs:ro
       - ./secrets:/opt/afinaz/secrets:ro
+      # Только для /admin/system/cleanup. --volumes НИКОГДА не передаётся.
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +114,11 @@ services:
     depends_on:
       - app
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - afina
 

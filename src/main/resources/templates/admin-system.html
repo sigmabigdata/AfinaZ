@@ -170,6 +170,42 @@
         </table>
     </section>
 
+    <!-- Очистка мусора -->
+    <section class="panel">
+        <div class="panel-head">
+            <h2 style="margin:0">🧹 Очистка мусора</h2>
+            <div style="display:flex; gap:8px;">
+                <button type="button" id="cleanup-analyze" class="btn-ghost btn-sm">↻ Обновить анализ</button>
+                <button type="button" id="cleanup-all" class="btn-danger btn-sm">🗑 Очистить всё</button>
+            </div>
+        </div>
+
+        <p class="muted small" style="margin-top:0;">
+            <b>Безопасно:</b> volumes Docker (БД, angie-data) никогда не удаляются.
+            Docker-очистка удаляет только build cache, dangling/unused images и остановленные контейнеры.
+            Retention настраивается в <code>cleanup.*_max_age_days</code> через БД (таблица <code>app_settings</code>).
+        </p>
+
+        <table class="docs" id="cleanup-table">
+            <thead>
+            <tr>
+                <th>Категория</th>
+                <th>Размер</th>
+                <th>Кол-во</th>
+                <th>Примечание</th>
+                <th style="width:140px">Действие</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td colspan="5" class="muted center">Нажмите «Обновить анализ»</td>
+            </tr>
+            </tbody>
+        </table>
+        <div id="cleanup-total" class="muted small" style="margin-top:12px;"></div>
+        <div id="cleanup-result" class="alert" style="display:none; margin-top:12px;"></div>
+    </section>
+
     <!-- Диагностика -->
     <section class="panel">
         <h2>Диагностика</h2>
@@ -451,6 +487,87 @@
             document.body.removeChild(ta);
         }
     });
+})();
+</script>
+
+<script>
+(function () {
+    const tableBody = document.querySelector('#cleanup-table tbody');
+    const totalEl = document.getElementById('cleanup-total');
+    const resultEl = document.getElementById('cleanup-result');
+
+    function showResult(kind, text) {
+        resultEl.className = 'alert ' + (kind === 'ok' ? 'ok' : 'err');
+        resultEl.textContent = text;
+        resultEl.style.display = 'block';
+        setTimeout(function () { resultEl.style.display = 'none'; }, 5000);
+    }
+
+    async function loadAnalysis() {
+        tableBody.innerHTML = '<tr><td colspan="5" class="muted center">Анализ…</td></tr>';
+        try {
+            const r = await fetch('/admin/system/cleanup/analyze', {credentials: 'same-origin'});
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const data = await r.json();
+            tableBody.innerHTML = '';
+            data.categories.forEach(function (cat) {
+                const canClean = cat.bytes > 0 && cat.key;
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td><b>' + cat.title + '</b></td>' +
+                    '<td class="' + (cat.bytes > 0 ? 'warn' : 'muted') + '">' + cat.sizePretty + '</td>' +
+                    '<td>' + (cat.count > 0 ? cat.count : '—') + '</td>' +
+                    '<td class="muted small">' + (cat.note || '—') + '</td>' +
+                    '<td>' + (canClean
+                        ? '<button class="btn-ghost btn-sm" data-clean="' + cat.key + '">Очистить</button>'
+                        : '<span class="muted small">—</span>') + '</td>';
+                tableBody.appendChild(tr);
+            });
+            totalEl.innerHTML = 'Всего мусора: <b>' + data.totalPretty + '</b>';
+            attachHandlers();
+        } catch (e) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="muted center">Ошибка: ' + e.message + '</td></tr>';
+        }
+    }
+
+    async function runCleanup(type) {
+        const labels = {
+            docker: 'Docker (build cache, образы, контейнеры)',
+            logs: 'старые логи',
+            crls: 'старые auto-CRL',
+            backups: 'старые бэкапы',
+            orphans: 'файлы-сироты',
+            orphanvis: 'визуализации-сироты'
+        };
+        if (!confirm('Очистить: ' + (labels[type] || type) + '?')) return;
+        try {
+            const r = await fetch('/admin/system/cleanup/' + type, {
+                method: 'POST', credentials: 'same-origin'
+            });
+            const data = await r.json();
+            if (data.ok) showResult('ok', '✓ ' + data.message);
+            else showResult('err', '✗ ' + (data.error || 'Ошибка'));
+            await loadAnalysis();
+        } catch (e) {
+            showResult('err', '✗ ' + e.message);
+        }
+    }
+
+    function attachHandlers() {
+        tableBody.querySelectorAll('button[data-clean]').forEach(function (btn) {
+            btn.addEventListener('click', function () { runCleanup(btn.dataset.clean); });
+        });
+    }
+
+    document.getElementById('cleanup-analyze').addEventListener('click', loadAnalysis);
+    document.getElementById('cleanup-all').addEventListener('click', async function () {
+        if (!confirm('Очистить все категории? (Docker + логи + CRL + бэкапы + сироты)')) return;
+        for (const t of ['docker', 'logs', 'crls', 'backups', 'orphans', 'orphanvis']) {
+            await runCleanup(t);
+        }
+    });
+
+    loadAnalysis();
 })();
 </script>
 

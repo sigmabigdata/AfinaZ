@@ -164,11 +164,20 @@ public class DocumentVisualizationController {
                     + "Подписант: " + subject
                     + (serial != null && !"null".equals(serial) ? " (serial " + serial + ")" : ""));
 
+        } catch (ru.example.ukep.service.SignatureVerifier.SignatureMismatchException e) {
+            log.warn("upload-signature: mismatch for doc {}: {}", id, e.getMessage());
+            ra.addFlashAttribute("err", e.getMessage());
+        } catch (ru.example.ukep.service.SignatureVerifier.CryptoNotSupportedException e) {
+            log.warn("upload-signature: crypto not supported for doc {}: {}", id, e.getMessage());
+            ra.addFlashAttribute("err", e.getMessage());
         } catch (IllegalArgumentException e) {
+            log.warn("upload-signature: rejected for doc {}: {}", id, e.getMessage());
             ra.addFlashAttribute("err", "Подпись не принята: " + e.getMessage());
         } catch (Exception e) {
             log.error("upload-signature failed for doc {}", id, e);
-            ra.addFlashAttribute("err", "Ошибка: " + e.getMessage());
+            ra.addFlashAttribute("err",
+                "Не удалось обработать файл подписи. Проверьте, что это корректный .sig, " +
+                "или обратитесь к администратору.");
         }
         return "redirect:/admin/users/" + ownerId;
     }
