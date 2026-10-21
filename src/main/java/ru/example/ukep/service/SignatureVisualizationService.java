@@ -60,8 +60,8 @@ public class SignatureVisualizationService {
     private static final DateTimeFormatter D_FMT  = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     // Компактный стиль (в 2 раза ниже): 4.5pt вместо 7pt, line-height 4.5 вместо 9
-    private static final float FONT_SIZE = 9.0f;
-    private static final float LINE_HEIGHT = 12f;
+    private static final float FONT_SIZE = 6.0f;
+    private static final float LINE_HEIGHT = 8f;
     private static final float MARGIN = 20f;         // текст от низа страницы
     private static final float BOX_MARGIN_X = 10f;   // рамка от боков страницы
     private static final float BOX_PADDING = 3f;     // зазор между рамкой и текстом
@@ -341,33 +341,103 @@ public class SignatureVisualizationService {
 
     /**
      * Собирает отображаемое имя владельца сертификата:
-     *   [Должность (T)] + [ФИО (CN)] + [Организация (O)]
-     * Порядок фиксирован: должность → ФИО → организация.
-     * Если чего-то нет (например, физлицо без O/T) — просто пропускается.
+     *   [Должность] + [ФИО] + [Организация]
+     *
+     * <p>Источники:
+     * <ul>
+     *   <li>Должность: T, либо OID.1.2.840.113549.1.9.2 (unstructuredName)</li>
+     *   <li>ФИО: SURNAME+GIVENNAME, либо CN (если не похож на название юрлица),
+     *       либо unstructuredName</li>
+     *   <li>Организация: O</li>
+     * </ul>
+     *
+     * <p>Дубли (O == CN, O == ФИО) отбрасываются. Если в CN лежит только
+     * название юрлица (ООО/АО/ПАО/ИП) — считаем, что ФИО в этом сертификате
+     * нет, и не пытаемся подставить CN как ФИО.
      */
     private static String buildOwnerDisplay(java.security.cert.X509Certificate cert) {
         try {
             var p = cert.getSubjectX500Principal();
             var ldap = new javax.naming.ldap.LdapName(
                     p.getName(javax.security.auth.x500.X500Principal.RFC2253));
+
             String cn = null, o = null, t = null;
+            String surname = null, givenName = null, unstructured = null;
+
             for (var rdn : ldap.getRdns()) {
-                String type = rdn.getType().toUpperCase();
+                String type = rdn.getType();
+                String typeUpper = type.toUpperCase();
                 String value = String.valueOf(rdn.getValue()).trim();
-                switch (type) {
+                if (value.isEmpty()) continue;
+                switch (typeUpper) {
                     case "CN" -> cn = value;
                     case "O"  -> o  = value;
-                    case "T"  -> t  = value;
+                    case "T", "TITLE" -> t = value;
+                    case "SURNAME" -> surname = value;
+                    case "GIVENNAME", "GN" -> givenName = value;
+                    case "1.2.840.113549.1.9.2" -> unstructured = value;
+                    // OID.1.2.643.* — служебные (ИНН, СНИЛС, ОГРН), не для отображения
+                    default -> { /* ignore */ }
                 }
             }
+
+            // 1. Должность
+            String position = t;
+            if (position == null && unstructured != null && looksLikePosition(unstructured)) {
+                position = unstructured;
+            }
+
+            // 2. ФИО
+            String fio = null;
+            if (surname != null && givenName != null) {
+                fio = surname + " " + givenName;
+            } else if (cn != null && !looksLikeOrganization(cn)) {
+                fio = cn;
+            } else if (unstructured != null && !looksLikeOrganization(unstructured)) {
+                fio = unstructured;
+            }
+
+            // 3. Организация (только O, без дублей)
+            String org = o;
+
             var parts = new java.util.ArrayList<String>();
-            if (t  != null && !t.isBlank())  parts.add(t);
-            if (cn != null && !cn.isBlank()) parts.add(cn);
-            if (o  != null && !o.isBlank())  parts.add(o);
+            if (position != null && !position.isBlank())      parts.add(position);
+            if (fio != null && !fio.isBlank())                parts.add(fio);
+            if (org != null && !org.isBlank()
+                    && !org.equalsIgnoreCase(fio)
+                    && !org.equalsIgnoreCase(cn))             parts.add(org);
+
+            // Fallback: если вообще ничего не собрали — CN
+            if (parts.isEmpty() && cn != null && !cn.isBlank()) parts.add(cn);
+
             return parts.isEmpty() ? p.getName() : String.join(", ", parts);
         } catch (Exception e) {
             return cert.getSubjectX500Principal().getName();
         }
+    }
+
+    /** Название юрлица/ИП (ООО, АО, ПАО, ЗАО, ОАО, ИП, LLC, LTD, INC). */
+    private static boolean looksLikeOrganization(String s) {
+        if (s == null || s.isBlank()) return false;
+        String u = s.toUpperCase();
+        return u.startsWith("ООО") || u.startsWith("АО ") || u.startsWith("ПАО")
+            || u.startsWith("ЗАО") || u.startsWith("ОАО") || u.startsWith("ИП ")
+            || u.contains(" ООО ") || u.contains(" АО ") || u.contains(" ПАО ")
+            || u.contains(" ЗАО ") || u.contains(" ОАО ")
+            || u.contains("LLC") || u.contains("LTD") || u.contains("INC");
+    }
+
+    /** Похоже на должность (директор, менеджер, …). */
+    private static boolean looksLikePosition(String s) {
+        if (s == null) return false;
+        String u = s.toUpperCase();
+        return u.contains("ДИРЕКТОР") || u.contains("МЕНЕДЖЕР")
+            || u.contains("ГЛАВ")       || u.contains("ЗАМЕСТИТЕЛЬ")
+            || u.contains("РУКОВОДИТЕЛЬ") || u.contains("СПЕЦИАЛИСТ")
+            || u.contains("БУХГАЛТЕР")  || u.contains("ИНЖЕНЕР")
+            || u.contains("НАЧАЛЬНИК")  || u.contains("ПРЕДСЕДАТЕЛЬ")
+            || u.contains("DIRECTOR")    || u.contains("MANAGER")
+            || u.contains("CHIEF")       || u.contains("HEAD");
     }
 
     private static String extractCn(String subject) {
@@ -416,7 +486,9 @@ public class SignatureVisualizationService {
             // signingTime из CMS signed attributes
             Instant signingTime = extractSigningTime(signer);
 
-            String ownerFio = extractCn(cert.getSubjectX500Principal().getName());
+            String fullSubject = cert.getSubjectX500Principal().getName();
+            log.info("extractCertInfo: full subject = {}", fullSubject);
+            String ownerFio = extractCn(fullSubject);
             String ownerDisplay = buildOwnerDisplay(cert);
             log.info("extractCertInfo: sig={}, serial={}, ownerFio='{}', ownerDisplay='{}', signingTime={}",
                     sig.getId(), cert.getSerialNumber().toString(16), ownerFio, ownerDisplay, signingTime);

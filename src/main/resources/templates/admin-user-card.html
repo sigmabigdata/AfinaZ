@@ -259,7 +259,7 @@
                           method="post" enctype="multipart/form-data"
                           style="display:inline; margin:0; padding:0;"
                           onsubmit="return confirm('Загрузить .sig и добавить подпись к документу?');">
-                        <label title="Загрузить .sig (документ станет подписанным)"
+                        <label title="Загрузить .sig из файла (документ станет подписанным)"
                                style="display:inline-flex; align-items:center; justify-content:center;
                                       width:32px; height:32px; border-radius:6px; cursor:pointer;
                                       color:#2454ff; font-size:16px;"
@@ -275,7 +275,7 @@
                             class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
                     <a th:if="${d.signed}"
                        th:href="@{'/admin/documents/' + ${d.id} + '/signature/download'}"
-                       title="Скачать подпись">📎</a>
+                       title="Скачать подпись (.sig)">⬇</a>
 
                     <form method="post"
                           th:action="@{'/admin/documents/' + ${d.id} + '/delete'}"

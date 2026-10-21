@@ -76,7 +76,8 @@ public class DocumentVisualizationController {
             }
 
             byte[] bytes = visualizationService.loadBytes(vis);
-            String fileName = stripExtension(doc.getOriginalName()) + "_signed.pdf";
+            String fileName = "ВИЗУАЛИЗАЦИЯ_"
+                    + stripExtension(doc.getOriginalName()) + ".pdf";
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)
                     .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
