@@ -60,8 +60,8 @@ public class SignatureVisualizationService {
     private static final DateTimeFormatter D_FMT  = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     // Компактный стиль (в 2 раза ниже): 4.5pt вместо 7pt, line-height 4.5 вместо 9
-    private static final float FONT_SIZE = 4.5f;
-    private static final float LINE_HEIGHT = 4.5f;
+    private static final float FONT_SIZE = 9.0f;
+    private static final float LINE_HEIGHT = 12f;
     private static final float MARGIN = 20f;         // текст от низа страницы
     private static final float BOX_MARGIN_X = 10f;   // рамка от боков страницы
     private static final float BOX_PADDING = 3f;     // зазор между рамкой и текстом
@@ -231,7 +231,7 @@ public class SignatureVisualizationService {
                         y = drawSignatureBlock(cs, font, sig,
                                 certInfoMap.get(sig.getId()),
                                 poaMap.get(sig.getId()),
-                                sig.isApplyPoa(), MARGIN, y);
+                                sig.isApplyPoa(), pageWidth, y);
                         y -= LINE_HEIGHT / 2f;
                     }
 
@@ -247,8 +247,8 @@ public class SignatureVisualizationService {
     private float calculateStampHeight(List<DocumentSignature> sigs) {
         float total = 0f;
         for (var sig : sigs) {
-            // 7 строк базовых + 2 строки POA (номер + срок) если applyPoa
-            float linesPerBlock = sig.isApplyPoa() ? 9f : 7f;
+            // 3 строки базовых + 1 строка POA (если applyPoa)
+            float linesPerBlock = sig.isApplyPoa() ? 4f : 3f;
             total += linesPerBlock * LINE_HEIGHT;
         }
         float between = (sigs.size() > 1) ? (sigs.size() - 1) * (LINE_HEIGHT / 2f) : 0f;
@@ -258,44 +258,39 @@ public class SignatureVisualizationService {
     private float drawSignatureBlock(PDPageContentStream cs, PDFont font,
                                       DocumentSignature sig, CertInfo certInfo,
                                       PowerOfAttorney poa, boolean applyPoa,
-                                      float x, float y) throws IOException {
-        drawLine(cs, font, "Документ подписан электронной подписью", x, y);
-        y -= LINE_HEIGHT;
+                                      float pageWidth, float y) throws IOException {
+        float left = MARGIN;
+        float right = pageWidth - MARGIN;
 
-        // Дата подписания: из CMS signingTime, fallback — из БД
+        // Строка 1: заголовок слева | дата справа
         Instant signTime = certInfo.signingTime() != null
                 ? certInfo.signingTime()
                 : sig.getSignedAt();
         String signedAt = signTime != null
                 ? TS_FMT.format(signTime.atZone(ZoneId.systemDefault()))
                 : "—";
-        drawLine(cs, font, "Дата подписания: " + signedAt, x, y);
+        drawLineLeft(cs, font, "Документ подписан электронной подписью", left, y);
+        drawLineRight(cs, font, "Дата: " + signedAt, right, y);
         y -= LINE_HEIGHT;
 
-        drawLine(cs, font, "Сведения о сертификате электронной подписи", x, y);
+        // Строка 2: владелец (T, CN, O) — на всю ширину
+        drawLineLeft(cs, font, "Владелец: " + nvl(certInfo.ownerDisplay()), left, y);
         y -= LINE_HEIGHT;
 
-        drawLine(cs, font, "Серийный номер: " + nvl(certInfo.serialHex()), x, y);
-        y -= LINE_HEIGHT;
-
+        // Строка 3: серийный номер слева | срок действия справа
+        drawLineLeft(cs, font, "Сертификат: " + nvl(certInfo.serialHex()), left, y);
         String validity = "—";
         if (certInfo.notBefore() != null && certInfo.notAfter() != null) {
             validity = "с " + D_FMT.format(certInfo.notBefore().atZone(ZoneId.systemDefault()))
                      + " по " + D_FMT.format(certInfo.notAfter().atZone(ZoneId.systemDefault()));
         }
-        drawLine(cs, font, "Срок действия: " + validity, x, y);
+        drawLineRight(cs, font, "Действителен: " + validity, right, y);
         y -= LINE_HEIGHT;
 
-        drawLine(cs, font, "Владелец:", x, y);
-        y -= LINE_HEIGHT;
-
-        drawLine(cs, font, nvl(certInfo.ownerDisplay()), x + 6f, y);
-        y -= LINE_HEIGHT;
-
+        // Строка 4 (опц.): доверенность слева | срок справа
         if (applyPoa) {
             if (poa != null) {
-                drawLine(cs, font, "Доверенность №" + nvl(poa.getStampNumber()), x, y);
-                y -= LINE_HEIGHT;
+                drawLineLeft(cs, font, "Доверенность №" + nvl(poa.getStampNumber()), left, y);
                 String poaValidity = "—";
                 if (poa.getValidFrom() != null && poa.getValidUntil() != null) {
                     poaValidity = "с " + D_FMT.format(poa.getValidFrom())
@@ -303,10 +298,10 @@ public class SignatureVisualizationService {
                 } else if (poa.getValidUntil() != null) {
                     poaValidity = "по " + D_FMT.format(poa.getValidUntil());
                 }
-                drawLine(cs, font, "Срок действия " + poaValidity, x, y);
+                drawLineRight(cs, font, "Действительна: " + poaValidity, right, y);
                 y -= LINE_HEIGHT;
             } else {
-                drawLine(cs, font, "Доверенность не требуется", x, y);
+                drawLineLeft(cs, font, "Доверенность не требуется", left, y);
                 y -= LINE_HEIGHT;
             }
         }
@@ -314,13 +309,26 @@ public class SignatureVisualizationService {
         return y;
     }
 
-    private static void drawLine(PDPageContentStream cs, PDFont font,
-                                 String text, float x, float y) throws IOException {
+    private static void drawLineLeft(PDPageContentStream cs, PDFont font,
+                                      String text, float x, float y) throws IOException {
         if (text == null || text.isBlank()) return;
-        String safe = truncate(text, 140);
+        String safe = truncate(text, 200);
         cs.beginText();
         cs.setFont(font, FONT_SIZE);
         cs.newLineAtOffset(x, y);
+        cs.showText(safe);
+        cs.endText();
+    }
+
+    /** Рисует текст с выравниванием по правому краю (rightX — правая граница). */
+    private static void drawLineRight(PDPageContentStream cs, PDFont font,
+                                       String text, float rightX, float y) throws IOException {
+        if (text == null || text.isBlank()) return;
+        String safe = truncate(text, 200);
+        float width = font.getStringWidth(safe) / 1000f * FONT_SIZE;
+        cs.beginText();
+        cs.setFont(font, FONT_SIZE);
+        cs.newLineAtOffset(rightX - width, y);
         cs.showText(safe);
         cs.endText();
     }
