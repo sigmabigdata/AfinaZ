@@ -398,21 +398,36 @@ public class SignatureVisualizationService {
                 fio = unstructured;
             }
 
-            // 3. Организация (только O, без дублей)
+            // 3. Организация (только O, без дубля с ФИО)
             String org = o;
+            if (org != null && fio != null && org.equalsIgnoreCase(fio)) org = null;
 
-            var parts = new java.util.ArrayList<String>();
-            if (position != null && !position.isBlank())      parts.add(position);
-            if (fio != null && !fio.isBlank())                parts.add(fio);
-            // Дедуп только против ФИО: если CN — название юрлица, то в parts
-            // его нет, и организация должна попасть в вывод.
-            if (org != null && !org.isBlank()
-                    && !org.equalsIgnoreCase(fio))            parts.add(org);
+            // Должность и ФИО из сертификата часто в КАПСЕ — приводим к виду
+            String posDisplay = capitalizeFirst(position);
+            String fioDisplay = titleCaseFio(fio);
 
-            // Fallback: если вообще ничего не собрали — CN
-            if (parts.isEmpty() && cn != null && !cn.isBlank()) parts.add(cn);
+            // Формат: "[Должность] [Организация], [ФИО]"
+            //   Директор ООО "Ромашка", Иванов Иван Иванович
+            // Если нет должности: "[Организация], [ФИО]"
+            // Если нет ФИО:       "[Должность] [Организация]"
+            // Физлицо без O/T:    "[ФИО]"
+            String posOrg = null;
+            if (posDisplay != null && !posDisplay.isBlank()
+                    && org != null && !org.isBlank()) {
+                posOrg = posDisplay + " " + org;
+            } else if (posDisplay != null && !posDisplay.isBlank()) {
+                posOrg = posDisplay;
+            } else if (org != null && !org.isBlank()) {
+                posOrg = org;
+            }
 
-            return parts.isEmpty() ? p.getName() : String.join(", ", parts);
+            if (posOrg != null && fioDisplay != null && !fioDisplay.isBlank()) {
+                return posOrg + ", " + fioDisplay;
+            }
+            if (posOrg != null) return posOrg;
+            if (fioDisplay != null && !fioDisplay.isBlank()) return fioDisplay;
+            if (cn != null && !cn.isBlank()) return cn;
+            return p.getName();
         } catch (Exception e) {
             return cert.getSubjectX500Principal().getName();
         }
@@ -460,6 +475,43 @@ public class SignatureVisualizationService {
             || u.contains("НАЧАЛЬНИК")  || u.contains("ПРЕДСЕДАТЕЛЬ")
             || u.contains("DIRECTOR")    || u.contains("MANAGER")
             || u.contains("CHIEF")       || u.contains("HEAD");
+    }
+
+    /**
+     * Первая буква заглавная, остальные строчные.
+     * "ДИРЕКТОР"           → "Директор"
+     * "ГЕНЕРАЛЬНЫЙ ДИРЕКТОР" → "Генеральный директор"
+     * Смешанный регистр (уже "Директор") — возвращается как есть.
+     */
+    private static String capitalizeFirst(String s) {
+        if (s == null || s.isBlank()) return s;
+        if (!s.equals(s.toUpperCase())) return s;
+        String lower = s.toLowerCase();
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+    }
+
+    /**
+     * Каждое слово с заглавной буквы, остальные строчные.
+     * "МАЖЕЙКО АЛЕКСЕЙ АНАТОЛЬЕВИЧ" → "Мажейко Алексей Анатольевич"
+     * Смешанный регистр (уже "Иванов Иван") — возвращается как есть.
+     * Разделители (пробел, дефис, точка) начинают новое слово.
+     */
+    private static String titleCaseFio(String s) {
+        if (s == null || s.isBlank()) return s;
+        if (!s.equals(s.toUpperCase())) return s;
+        var sb = new StringBuilder();
+        boolean newWord = true;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (Character.isLetter(ch)) {
+                sb.append(newWord ? Character.toUpperCase(ch) : Character.toLowerCase(ch));
+                newWord = false;
+            } else {
+                sb.append(ch);
+                newWord = true;
+            }
+        }
+        return sb.toString();
     }
 
     private static String extractCn(String subject) {
