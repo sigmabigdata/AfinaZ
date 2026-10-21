@@ -345,15 +345,14 @@ public class SignatureVisualizationService {
      *
      * <p>Источники:
      * <ul>
-     *   <li>Должность: T, либо OID.1.2.840.113549.1.9.2 (unstructuredName)</li>
-     *   <li>ФИО: SURNAME+GIVENNAME, либо CN (если не похож на название юрлица),
-     *       либо unstructuredName</li>
+     *   <li>Должность: 2.5.4.12 / T / TITLE, либо unstructuredName</li>
+     *   <li>ФИО: 2.5.4.4 (SURNAME) + 2.5.4.42 (GIVENNAME);
+     *       fallback — CN, если не похож на название юрлица</li>
      *   <li>Организация: O</li>
      * </ul>
      *
-     * <p>Дубли (O == CN, O == ФИО) отбрасываются. Если в CN лежит только
-     * название юрлица (ООО/АО/ПАО/ИП) — считаем, что ФИО в этом сертификате
-     * нет, и не пытаемся подставить CN как ФИО.
+     * <p>OID-поля часто приходят как DER-encoded byte[] (в RFC2253 — «#hex»),
+     * поэтому их значения декодируются через BouncyCastle.
      */
     private static String buildOwnerDisplay(java.security.cert.X509Certificate cert) {
         try {
@@ -365,19 +364,17 @@ public class SignatureVisualizationService {
             String surname = null, givenName = null, unstructured = null;
 
             for (var rdn : ldap.getRdns()) {
-                String type = rdn.getType();
-                String typeUpper = type.toUpperCase();
-                String value = String.valueOf(rdn.getValue()).trim();
-                if (value.isEmpty()) continue;
+                String typeUpper = rdn.getType().toUpperCase();
+                String value = decodeRdnValue(rdn.getValue());
+                if (value == null || value.isEmpty()) continue;
                 switch (typeUpper) {
                     case "CN" -> cn = value;
                     case "O"  -> o  = value;
-                    case "T", "TITLE" -> t = value;
-                    case "SURNAME" -> surname = value;
-                    case "GIVENNAME", "GN" -> givenName = value;
+                    case "T", "TITLE", "2.5.4.12" -> t = value;
+                    case "SURNAME", "SN", "2.5.4.4" -> surname = value;
+                    case "GIVENNAME", "GN", "2.5.4.42" -> givenName = value;
                     case "1.2.840.113549.1.9.2" -> unstructured = value;
-                    // OID.1.2.643.* — служебные (ИНН, СНИЛС, ОГРН), не для отображения
-                    default -> { /* ignore */ }
+                    default -> { /* OID.1.2.643.* — ИНН/СНИЛС/ОГРН, не для отображения */ }
                 }
             }
 
@@ -391,6 +388,10 @@ public class SignatureVisualizationService {
             String fio = null;
             if (surname != null && givenName != null) {
                 fio = surname + " " + givenName;
+            } else if (surname != null) {
+                fio = surname;
+            } else if (givenName != null) {
+                fio = givenName;
             } else if (cn != null && !looksLikeOrganization(cn)) {
                 fio = cn;
             } else if (unstructured != null && !looksLikeOrganization(unstructured)) {
@@ -414,6 +415,26 @@ public class SignatureVisualizationService {
         } catch (Exception e) {
             return cert.getSubjectX500Principal().getName();
         }
+    }
+
+    /**
+     * Декодирует значение RDN: если byte[] (DER) — через ASN1,
+     * иначе — как строку. Нужно потому, что OID-поля (2.5.4.4, 2.5.4.42, …)
+     * в RFC2253 приходят как «#hex», и Java отдаёт их байтами.
+     */
+    private static String decodeRdnValue(Object value) {
+        if (value == null) return null;
+        if (value instanceof String s) return s.trim();
+        if (value instanceof byte[] bytes) {
+            try {
+                var asn1 = org.bouncycastle.asn1.ASN1Primitive.fromByteArray(bytes);
+                if (asn1 instanceof org.bouncycastle.asn1.ASN1String as) {
+                    return as.getString().trim();
+                }
+            } catch (Exception ignored) { /* fallback ниже */ }
+            return new String(bytes, java.nio.charset.StandardCharsets.UTF_8).trim();
+        }
+        return String.valueOf(value).trim();
     }
 
     /** Название юрлица/ИП (ООО, АО, ПАО, ЗАО, ОАО, ИП, LLC, LTD, INC). */
