@@ -404,9 +404,10 @@ public class SignatureVisualizationService {
             var parts = new java.util.ArrayList<String>();
             if (position != null && !position.isBlank())      parts.add(position);
             if (fio != null && !fio.isBlank())                parts.add(fio);
+            // Дедуп только против ФИО: если CN — название юрлица, то в parts
+            // его нет, и организация должна попасть в вывод.
             if (org != null && !org.isBlank()
-                    && !org.equalsIgnoreCase(fio)
-                    && !org.equalsIgnoreCase(cn))             parts.add(org);
+                    && !org.equalsIgnoreCase(fio))            parts.add(org);
 
             // Fallback: если вообще ничего не собрали — CN
             if (parts.isEmpty() && cn != null && !cn.isBlank()) parts.add(cn);
