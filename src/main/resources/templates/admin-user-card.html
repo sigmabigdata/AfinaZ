@@ -244,28 +244,6 @@
                         </div>
                     </div>
                     <span th:if="${#lists.isEmpty(d.signatures)}" class="muted small">—</span>
-                    <div th:if="${d.signed}" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                        <form method="post"
-                              th:action="@{'/admin/documents/' + ${d.id} + '/apply-poa'}"
-                              style="display:inline; margin:0;">
-                            <input type="hidden" name="apply" th:value="${!d.applyPoa}"/>
-                            <button type="submit"
-                                    class="btn-ghost btn-sm"
-                                    th:style="${d.applyPoa} ? 'background:#e6f7ec; color:#166534; border-color:#c2e7cd;' : ''"
-                                    th:text="${d.applyPoa ? '✓ Доверенность' : 'Применить доверенность'}"
-                                    title="Применить/отключить доверенность в штампе">
-                            </button>
-                        </form>
-                        <form th:action="@{'/admin/documents/' + ${d.id} + '/upload-signature'}"
-                              method="post" enctype="multipart/form-data"
-                              style="display:inline-flex; gap:3px; align-items:center;">
-                            <input type="file" name="file" accept=".sig,.p7s,.der" required
-                                   style="font-size:10px; max-width:110px;"/>
-                            <button type="submit" class="btn-ghost btn-sm"
-                                    title="Загрузить .sig и проверить"
-                                    style="padding:3px 8px; font-size:11px;">📎</button>
-                        </form>
-                    </div>
                 </td>
                 <td class="actions">
                     <a th:href="@{'/admin/documents/' + ${d.id} + '/view'}"

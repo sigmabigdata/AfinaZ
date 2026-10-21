@@ -164,7 +164,7 @@ public class SignatureVisualizationService {
     // ============ ядро ============
 
     private record CertInfo(String serialHex, Instant notBefore, Instant notAfter,
-                            String ownerFio, Instant signingTime) {}
+                            String ownerFio, String ownerDisplay, Instant signingTime) {}
 
     private byte[] stampPdf(byte[] original, Document document) throws IOException {
         List<DocumentSignature> sigs = new ArrayList<>(document.getSignatures());
@@ -289,7 +289,7 @@ public class SignatureVisualizationService {
         drawLine(cs, font, "Владелец:", x, y);
         y -= LINE_HEIGHT;
 
-        drawLine(cs, font, nvl(certInfo.ownerFio()), x + 6f, y);
+        drawLine(cs, font, nvl(certInfo.ownerDisplay()), x + 6f, y);
         y -= LINE_HEIGHT;
 
         if (applyPoa) {
@@ -330,6 +330,37 @@ public class SignatureVisualizationService {
     }
 
     private static String nvl(String s) { return s != null && !s.isBlank() ? s : "—"; }
+
+    /**
+     * Собирает отображаемое имя владельца сертификата:
+     *   [Должность (T)] + [ФИО (CN)] + [Организация (O)]
+     * Порядок фиксирован: должность → ФИО → организация.
+     * Если чего-то нет (например, физлицо без O/T) — просто пропускается.
+     */
+    private static String buildOwnerDisplay(java.security.cert.X509Certificate cert) {
+        try {
+            var p = cert.getSubjectX500Principal();
+            var ldap = new javax.naming.ldap.LdapName(
+                    p.getName(javax.security.auth.x500.X500Principal.RFC2253));
+            String cn = null, o = null, t = null;
+            for (var rdn : ldap.getRdns()) {
+                String type = rdn.getType().toUpperCase();
+                String value = String.valueOf(rdn.getValue()).trim();
+                switch (type) {
+                    case "CN" -> cn = value;
+                    case "O"  -> o  = value;
+                    case "T"  -> t  = value;
+                }
+            }
+            var parts = new java.util.ArrayList<String>();
+            if (t  != null && !t.isBlank())  parts.add(t);
+            if (cn != null && !cn.isBlank()) parts.add(cn);
+            if (o  != null && !o.isBlank())  parts.add(o);
+            return parts.isEmpty() ? p.getName() : String.join(", ", parts);
+        } catch (Exception e) {
+            return cert.getSubjectX500Principal().getName();
+        }
+    }
 
     private static String extractCn(String subject) {
         if (subject == null) return "—";
@@ -378,13 +409,15 @@ public class SignatureVisualizationService {
             Instant signingTime = extractSigningTime(signer);
 
             String ownerFio = extractCn(cert.getSubjectX500Principal().getName());
-            log.info("extractCertInfo: sig={}, serial={}, ownerFio='{}', signingTime={}",
-                    sig.getId(), cert.getSerialNumber().toString(16), ownerFio, signingTime);
+            String ownerDisplay = buildOwnerDisplay(cert);
+            log.info("extractCertInfo: sig={}, serial={}, ownerFio='{}', ownerDisplay='{}', signingTime={}",
+                    sig.getId(), cert.getSerialNumber().toString(16), ownerFio, ownerDisplay, signingTime);
             return new CertInfo(
                     cert.getSerialNumber().toString(16).toUpperCase(),
                     cert.getNotBefore().toInstant(),
                     cert.getNotAfter().toInstant(),
                     ownerFio,
+                    ownerDisplay,
                     signingTime);
 
         } catch (Exception e) {
@@ -392,10 +425,12 @@ public class SignatureVisualizationService {
         }
 
         // Fallback на данные из БД
+        String fallbackDisplay = extractCn(sig.getSignerSubject());
         return new CertInfo(
                 sig.getSignerSerial() != null ? sig.getSignerSerial().toUpperCase() : "—",
                 null, null,
-                extractCn(sig.getSignerSubject()),
+                fallbackDisplay,
+                fallbackDisplay,
                 null);
     }
 

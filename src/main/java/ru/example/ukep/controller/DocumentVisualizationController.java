@@ -175,6 +175,7 @@ public class DocumentVisualizationController {
 
     /** Toggle "применить доверенность" для конкретной подписи. */
     @PostMapping("/signatures/{sigId}/apply-poa")
+    @org.springframework.transaction.annotation.Transactional
     public String applyPoaSignature(@PathVariable Long id,
                                      @PathVariable Long sigId,
                                      @RequestParam boolean apply,

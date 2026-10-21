@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface DocumentSignatureRepository extends JpaRepository<DocumentSignature, Long> {
 
-    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @org.springframework.data.jpa.repository.Query(
             "update DocumentSignature s set s.applyPoa = :apply where s.id = :id")
     int updateApplyPoa(@org.springframework.data.repository.query.Param("id") Long id,
