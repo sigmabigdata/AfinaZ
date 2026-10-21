@@ -200,6 +200,9 @@ public class SystemInfoController {
                 case "backups"   -> cleanup.cleanBackups();
                 case "orphans"   -> cleanup.cleanOrphanFiles();
                 case "orphanvis" -> cleanup.cleanOrphanVisualizations();
+                case "tmp"       -> cleanup.cleanTmp();
+                case "apt"       -> cleanup.cleanAptCache();
+                case "journal"   -> cleanup.cleanJournal();
                 case "docker"    -> cleanup.cleanDocker();
                 default -> throw new IllegalArgumentException("Неизвестная категория: " + type);
             };

@@ -537,7 +537,10 @@
             crls: 'старые auto-CRL',
             backups: 'старые бэкапы',
             orphans: 'файлы-сироты',
-            orphanvis: 'визуализации-сироты'
+            orphanvis: 'визуализации-сироты',
+            tmp: 'временные файлы /tmp',
+            apt: 'APT cache',
+            journal: 'journald'
         };
         if (!confirm('Очистить: ' + (labels[type] || type) + '?')) return;
         try {
@@ -562,7 +565,7 @@
     document.getElementById('cleanup-analyze').addEventListener('click', loadAnalysis);
     document.getElementById('cleanup-all').addEventListener('click', async function () {
         if (!confirm('Очистить все категории? (Docker + логи + CRL + бэкапы + сироты)')) return;
-        for (const t of ['docker', 'logs', 'crls', 'backups', 'orphans', 'orphanvis']) {
+        for (const t of ['docker', 'logs', 'crls', 'backups', 'orphans', 'orphanvis', 'tmp', 'apt', 'journal']) {
             await runCleanup(t);
         }
     });

@@ -87,6 +87,9 @@ public class CleanupService {
         list.add(analyzeBackups());
         list.add(analyzeOrphanFiles());
         list.add(analyzeOrphanVisualizations());
+        list.add(analyzeTmp());
+        list.add(analyzeAptCache());
+        list.add(analyzeJournal());
         list.add(analyzeDocker());
         long total = list.stream().mapToLong(Category::bytes).sum();
         return new Report(list, total);
@@ -186,6 +189,67 @@ public class CleanupService {
             });
         } catch (Exception e) { log.debug("analyzeOrphanVisualizations: {}", e.getMessage()); }
         return new Category("orphanvis", "Визуализации-сироты", acc[0], acc[1], "файлы без записи в БД");
+    }
+
+    private Category analyzeAptCache() {
+        Path dir = Path.of("/var/cache/apt/archives");
+        if (!Files.isDirectory(dir)) return new Category("apt", "APT cache", 0, 0, "нет каталога");
+        long[] acc = {0, 0};
+        try (Stream<Path> s = Files.list(dir)) {
+            s.filter(Files::isRegularFile).forEach(f -> {
+                try {
+                    if (f.getFileName().toString().endsWith(".deb")) {
+                        acc[0] += Files.size(f); acc[1]++;
+                    }
+                } catch (Exception ignored) {}
+            });
+        } catch (Exception e) { log.debug("analyzeAptCache: {}", e.getMessage()); }
+        return new Category("apt", "APT cache (.deb)", acc[0], acc[1], "apt clean");
+    }
+
+    private Category analyzeJournal() {
+        long bytes = 0;
+        try {
+            String out = runProcess("journalctl", "--disk-usage");
+            // "Archived and active journals take up 44.4M in the file system."
+            var m = java.util.regex.Pattern.compile("take up ([\\d.]+)([KMG]?)")
+                    .matcher(out);
+            if (m.find()) {
+                double v = Double.parseDouble(m.group(1));
+                bytes = switch (m.group(2)) {
+                    case "G" -> (long) (v * 1024 * 1024 * 1024);
+                    case "M" -> (long) (v * 1024 * 1024);
+                    case "K" -> (long) (v * 1024);
+                    default  -> (long) v;
+                };
+            }
+        } catch (Exception e) { log.debug("analyzeJournal: {}", e.getMessage()); }
+        // Освободится столько, сколько выше target (по умолчанию 200M)
+        long target = settings.getIntOrDefault("cleanup.journal_max_mb", 200) * 1024L * 1024L;
+        long freed = Math.max(0, bytes - target);
+        return new Category("journal", "journald", freed, 0,
+                "current=" + formatBytes(bytes) + ", target=" + formatBytes(target));
+    }
+
+    private Category analyzeTmp() {
+        Path dir = Path.of("/tmp");
+        if (!Files.isDirectory(dir)) return new Category("tmp", "Временные файлы", 0, 0, "нет /tmp");
+        long[] acc = {0, 0};
+        int maxDays = settings.getIntOrDefault("cleanup.tmp_max_age_days", 7);
+        try (Stream<Path> s = Files.list(dir)) {
+            s.filter(Files::isRegularFile).forEach(f -> {
+                try {
+                    String n = f.getFileName().toString();
+                    boolean ours = n.startsWith("afina-") || n.startsWith("rebuild-")
+                            || n.startsWith("build-") || n.endsWith(".tmp");
+                    if (ours && isOlderThan(f, maxDays)) {
+                        acc[0] += Files.size(f); acc[1]++;
+                    }
+                } catch (Exception ignored) {}
+            });
+        } catch (Exception e) { log.debug("analyzeTmp: {}", e.getMessage()); }
+        return new Category("tmp", "Временные файлы", acc[0], acc[1],
+                "afina-*/rebuild-*/build-* старше " + maxDays + " дн.");
     }
 
     private Category analyzeDocker() {
@@ -291,6 +355,46 @@ public class CleanupService {
      * Docker-очистка. БЕЗ --volumes.
      * Порядок: build cache → dangling+unused images → stopped containers.
      */
+    public CleanResult cleanTmp() {
+        Path dir = Path.of("/tmp");
+        if (!Files.isDirectory(dir)) return new CleanResult("tmp", 0, 0, "нет /tmp");
+        int maxDays = settings.getIntOrDefault("cleanup.tmp_max_age_days", 7);
+        return cleanFiles(dir, "tmp",
+                f -> {
+                    String n = f.getFileName().toString();
+                    boolean ours = n.startsWith("afina-") || n.startsWith("rebuild-")
+                            || n.startsWith("build-") || n.endsWith(".tmp");
+                    return ours && isOlderThan(f, maxDays);
+                });
+    }
+
+    public CleanResult cleanAptCache() {
+        long before = analyzeAptCache().bytes();
+        try {
+            runProcess("apt-get", "clean");
+            long after = analyzeAptCache().bytes();
+            long freed = Math.max(0, before - after);
+            return new CleanResult("apt", freed, 0,
+                    "APT cache очищен: " + formatBytes(freed));
+        } catch (Exception e) {
+            return new CleanResult("apt", 0, 0, "Ошибка: " + e.getMessage());
+        }
+    }
+
+    public CleanResult cleanJournal() {
+        int maxMb = settings.getIntOrDefault("cleanup.journal_max_mb", 200);
+        long before = analyzeJournal().bytes() + maxMb * 1024L * 1024L;
+        try {
+            runProcess("journalctl", "--vacuum-size=" + maxMb + "M");
+            long after = analyzeJournal().bytes() + maxMb * 1024L * 1024L;
+            long freed = Math.max(0, before - after);
+            return new CleanResult("journal", freed, 0,
+                    "journald сжат до " + maxMb + " MB (освобождено " + formatBytes(freed) + ")");
+        } catch (Exception e) {
+            return new CleanResult("journal", 0, 0, "Ошибка: " + e.getMessage());
+        }
+    }
+
     public CleanResult cleanDocker() {
         long freed = 0;
         StringBuilder msg = new StringBuilder();
