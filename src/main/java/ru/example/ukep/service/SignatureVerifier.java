@@ -113,6 +113,69 @@ public class SignatureVerifier {
         return result;
     }
 
+    /**
+     * Верификация подписи <b>без построения цепочки</b>.
+     * <p>Проверяет только:
+     * <ol>
+     *   <li>Криптографическую подпись документа signer-сертификатом</li>
+     *   <li>Срок действия signer-сертификата</li>
+     * </ol>
+     * <p>НЕ проверяет: issuer chain, доверие корню, отзыв по CRL.
+     *
+     * <p>Используется при загрузке .sig через админку, когда .sig сделан
+     * с опцией END_ENTITY_ONLY (без промежуточного CA в CMS).</p>
+     */
+    public Map<String, Object> verifyDetachedBasic(byte[] data, String signatureBase64) throws Exception {
+        String cleaned = signatureBase64
+                .replaceAll("-----BEGIN[^-]*-----", "")
+                .replaceAll("-----END[^-]*-----", "")
+                .replaceAll("\\s+", "")
+                .replaceAll("[^A-Za-z0-9+/=]", "");
+        byte[] signatureBytes = Base64.decode(cleaned);
+
+        CMSSignedData cms = new CMSSignedData(new CMSProcessableByteArray(data), signatureBytes);
+        SignerInformationStore signers = cms.getSignerInfos();
+
+        Map<String, Object> result = new HashMap<>();
+        List<String> infos = new ArrayList<>();
+        String firstCn = "";
+        String firstSerial = "";
+
+        for (SignerInformation signer : signers.getSigners()) {
+            X509Certificate leaf = getSignerCert(signer, cms);
+
+            // 1) Криптопроверка подписи документа
+            if (!verifySignerCrypto(signer, leaf)) {
+                throw new IllegalStateException("Подпись недействительна (crypto verify failed)");
+            }
+
+            // 2) Срок действия leaf
+            try {
+                leaf.checkValidity();
+            } catch (java.security.cert.CertificateException e) {
+                throw new IllegalStateException(
+                        "Срок действия сертификата истёк: " + leaf.getSubjectX500Principal(), e);
+            }
+
+            String subject = leaf.getSubjectX500Principal().getName();
+            String cn = extractCn(subject);
+            String serial = leaf.getSerialNumber().toString(16);
+            infos.add(subject + "; serial=" + serial);
+            if (firstCn.isEmpty()) {
+                firstCn = cn;
+                firstSerial = serial;
+            }
+        }
+
+        result.put("valid", true);
+        result.put("signersCount", infos.size());
+        result.put("signersInfo", String.join("\n", infos));
+        result.put("signerSubject", firstCn);
+        result.put("signerSerial", firstSerial);
+        result.put("chainVerified", false);
+        return result;
+    }
+
     // ==================== Внутренние методы ====================
 
     /** Метаданные одного подписанта (для результата верификации). */
