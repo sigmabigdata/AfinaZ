@@ -269,8 +269,8 @@ public class SignatureVisualizationService {
         String signedAt = signTime != null
                 ? TS_FMT.format(signTime.atZone(ZoneId.systemDefault()))
                 : "—";
-        drawLineLeft(cs, font, "Документ подписан электронной подписью", left, y);
-        drawLineRight(cs, font, "Дата: " + signedAt, right, y);
+        drawLineLeft(cs, font, "Дата: " + signedAt, left, y);
+        drawLineRight(cs, font, "Документ подписан электронной подписью", right, y);
         y -= LINE_HEIGHT;
 
         // Строка 2: владелец (T, CN, O) — на всю ширину
@@ -278,13 +278,13 @@ public class SignatureVisualizationService {
         y -= LINE_HEIGHT;
 
         // Строка 3: серийный номер слева | срок действия справа
-        drawLineLeft(cs, font, "Сертификат: " + nvl(certInfo.serialHex()), left, y);
         String validity = "—";
         if (certInfo.notBefore() != null && certInfo.notAfter() != null) {
             validity = "с " + D_FMT.format(certInfo.notBefore().atZone(ZoneId.systemDefault()))
                      + " по " + D_FMT.format(certInfo.notAfter().atZone(ZoneId.systemDefault()));
         }
-        drawLineRight(cs, font, "Действителен: " + validity, right, y);
+        drawLineLeft(cs, font, "Действителен: " + validity, left, y);
+        drawLineRight(cs, font, "Сертификат: " + nvl(certInfo.serialHex()), right, y);
         y -= LINE_HEIGHT;
 
         // Строка 4 (опц.): доверенность слева | срок справа
