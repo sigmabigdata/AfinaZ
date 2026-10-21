@@ -133,16 +133,22 @@ public class DocumentVisualizationController {
             byte[] sigBytes = file.getBytes();
             String sigBase64 = java.util.Base64.getEncoder().encodeToString(sigBytes);
 
-            // Верификация: подпись должна соответствовать содержимому документа
-            java.util.Map<String, Object> result = signatureVerifier.verifyDetached(
+            // Верификация: подпись должна соответствовать содержимому документа.
+            // Используем verifyDetachedBasic — без chain building, потому что .sig
+            // может быть сделан с END_ENTITY_ONLY (промежуточный CA не вшит).
+            // Подпись документа (signer.verify) — проверяется в полном объёме.
+            java.util.Map<String, Object> result = signatureVerifier.verifyDetachedBasic(
                     documentService.getBytes(doc), sigBase64);
+            log.info("upload-signature: cryptographic verify OK, chain NOT verified (END_ENTITY_ONLY allowed)");
             String subject = String.valueOf(result.getOrDefault("signerSubject", "—"));
             String serial = String.valueOf(result.getOrDefault("signerSerial", "—"));
 
             // signer = null (не привязываем к пользователю — это подпись из файла)
             documentService.addSignature(id, null, sigBase64, subject, serial);
-            audit.documentUploadSignature(
-                    principal != null ? principal.getName() : "unknown", id, subject);
+            audit.event("DOC_UPLOAD_SIG", "SUCCESS",
+                    principal != null ? principal.getName() : "unknown",
+                    "DOCUMENT", String.valueOf(id), subject,
+                    "chain-not-verified (END_ENTITY_ONLY .sig)");
 
             // Пересоздать визуализацию
             try {
