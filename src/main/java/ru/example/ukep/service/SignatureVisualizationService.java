@@ -4,6 +4,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.cms.Attribute;
@@ -244,48 +245,6 @@ public class SignatureVisualizationService {
 
             pdf.save(out);
             return out.toByteArray();
-        }
-    }
-
-    private void drawFooter(PDPageContentStream cs, PDFont font, PDImageXObject logo, float pageWidth) throws IOException {
-        float footerY = 15f; // Отступ от низа
-        float logoWidth = 70f;
-        float logoHeight = logo != null ? logoWidth * ((float) logo.getHeight() / logo.getWidth()) : 0f;
-
-        // Логотип слева
-        if (logo != null) {
-            cs.drawImage(logo, MARGIN, footerY, logoWidth, logoHeight);
-        }
-
-        // Текст справа (серый, элегантный)
-        String text = "Документ подписан усиленной квалифицированной электронной подписью";
-        float fontSize = 8f;
-        cs.setFont(font, fontSize);
-        cs.setNonStrokingColor(0.4f, 0.4f, 0.4f); // Серый
-
-        float textWidth = font.getStringWidth(text) / 1000f * fontSize;
-        float textX = pageWidth - MARGIN - textWidth;
-        float textY = footerY + (logoHeight / 2f) - (fontSize / 3f);
-
-        cs.beginText();
-        cs.newLineAtOffset(textX, textY);
-        cs.showText(text);
-        cs.endText();
-
-        cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
-    }
-
-    private PDImageXObject loadLogo(PDDocument pdf) {
-        try {
-            java.io.InputStream is = getClass().getResourceAsStream("/static/img/logo.png");
-            if (is == null) {
-                log.warn("Логотип не найден в /static/img/logo.png, футер будет без лого");
-                return null;
-            }
-            return PDImageXObject.createFromByteArray(pdf, is.readAllBytes(), "logo");
-        } catch (Exception e) {
-            log.warn("Не удалось загрузить логотип: {}", e.getMessage());
-            return null;
         }
     }
 
