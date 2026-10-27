@@ -180,14 +180,9 @@ public class SignatureVisualizationService {
         for (var sig : sigs) {
             CertInfo info = extractCertInfo(sig, original);
             certInfoMap.put(sig.getId(), info);
-            // POA применяется per-signature
             if (sig.isApplyPoa()) {
                 Optional<PowerOfAttorney> poa = poaService.findEffectiveByFio(info.ownerFio());
                 poa.ifPresent(p -> poaMap.put(sig.getId(), p));
-                log.info("Visualization: sig={}, applyPoa=true, ownerFio='{}', poaFound={}",
-                        sig.getId(), info.ownerFio(), poa.isPresent());
-            } else {
-                log.debug("Visualization: sig={}, applyPoa=false", sig.getId());
             }
         }
 
@@ -195,52 +190,102 @@ public class SignatureVisualizationService {
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             PDFont font = loadFont(pdf);
+            PDImageXObject logo = loadLogo(pdf);
+            int totalPages = pdf.getNumberOfPages();
 
-            for (int pageNum = 0; pageNum < pdf.getNumberOfPages(); pageNum++) {
+            for (int pageNum = 0; pageNum < totalPages; pageNum++) {
                 PDPage page = pdf.getPage(pageNum);
                 float pageWidth = page.getMediaBox().getWidth();
-                float stampHeight = calculateStampHeight(sigs);
-                float boxTopY = MARGIN + stampHeight + BOX_PADDING;
-                float boxBotY = MARGIN - BOX_PADDING;
 
                 try (PDPageContentStream cs = new PDPageContentStream(
                         pdf, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
 
-                    // Синяя рамка
-                    cs.setStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
-                    cs.setLineWidth(0.6f);
-                    cs.addRect(BOX_MARGIN_X, boxBotY,
-                            pageWidth - 2 * BOX_MARGIN_X, boxTopY - boxBotY);
-                    cs.stroke();
+                    // 1. ФУТЕР НА КАЖДОЙ СТРАНИЦЕ (лого + текст)
+                    drawFooter(cs, font, logo, pageWidth);
 
-                    // Синий текст
-                    cs.setNonStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
+                    // 2. ШТАМПЫ ПОДПИСЕЙ — ТОЛЬКО НА ПОСЛЕДНЕЙ СТРАНИЦЕ
+                    if (pageNum == totalPages - 1) {
+                        float stampHeight = calculateStampHeight(sigs);
+                        // Приподнимаем штамп над футером (футер занимает ~20f)
+                        float boxTopY = MARGIN + 20f + stampHeight + BOX_PADDING;
+                        float boxBotY = MARGIN + 20f;
 
-                    float y = boxTopY - LINE_HEIGHT;
-                    boolean first = true;
-                    for (var sig : sigs) {
-                        if (!first) {
-                            cs.setStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
-                            cs.setLineWidth(0.25f);
-                            cs.moveTo(MARGIN + 2f, y + LINE_HEIGHT / 2f);
-                            cs.lineTo(pageWidth - MARGIN - 2f, y + LINE_HEIGHT / 2f);
-                            cs.stroke();
+                        // Синяя рамка штампа
+                        cs.setStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
+                        cs.setLineWidth(0.6f);
+                        cs.addRect(BOX_MARGIN_X, boxBotY,
+                                pageWidth - 2 * BOX_MARGIN_X, boxTopY - boxBotY);
+                        cs.stroke();
+
+                        cs.setNonStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
+
+                        float y = boxTopY - LINE_HEIGHT;
+                        boolean first = true;
+                        for (var sig : sigs) {
+                            if (!first) {
+                                cs.setStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
+                                cs.setLineWidth(0.25f);
+                                cs.moveTo(MARGIN + 2f, y + LINE_HEIGHT / 2f);
+                                cs.lineTo(pageWidth - MARGIN - 2f, y + LINE_HEIGHT / 2f);
+                                cs.stroke();
+                                y -= LINE_HEIGHT / 2f;
+                            }
+                            first = false;
+                            y = drawSignatureBlock(cs, font, sig,
+                                    certInfoMap.get(sig.getId()),
+                                    poaMap.get(sig.getId()),
+                                    sig.isApplyPoa(), pageWidth, y);
                             y -= LINE_HEIGHT / 2f;
                         }
-                        first = false;
-                        y = drawSignatureBlock(cs, font, sig,
-                                certInfoMap.get(sig.getId()),
-                                poaMap.get(sig.getId()),
-                                sig.isApplyPoa(), pageWidth, y);
-                        y -= LINE_HEIGHT / 2f;
+                        cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
                     }
-
-                    cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
                 }
             }
 
             pdf.save(out);
             return out.toByteArray();
+        }
+    }
+
+    private void drawFooter(PDPageContentStream cs, PDFont font, PDImageXObject logo, float pageWidth) throws IOException {
+        float footerY = 15f; // Отступ от низа
+        float logoWidth = 70f;
+        float logoHeight = logo != null ? logoWidth * ((float) logo.getHeight() / logo.getWidth()) : 0f;
+
+        // Логотип слева
+        if (logo != null) {
+            cs.drawImage(logo, MARGIN, footerY, logoWidth, logoHeight);
+        }
+
+        // Текст справа (серый, элегантный)
+        String text = "Документ подписан усиленной квалифицированной электронной подписью";
+        float fontSize = 8f;
+        cs.setFont(font, fontSize);
+        cs.setNonStrokingColor(0.4f, 0.4f, 0.4f); // Серый
+
+        float textWidth = font.getStringWidth(text) / 1000f * fontSize;
+        float textX = pageWidth - MARGIN - textWidth;
+        float textY = footerY + (logoHeight / 2f) - (fontSize / 3f);
+
+        cs.beginText();
+        cs.newLineAtOffset(textX, textY);
+        cs.showText(text);
+        cs.endText();
+
+        cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
+    }
+
+    private PDImageXObject loadLogo(PDDocument pdf) {
+        try {
+            java.io.InputStream is = getClass().getResourceAsStream("/static/img/logo.png");
+            if (is == null) {
+                log.warn("Логотип не найден в /static/img/logo.png, футер будет без лого");
+                return null;
+            }
+            return PDImageXObject.createFromByteArray(pdf, is.readAllBytes(), "logo");
+        } catch (Exception e) {
+            log.warn("Не удалось загрузить логотип: {}", e.getMessage());
+            return null;
         }
     }
 
