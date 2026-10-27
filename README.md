@@ -106,23 +106,8 @@ docker compose -f docker-compose-prod.yml --env-file .env.prod up -d --build
 ## Документация
 Подробное описание архитектуры, потоков данных, API и структуры БД читайте в [TECHNICAL.md](./TECHNICAL.md).
 
-## Контакты
-* Разработка: sigmabigdata
-* Репозиторий: https://github.com/sigmabigdata/AfinaZ
 ```
 
-5. Прокрути страницу вниз. В поле **Commit changes** напиши: `docs: expanded README` и нажми зеленую кнопку **Commit changes**.
-
----
-
-### Теперь то же самое для TECHNICAL.md:
-
-1. Открой ссылку: 👉 **[https://github.com/sigmabigdata/AfinaZ/blob/main/TECHNICAL.md](https://github.com/sigmabigdata/AfinaZ/blob/main/TECHNICAL.md)**
-2. Нажми **карандаш** (Edit).
-3. Удали старый текст.
-4. Вставь **этот текст**:
-
-```markdown
 # Техническая документация (AfinaZ / ПАО «НБД-Банк»)
 
 Документ предназначен для ИТ-специалистов, администраторов безопасности и DevOps-инженеров.
@@ -256,4 +241,3 @@ cd /opt/afinaz
 git pull origin main
 ```
 
-Всё готово. Больше никаких зависаний терминала с `heredoc>`.
