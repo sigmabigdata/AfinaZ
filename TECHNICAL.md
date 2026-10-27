@@ -110,23 +110,4 @@ curl -s http://localhost:8080/actuator/health
 | POST | `/admin/system/cleanup/{type}` | Очистка мусора (docker, logs, tmp) |
 ```
 
-5. Нажми **Commit changes**.
 
----
-
-### Финальный шаг: Синхронизация Mac и Сервера
-
-Теперь, когда файлы обновлены прямо на GitHub, просто стяни их в терминале:
-
-**На Mac:**
-```bash
-cd ~/Documents/Projects/AfinaZ
-git pull origin main
-```
-
-**На Сервере (по SSH):**
-```bash
-ssh root@195.206.252.79
-cd /opt/afinaz
-git pull origin main
-```
