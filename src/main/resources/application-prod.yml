@@ -106,7 +106,7 @@ app:
   mail:
     mode: smtp
     from: ${MAIL_FROM:noreply@company.ru}
-    from-name: ${MAIL_FROM_NAME:Афина}
+    from-name: ${MAIL_FROM_NAME:ПАО "НБД-Банк"}
 
 # CryptoPro не отключаем — он установлен в образе
 crypto:

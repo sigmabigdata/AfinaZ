@@ -42,11 +42,11 @@ public class EmailService {
     }
 
     public void sendLoginLink(String to, String loginUrl) {
-        String subject = "Афина · Ссылка для входа";
+        String subject = "ПАО \"НБД-Банк\" · Ссылка для входа";
         String body = """
                 Здравствуйте!
 
-                Для входа в личный кабинет сервиса Афина перейдите по ссылке:
+                Для входа в личный кабинет ПАО "НБД-Банк" перейдите по ссылке:
                 %s
 
                 Ссылка действует 10 часов и может быть использована только один раз.
@@ -57,9 +57,9 @@ public class EmailService {
     }
 
     public void sendAlert(String to, int failCount, String reason) {
-        String subject = "Афина · Сервис недоступен";
+        String subject = "ПАО \"НБД-Банк\" · Сервис недоступен";
         String body = """
-                Обнаружена проблема с сервисом.
+                Обнаружена проблема с сервисом ПАО "НБД-Банк".
 
                 Причина: %s
                 Сбоев подряд: %d
@@ -76,9 +76,9 @@ public class EmailService {
 
     /** Тестовое письмо — для кнопки "Проверить" в UI. */
     public void sendTest(String to) {
-        String subject = "Афина · Тестовое письмо";
+        String subject = "ПАО \"НБД-Банк\" · Тестовое письмо";
         String body = """
-                Это тестовое письмо от сервиса Афина.
+                Это тестовое письмо от сервиса ПАО "НБД-Банк".
 
                 Если вы его видите — SMTP настроен корректно.
                 Отправлено: %s
