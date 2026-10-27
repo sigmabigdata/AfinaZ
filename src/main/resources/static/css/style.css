@@ -220,16 +220,17 @@ table.docs tr:hover td { background: #fafbff; }
 
 .actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    flex-wrap: nowrap; /* Запрет переноса */
+    gap: 2px;
     align-items: center;
     justify-content: flex-end;
-    white-space: normal;
+    white-space: nowrap;
+    min-width: 210px; /* Гарантированное место под 7-8 иконок */
 }
-.actions form { display: inline-flex; margin: 0; }
-.actions a, .actions button {
+.actions form { display: inline-flex; margin: 0; padding: 0; }
+.actions a, .actions button, .actions label {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; padding: 0; margin: 0 2px;
+    width: 28px; height: 28px; padding: 0; margin: 0;
     background: none; color: #2454ff;
     border: none; border-radius: 6px; cursor: pointer;
     font-size: 16px;
@@ -506,7 +507,14 @@ table.docs tr:hover td { background: #fafbff; }
     gap: 16px;
     padding: 16px 22px;
 }
-.doc-name { font-weight: 600; font-size: 15px; word-break: break-all; }
+.doc-name { 
+    font-weight: 600; font-size: 15px; 
+    word-break: break-all; 
+    max-width: 220px; /* Ограничиваем ширину */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* Обрезаем в одну строку */
+}
 .doc-meta {
     display: flex; gap: 8px; align-items: center;
     color: #6a7285; font-size: 13px;
