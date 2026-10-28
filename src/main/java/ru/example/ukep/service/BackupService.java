@@ -211,7 +211,10 @@ public class BackupService {
             "DROP SCHEMA public CASCADE; " +
             "CREATE SCHEMA public; " +
             "ALTER SCHEMA public OWNER TO afina_migrator; " +
-            "GRANT USAGE ON SCHEMA public TO afina_app, afina_auditor;"
+            "GRANT USAGE ON SCHEMA public TO afina_app, afina_auditor; " +
+            "CREATE EXTENSION IF NOT EXISTS pgcrypto; " +
+            "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"; " +
+            "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
         );
 
         runPsqlFromFileAsSuperuser(file, name.endsWith(".gz"));
