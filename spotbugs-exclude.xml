@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Игнорируем предупреждения о передаче ссылок на бины (Spring DI) -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2,CT_CONSTRUCTOR_THROW" />
+    </Match>
+    <!-- Игнорируем форматирование строк (для Java 17 text blocks это норма) -->
+    <Match>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE" />
+    </Match>
+    <!-- Игнорируем возврат null из Boolean (нужно для fallback-логики) -->
+    <Match>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
+        <Class name="ru.example.ukep.service.SignatureVerifier" />
+    </Match>
+    <!-- Игнорируем захардкоженный путь в SystemInfoService (сделан fallback) -->
+    <Match>
+        <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
+        <Class name="ru.example.ukep.service.SystemInfoService" />
+    </Match>
+    <!-- Игнорируем catch Exception (сделано намеренно для аудита) -->
+    <Match>
+        <Bug pattern="REC_CATCH_EXCEPTION" />
+    </Match>
+</FindBugsFilter>

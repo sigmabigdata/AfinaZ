@@ -277,14 +277,14 @@ public class SignatureVisualizationService {
     }
 
     private PDImageXObject loadLogo(PDDocument pdf) {
-        try {
-            java.io.InputStream is = getClass().getResourceAsStream("/static/img/logo.png");
+        try (java.io.InputStream is = getClass().getResourceAsStream("/static/img/logo.png")) {
             if (is == null) {
                 log.warn("Логотип не найден в /static/img/logo.png, футер будет без лого");
                 return null;
             }
-            return PDImageXObject.createFromByteArray(pdf, is.readAllBytes(), "logo");
-        } catch (Exception e) {
+            byte[] bytes = is.readAllBytes();
+            return PDImageXObject.createFromByteArray(pdf, bytes, "logo");
+        } catch (java.io.IOException e) {
             log.warn("Не удалось загрузить логотип: {}", e.getMessage());
             return null;
         }

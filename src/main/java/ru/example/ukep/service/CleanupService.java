@@ -450,7 +450,7 @@ public class CleanupService {
         pb.redirectErrorStream(true);
         Process p = pb.start();
         StringBuilder sb = new StringBuilder();
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
             String line;
             while ((line = br.readLine()) != null) sb.append(line).append("\n");
         }

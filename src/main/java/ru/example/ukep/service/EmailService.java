@@ -51,7 +51,7 @@ public class EmailService {
 
                 Ссылка действует 10 часов и может быть использована только один раз.
                 Если вы не запрашивали вход — просто проигнорируйте это письмо.
-                """.formatted(loginUrl);
+                """.formatted(loginUrl).replace("\n", System.lineSeparator());
 
         send(to, subject, body);
     }
@@ -69,7 +69,7 @@ public class EmailService {
                   cd /opt/afina
                   docker compose -f docker-compose-prod.yml --env-file .env.prod ps
                   docker compose -f docker-compose-prod.yml --env-file .env.prod logs app --tail 50
-                """.formatted(reason, failCount);
+                """.formatted(reason, failCount).replace("\n", System.lineSeparator());
 
         send(to, subject, body);
     }
@@ -82,7 +82,7 @@ public class EmailService {
 
                 Если вы его видите — SMTP настроен корректно.
                 Отправлено: %s
-                """.formatted(java.time.LocalDateTime.now());
+                """.formatted(java.time.LocalDateTime.now()).replace("\n", System.lineSeparator());
 
         // Тестовое письмо всегда уходит, даже в режиме log
         sendWithOverride(to, subject, body, true);

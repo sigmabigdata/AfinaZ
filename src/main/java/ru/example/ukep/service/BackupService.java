@@ -127,7 +127,7 @@ public class BackupService {
         final StringBuilder stderrBuf = new StringBuilder();
         Thread errThread = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(proc.getErrorStream()))) {
+                    new InputStreamReader(proc.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
                     stderrBuf.append(line).append("\n");
@@ -251,7 +251,7 @@ public class BackupService {
 
         Thread outThread = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(proc.getInputStream()))) {
+                    new InputStreamReader(proc.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) outBuf.append(line).append("\n");
             } catch (IOException ex) {
@@ -261,7 +261,7 @@ public class BackupService {
 
         Thread errThread = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(proc.getErrorStream()))) {
+                    new InputStreamReader(proc.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) errBuf.append(line).append("\n");
             } catch (IOException ex) {
@@ -300,7 +300,7 @@ public class BackupService {
             );
             pb.environment().put(ENV_PGPASSWORD, dbPassword);
             Process p = pb.start();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 // читаем и выбрасываем вывод psql, чтобы не блокировать pipe
                 @SuppressWarnings("unused")
                 String ignored;
@@ -379,7 +379,7 @@ public class BackupService {
         final StringBuilder stderrBuf = new StringBuilder();
         Thread errThread = new Thread(() -> {
             try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(proc.getErrorStream()))) {
+                    new InputStreamReader(proc.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) stderrBuf.append(line).append("\n");
             } catch (IOException ex) {

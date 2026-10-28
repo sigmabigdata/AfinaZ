@@ -28,6 +28,12 @@ public class SystemInfoService {
 
     private final JdbcTemplate jdbc;
 
+    @org.springframework.beans.factory.annotation.Value("${app.disk-path:/}")
+    private String diskPath;
+
+    @org.springframework.beans.factory.annotation.Value("${app.storage-path:/app/storage/documents}")
+    private String storagePath;
+
     public SystemInfoService(DataSource dataSource) {
         this.jdbc = new JdbcTemplate(dataSource);
     }
@@ -145,7 +151,7 @@ public class SystemInfoService {
     /** Диск: общий/использованный/свободный (ГБ). */
     public Map<String, Long> getDisk() {
         Map<String, Long> result = new LinkedHashMap<>();
-        File root = new File("/");
+        File root = new File(diskPath);
         long total = root.getTotalSpace();
         long free  = root.getFreeSpace();
         long used  = total - free;
@@ -181,7 +187,7 @@ public class SystemInfoService {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("name", t.get("name"));
                 m.put("rows", t.get("rows"));
-                Long sz = ((Number) t.get("size")).longValue();
+                long sz = ((Number) t.get("size")).longValue();
                 m.put("size", prettySize(sz));
                 pretty.add(m);
             }
@@ -260,10 +266,10 @@ public class SystemInfoService {
     public java.util.Map<String, Object> getStorageSize() {
         java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
         try {
-            java.nio.file.Path root = java.nio.file.Paths.get(
-                    System.getProperty("app.storage-path", "/app/storage/documents"));
+            java.nio.file.Path root = java.nio.file.Paths.get(storagePath);
             if (!java.nio.file.Files.isDirectory(root)) {
-                root = java.nio.file.Paths.get("/app/storage/documents");
+                log.warn("Storage path is not a directory: {}", storagePath);
+                root = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir")); // Fallback
             }
             long total = 0;
             long count = 0;
@@ -279,7 +285,8 @@ public class SystemInfoService {
             result.put("bytes", total);
             result.put("pretty", prettySize(total));
             result.put("files", count);
-        } catch (Exception e) {
+        } catch (java.io.IOException | SecurityException e) {
+            log.error("Failed to calculate storage size", e);
             result.put("bytes", 0L);
             result.put("pretty", "n/a");
             result.put("files", 0L);
