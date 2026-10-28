@@ -156,8 +156,8 @@ public class SignatureVerifier {
             X509Certificate leaf = getSignerCert(signer, cms);
 
             // 1) Быстрая проверка: digest из CMS == digest переданных данных?
-            Boolean digestMatches = checkSignedDigest(signer, data);
-            if (Boolean.FALSE.equals(digestMatches)) {
+            boolean digestMatches = checkSignedDigest(signer, data);
+            if (!digestMatches) {
                 throw new SignatureMismatchException(
                         "Файл подписи не соответствует документу. " +
                         "Возможно, выбран .sig от другого файла.");
@@ -171,7 +171,7 @@ public class SignatureVerifier {
                             "(подпись не сходится с содержимым).");
                 }
             } catch (CryptoNotSupportedException e) {
-                if (Boolean.TRUE.equals(digestMatches)) {
+                if (digestMatches) {
                     log.warn("verifyDetachedBasic: digest OK, но провайдер не проверил " +
                             "подпись ({}). Файл принят по digest.", e.getMessage());
                 } else {
@@ -288,8 +288,9 @@ public class SignatureVerifier {
         Boolean manual = tryManualVerify(signer, leaf);
         if (manual != null) return manual;
 
-        String bcMsg = bcError != null ? bcError.getMessage() : "?";
-        String jcspMsg = jcspError != null ? jcspError.getMessage() : "?";
+        // SonarQube: переменные точно не null, так как мы в блоке, где оба метода упали
+        String bcMsg = bcError.getMessage();
+        String jcspMsg = jcspError.getMessage();
         log.warn("verifySignerCrypto: BC: {} | JCSP: {}", bcMsg, jcspMsg);
         throw new CryptoNotSupportedException(
                 "Криптопровайдер не поддерживает алгоритм подписи этого сертификата. " +
@@ -297,11 +298,11 @@ public class SignatureVerifier {
                 jcspError != null ? jcspError : bcError);
     }
 
-    private Boolean tryManualVerify(SignerInformation signer, X509Certificate leaf) {
+    private boolean tryManualVerify(SignerInformation signer, X509Certificate leaf) {
         try {
             byte[] signedData = signedAttrsOrContent(signer);
             byte[] sigBytes = signer.getSignature();
-            if (signedData == null || sigBytes == null) return null;
+            if (signedData == null || sigBytes == null) return false;
 
             String[] algos = {
                 signer.getEncryptionAlgOID(),
@@ -329,7 +330,7 @@ public class SignatureVerifier {
         } catch (Exception e) {
             log.debug("manual verify failed: {}", e.getMessage());
         }
-        return null;
+        return false;
     }
 
     /** Signed attributes (DER) — то, что подписано. */
@@ -355,12 +356,12 @@ public class SignatureVerifier {
      *
      * @return TRUE — совпадает, FALSE — не совпадает, NULL — невозможно проверить.
      */
-    private Boolean checkSignedDigest(SignerInformation signer, byte[] data) {
+    private boolean checkSignedDigest(SignerInformation signer, byte[] data) {
         try {
             var attrs = signer.getSignedAttributes();
-            if (attrs == null) return null;
+            if (attrs == null) return false;
             var mdAttr = attrs.get(org.bouncycastle.asn1.cms.CMSAttributes.messageDigest);
-            if (mdAttr == null) return null;
+            if (mdAttr == null) return false;
             byte[] expected = ((org.bouncycastle.asn1.ASN1OctetString)
                     mdAttr.getAttrValues().getObjectAt(0)).getOctets();
 
@@ -380,7 +381,7 @@ public class SignatureVerifier {
             return false;
         } catch (Exception e) {
             log.debug("checkSignedDigest failed: {}", e.getMessage());
-            return null;
+            return false;
         }
     }
 
