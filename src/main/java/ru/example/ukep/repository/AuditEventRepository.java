@@ -42,6 +42,9 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
                                                 @Param("result") String result,
                                                 Pageable pageable);
 
+    /** Количество событий старше cutoff (для UI). */
+    long countByEventTimeBefore(Instant cutoff);
+
     /** Удаление старых событий (retention policy). */
     long deleteByEventTimeBefore(Instant cutoff);
 

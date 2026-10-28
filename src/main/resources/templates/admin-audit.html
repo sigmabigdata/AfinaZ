@@ -33,21 +33,39 @@
 <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
 <div th:if="${err}" class="alert err" th:text="${err}"></div>
 
-<div class="panel" style="display:flex; justify-content:space-between; align-items:center; gap:20px;">
-    <div>
-        <b>Хранение событий:</b>
-        <span th:text="${retentionDays} + ' дней'">365 дней</span>
-        <span th:if="${retentionDays == 0}" class="muted">(очистка отключена)</span>
+<div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div>
+            <b>Хранение событий:</b>
+            <span th:text="${retentionDays} + ' дней'">365 дней</span>
+            <span th:if="${retentionDays == 0}" class="muted">(очистка отключена)</span>
+            <span class="muted small" style="margin-left:8px;">
+                (удаляются записи <b>старше</b> этого срока)
+            </span>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <form method="post" th:action="@{/admin/audit/retention}"
+                  style="display:flex; gap:8px; align-items:center; margin:0;">
+                <input type="number" name="days" th:value="${retentionDays}"
+                       min="0" max="3650" style="width:90px;" title="Дней хранения"/>
+                <button type="submit" class="btn-ghost btn-sm">Сохранить</button>
+            </form>
+            <form method="post" th:action="@{/admin/audit/cleanup}"
+                  onsubmit="return confirm('Удалить записи старше ' + ${retentionDays} + ' дней?');"
+                  style="margin:0;">
+                <button type="submit" class="btn btn-sm">🗑 Очистить сейчас</button>
+            </form>
+        </div>
     </div>
-    <div style="display:flex; gap:10px; align-items:center;">
-        <form method="post" th:action="@{/admin/audit/retention}"
-              style="display:flex; gap:8px; align-items:center;">
-            <input type="number" name="days" th:value="${retentionDays}"
-                   min="0" max="3650" style="width:100px"/>
-            <button type="submit" class="btn-ghost">Сохранить</button>
-        </form>
-
-    </div>
+    <p class="muted small" style="margin:12px 0 0;">
+        💡 Если стоит 365 дней, а записи в БД младше года — удалять нечего.
+        Поставьте 7–30 дней и нажмите «Очистить сейчас», чтобы убрать старое.
+    </p>
+    <p class="muted small" style="margin:8px 0 0;">
+        Всего событий в БД: <b th:text="${totalEvents}">0</b>.
+        Старше <b th:text="${retentionDays}">365</b> дней: <b class="warn" th:text="${oldEvents}">0</b>
+        <span th:if="${oldEvents == 0}" class="muted">(удалять нечего)</span>
+    </p>
 </div>
 <p class="muted small" style="margin:-8px 0 16px;">
     Автоочистка запускается <b>ежедневно в 04:00</b> (МСК).
