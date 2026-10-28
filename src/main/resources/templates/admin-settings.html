@@ -40,14 +40,14 @@
         <div class="form-field">
             <label>Email для алертов</label>
             <input type="email" name="monitorMailTo"
-                   th:value="${settings.?[key == 'monitor.mail_to'][0]?.value}"
+                   th:value="${monitorMailTo}"
                    placeholder="admin@example.ru"/>
             <div class="hint">Пусто = используется MAIL_FROM из .env.prod</div>
         </div>
 
         <div class="checkbox-field">
             <input type="checkbox" id="monitorEnabled" name="monitorEnabled"
-                   th:checked="${settings.?[key == 'monitor.enabled'][0]?.value == 'true'}"/>
+                   th:checked="${monitorEnabled}"/>
             <label for="monitorEnabled" style="margin:0;font-weight:400;">
                 Мониторинг включён (проверка каждые 5 минут)
             </label>
@@ -59,15 +59,15 @@
             <label>Режим проверки отзыва</label>
             <select name="revocationMode">
                 <option value="strict"
-                        th:selected="${settings.?[key == 'revocation.mode'][0]?.value == 'strict'}">
+                        th:selected="${revocationMode == 'strict'}">
                     strict — блокировать подпись без CRL
                 </option>
                 <option value="soft"
-                        th:selected="${settings.?[key == 'revocation.mode'][0]?.value == 'soft'}">
+                        th:selected="${revocationMode == 'soft'}">
                     soft — принимать с warning (по умолчанию)
                 </option>
                 <option value="off"
-                        th:selected="${settings.?[key == 'revocation.mode'][0]?.value == 'off'}">
+                        th:selected="${revocationMode == 'off'}">
                     off — не проверять отзыв
                 </option>
             </select>
@@ -75,7 +75,7 @@
 
         <div class="checkbox-field">
             <input type="checkbox" id="requireCrl" name="requireCrl"
-                   th:checked="${settings.?[key == 'signature.require_crl'][0]?.value == 'true'}"/>
+                   th:checked="${requireCrl}"/>
             <label for="requireCrl" style="margin:0;font-weight:400;">
                 Требовать актуальный CRL (может блокировать подпись)
             </label>
@@ -86,13 +86,13 @@
         <div class="form-field">
             <label>Максимум попыток входа (на IP+email)</label>
             <input type="number" name="rateLimitLogin" min="1" max="100"
-                   th:value="${settings.?[key == 'auth.rate_limit.login'][0]?.value}"/>
+                   th:value="${rateLimitLogin}"/>
         </div>
 
         <div class="form-field">
             <label>Окно (минут)</label>
             <input type="number" name="rateLimitWindow" min="1" max="1440"
-                   th:value="${settings.?[key == 'auth.rate_limit.window_min'][0]?.value}"/>
+                   th:value="${rateLimitWindow}"/>
         </div>
 
         <h2>SMTP (отправка email)</h2>

@@ -58,6 +58,13 @@ public class SettingsController {
     @GetMapping
     public String page(Model model) {
         model.addAttribute("settings", settings.getAll());
+        // Передаем значения явно, чтобы избежать ошибок SpEL в Thymeleaf
+        model.addAttribute("monitorMailTo", settings.getOrDefault("monitor.mail_to", ""));
+        model.addAttribute("monitorEnabled", settings.getBoolOrDefault("monitor.enabled", true));
+        model.addAttribute("revocationMode", settings.getOrDefault("revocation.mode", "soft"));
+        model.addAttribute("rateLimitLogin", settings.getIntOrDefault("auth.rate_limit.login", 5));
+        model.addAttribute("rateLimitWindow", settings.getIntOrDefault("auth.rate_limit.window_min", 15));
+        model.addAttribute("requireCrl", settings.getBoolOrDefault("signature.require_crl", false));
         // SMTP-значения для формы (пароль маскируем)
         model.addAttribute("smtpHost", settings.getOrDefault(K_SMTP_HOST, ""));
         model.addAttribute("smtpPort", settings.getOrDefault(K_SMTP_PORT, "465"));
@@ -76,6 +83,7 @@ public class SettingsController {
     }
 
     @PostMapping
+    @org.springframework.transaction.annotation.Transactional
     public String save(@RequestParam(required = false) String monitorMailTo,
                        @RequestParam(required = false) String monitorEnabled,
                        @RequestParam(required = false) String revocationMode,
