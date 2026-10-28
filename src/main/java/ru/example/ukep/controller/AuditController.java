@@ -54,7 +54,6 @@ public class AuditController {
                        @RequestParam(name = "to", required = false) String toStr,
                        @RequestParam(defaultValue = "200") int limit,
                        Model model) {
-
         int safeLimit = Math.min(Math.max(limit, 10), 2000);
 
         LocalDate from = parseDate(fromStr);
@@ -74,7 +73,17 @@ public class AuditController {
         model.addAttribute("to", to);
         model.addAttribute("limit", safeLimit);
         model.addAttribute("totalFound", filtered.size());
-        model.addAttribute("retentionDays", settings.getIntOrDefault(K_RETENTION, 365));
+
+        int retentionDays = settings.getIntOrDefault(K_RETENTION, 365);
+        model.addAttribute("retentionDays", retentionDays);
+
+        // Статистика: сколько всего событий и сколько из них старше retention
+        long totalEvents = repo.count();
+        java.time.Instant cutoff = java.time.Instant.now()
+                .minus(retentionDays, java.time.temporal.ChronoUnit.DAYS);
+        long oldEvents = (retentionDays > 0) ? repo.countByEventTimeBefore(cutoff) : 0L;
+        model.addAttribute("totalEvents", totalEvents);
+        model.addAttribute("oldEvents", oldEvents);
 
         // Автоочистка: cron 0 0 4 * * * (ежедневно в 04:00)
         java.time.ZonedDateTime now = java.time.ZonedDateTime.now();
@@ -172,8 +181,10 @@ public class AuditController {
         }
         try {
             long deleted = cleanupService.cleanup(days);
+            log.info("Manual cleanup: удалено {} записей старше {} дней", deleted, days);
             ra.addFlashAttribute("ok", "Удалено записей: " + deleted + " (старше " + days + " дней)");
         } catch (Exception e) {
+            log.error("cleanupNow failed", e);
             ra.addFlashAttribute("err", "Ошибка очистки: " + e.getMessage());
         }
         return new RedirectView(REDIR_AUDIT);
