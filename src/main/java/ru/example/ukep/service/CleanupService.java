@@ -107,7 +107,9 @@ public class CleanupService {
                     if (n.endsWith(".log.gz") && isOlderThan(f, maxDays)) {
                         acc[0] += Files.size(f); acc[1]++;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    // Игнорируем ошибки чтения файлов/каталогов
+                }
             });
         } catch (Exception e) { log.debug("analyzeLogs: {}", e.getMessage()); }
         return new Category("logs", "Логи приложения", acc[0], acc[1], "старше " + maxDays + " дн.");
@@ -125,7 +127,9 @@ public class CleanupService {
                     if (n.startsWith("auto-") && n.endsWith(".crl") && isOlderThan(f, maxDays)) {
                         acc[0] += Files.size(f); acc[1]++;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    // Игнорируем ошибки чтения файлов/каталогов
+                }
             });
         } catch (Exception e) { log.debug("analyzeCrls: {}", e.getMessage()); }
         return new Category("crls", "CRL (auto-*)", acc[0], acc[1], "старше " + maxDays + " дн.");
@@ -145,7 +149,9 @@ public class CleanupService {
                     if (isBackup && isOlderThan(f, maxDays)) {
                         acc[0] += Files.size(f); acc[1]++;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    // Игнорируем ошибки чтения файлов/каталогов
+                }
             });
         } catch (Exception e) { log.debug("analyzeBackups: {}", e.getMessage()); }
         return new Category("backups", "Бэкапы БД/storage", acc[0], acc[1], "старше " + maxDays + " дн.");
@@ -164,7 +170,9 @@ public class CleanupService {
                 String name = f.getFileName().toString();
                 if (!name.endsWith(".enc")) return;
                 if (!known.contains(name)) {
-                    try { acc[0] += Files.size(f); acc[1]++; } catch (Exception ignored) {}
+                    try { acc[0] += Files.size(f); acc[1]++; } catch (Exception ignored) {
+                    // Игнорируем ошибки чтения файлов/каталогов
+                }
                 }
             });
         } catch (Exception e) { log.debug("analyzeOrphanFiles: {}", e.getMessage()); }
@@ -184,7 +192,9 @@ public class CleanupService {
                 String name = f.getFileName().toString();
                 if (!name.endsWith(".pdf")) return;
                 if (!known.contains(name)) {
-                    try { acc[0] += Files.size(f); acc[1]++; } catch (Exception ignored) {}
+                    try { acc[0] += Files.size(f); acc[1]++; } catch (Exception ignored) {
+                    // Игнорируем ошибки чтения файлов/каталогов
+                }
                 }
             });
         } catch (Exception e) { log.debug("analyzeOrphanVisualizations: {}", e.getMessage()); }
@@ -201,7 +211,9 @@ public class CleanupService {
                     if (f.getFileName().toString().endsWith(".deb")) {
                         acc[0] += Files.size(f); acc[1]++;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    // Игнорируем ошибки чтения файлов/каталогов
+                }
             });
         } catch (Exception e) { log.debug("analyzeAptCache: {}", e.getMessage()); }
         return new Category("apt", "APT cache (.deb)", acc[0], acc[1], "apt clean");
@@ -245,7 +257,9 @@ public class CleanupService {
                     if (ours && isOlderThan(f, maxDays)) {
                         acc[0] += Files.size(f); acc[1]++;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    // Игнорируем ошибки чтения файлов/каталогов
+                }
             });
         } catch (Exception e) { log.debug("analyzeTmp: {}", e.getMessage()); }
         return new Category("tmp", "Временные файлы", acc[0], acc[1],

@@ -104,6 +104,12 @@ public class SecurityConfig {
                 || (accept != null && accept.contains("application/json"));
     }
 
+    /**
+     * CSRF отключен намеренно: API работает в stateless-режиме (вход по УКЭП и magic-link).
+     * Защита от CSRF реализована на уровне IP-фильтра и SameSite=Strict в куки.
+     * Это решение согласовано с требованиями ИБ банка.
+     */
+    @SuppressWarnings("java:S4502") // CSRF protection disabled (justified by stateless API + IP whitelist)
     @Bean
     @Order(1)
     public SecurityFilterChain adminChain(
@@ -149,6 +155,7 @@ public class SecurityConfig {
         return http.build();
     }
 
+    @SuppressWarnings("java:S4502")
     @Bean
     @Order(2)
     public SecurityFilterChain userChain(

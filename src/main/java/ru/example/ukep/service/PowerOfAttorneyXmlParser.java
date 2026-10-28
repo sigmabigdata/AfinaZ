@@ -100,9 +100,17 @@ public class PowerOfAttorneyXmlParser {
 
     private static String joinFio(String s, String n, String p) {
         StringBuilder sb = new StringBuilder();
-        if (s != null && !s.isBlank()) sb.append(s.trim());
-        if (n != null && !n.isBlank()) { if (sb.length() > 0) sb.append(' '); sb.append(n.trim()); }
-        if (p != null && !p.isBlank()) { if (sb.length() > 0) sb.append(' '); sb.append(p.trim()); }
+        if (s != null && !s.isBlank()) {
+            sb.append(s.trim());
+        }
+        if (n != null && !n.isBlank()) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(n.trim());
+        }
+        if (p != null && !p.isBlank()) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(p.trim());
+        }
         return sb.length() > 0 ? sb.toString() : null;
     }
 
