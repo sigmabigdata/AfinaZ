@@ -23,14 +23,14 @@ RUN cd libs && \
              ASN1P:asn1p asn1rt:asn1rt cmsutil:cmsutil JCPxml:jcp-xml \
              XAdES:xades XMLDSigRI:xmldsigri Rutoken:rutoken; do \
         f="${j%%:*}"; a="${j##*:}"; \
-        mvn -B -q install:install-file -Dfile="$f.jar" \
+        mvn -B -q org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file -Dfile="$f.jar" \
             -DgroupId=$G -DartifactId=$a -Dversion=$VERSION -Dpackaging=jar; \
     done && \
-    mvn -B -q install:install-file -Dfile=bcprov-jdk15on-1.70.jar \
+    mvn -B -q org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file -Dfile=bcprov-jdk15on-1.70.jar \
         -DgroupId=org.bouncycastle -DartifactId=bcprov-jdk15on -Dversion=1.70 -Dpackaging=jar && \
-    mvn -B -q install:install-file -Dfile=bcpkix-jdk15on-1.70.jar \
+    mvn -B -q org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file -Dfile=bcpkix-jdk15on-1.70.jar \
         -DgroupId=org.bouncycastle -DartifactId=bcpkix-jdk15on -Dversion=1.70 -Dpackaging=jar && \
-    mvn -B -q install:install-file -Dfile=bcutil-jdk15on-1.70.jar \
+    mvn -B -q org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file -Dfile=bcutil-jdk15on-1.70.jar \
         -DgroupId=org.bouncycastle -DartifactId=bcutil-jdk15on -Dversion=1.70 -Dpackaging=jar
 
 COPY pom.xml ./
