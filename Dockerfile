@@ -16,22 +16,36 @@ ENV MAVEN_OPTS="-Xmx512m -Xms128m"
 
 # JCSP JAR устанавливаем в локальный .m2
 COPY libs ./libs
-RUN cd libs && \
-    VERSION=5.0.49800 && G=ru.cryptopro.jcsp && \
-    for j in JCSP:jcsp JCP:jcp JCryptoP:jcryptop JCPRevCheck:jcp-revcheck \
-             JCPRevTools:jcp-revtools CAdES:cades AdES-core:ades-core \
-             ASN1P:asn1p asn1rt:asn1rt cmsutil:cmsutil JCPxml:jcp-xml \
-             XAdES:xades XMLDSigRI:xmldsigri Rutoken:rutoken; do \
-        f="${j%%:*}"; a="${j##*:}"; \
-        mvn -B -q org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file -Dfile="$f.jar" \
-            -DgroupId=$G -DartifactId=$a -Dversion=$VERSION -Dpackaging=jar; \
-    done && \
-    mvn -B -q org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file -Dfile=bcprov-jdk15on-1.70.jar \
-        -DgroupId=org.bouncycastle -DartifactId=bcprov-jdk15on -Dversion=1.70 -Dpackaging=jar && \
-    mvn -B -q org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file -Dfile=bcpkix-jdk15on-1.70.jar \
-        -DgroupId=org.bouncycastle -DartifactId=bcpkix-jdk15on -Dversion=1.70 -Dpackaging=jar && \
-    mvn -B -q org.apache.maven.plugins:maven-install-plugin:3.1.1:install-file -Dfile=bcutil-jdk15on-1.70.jar \
-        -DgroupId=org.bouncycastle -DartifactId=bcutil-jdk15on -Dversion=1.70 -Dpackaging=jar
+RUN mkdir -p /root/.m2/repository && \
+    install_jar() { \
+        local file="$1" group="$2" artifact="$3" version="$4"; \
+        local dir="/root/.m2/repository/$(echo "$group" | tr . /)/$artifact/$version"; \
+        mkdir -p "$dir"; \
+        cp "/app/libs/$file" "$dir/$artifact-$version.jar"; \
+        printf '<project><modelVersion>4.0.0</modelVersion><groupId>%s</groupId><artifactId>%s</artifactId><version>%s</version><packaging>jar</packaging></project>' \
+            "$group" "$artifact" "$version" > "$dir/$artifact-$version.pom"; \
+        echo "Installed: $group:$artifact:$version"; \
+    } && \
+    V=5.0.49800 && G=ru.cryptopro.jcsp && \
+    install_jar JCSP.jar       $G jcsp              $V && \
+    install_jar JCP.jar        $G jcp               $V && \
+    install_jar JCryptoP.jar   $G jcryptop          $V && \
+    install_jar JCPRevCheck.jar $G jcp-revcheck     $V && \
+    install_jar JCPRevTools.jar $G jcp-revtools     $V && \
+    install_jar CAdES.jar      $G cades             $V && \
+    install_jar AdES-core.jar  $G ades-core         $V && \
+    install_jar ASN1P.jar      $G asn1p             $V && \
+    install_jar asn1rt.jar     $G asn1rt            $V && \
+    install_jar cmsutil.jar    $G cmsutil           $V && \
+    install_jar JCPxml.jar     $G jcp-xml           $V && \
+    install_jar XAdES.jar      $G xades             $V && \
+    install_jar XMLDSigRI.jar  $G xmldsigri         $V && \
+    install_jar Rutoken.jar    $G rutoken           $V && \
+    install_jar bcprov-jdk15on-1.70.jar org.bouncycastle bcprov-jdk15on 1.70 && \
+    install_jar bcpkix-jdk15on-1.70.jar org.bouncycastle bcpkix-jdk15on 1.70 && \
+    install_jar bcutil-jdk15on-1.70.jar org.bouncycastle bcutil-jdk15on 1.70 && \
+    echo "✓ All local jars installed to ~/.m2"
+
 
 COPY pom.xml ./
 COPY src ./src
