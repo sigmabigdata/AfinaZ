@@ -109,7 +109,7 @@ services:
       - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./angie.conf:/etc/angie/angie.conf:ro
-      - ./angie-certs:/var/www/acme
+      - ./angie-certs:/etc/angie/certs:ro
       - angie_data:/var/lib/angie
     depends_on:
       - app

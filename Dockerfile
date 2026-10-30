@@ -101,7 +101,7 @@ RUN rm -f /usr/sbin/policy-rc.d
 
 # Непривилегированный пользователь
 RUN groupadd -r afina 2>/dev/null || true && \
-    useradd -r -g afina -m -d /home/afina afina 2>/dev/null || true && \
+    useradd -r -u 999 -g afina -m -d /home/afina afina 2>/dev/null || true && \
     mkdir -p /app/storage/documents /var/log/afina /opt/afinaz/secrets \
              /var/opt/cprocsp/tmp /var/opt/cprocsp/keys/afina && \
     chown -R afina:afina /app /var/log/afina /var/opt/cprocsp /opt/afinaz && \
