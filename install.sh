@@ -117,7 +117,16 @@ TLS_MODE_CHOICE=$(ask "Выберите [1]" "1")
 if [ "$TLS_MODE_CHOICE" = "2" ]; then
     TLS_MODE="custom"
     if [ ! -f angie-certs/fullchain.pem ] || [ ! -f angie-certs/privkey.pem ]; then
-        die "В angie-certs/ нет fullchain.pem или privkey.pem"
+        warn "Сертификаты не найдены в angie-certs/"
+        warn "Генерирую самоподписанный сертификат для ${APP_DOMAIN}..."
+        mkdir -p angie-certs
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+          -keyout angie-certs/privkey.pem \
+          -out angie-certs/fullchain.pem \
+          -subj "/CN=${APP_DOMAIN}" 2>/dev/null
+        chmod 600 angie-certs/privkey.pem
+        chmod 644 angie-certs/fullchain.pem
+        ok "Самоподписанный сертификат создан"
     fi
     ok "TLS: custom (свой сертификат)"
 else
