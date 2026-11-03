@@ -52,6 +52,10 @@ public class MonitoringService {
             return;
         }
 
+        // Фиксируем ФАКТИЧЕСКОЕ время проверки (каждые 5 минут), независимо от того,
+        // будет ли событие записано в monitor_events (OK-события пишутся только раз в час)
+        settings.set("monitor.last_check_at", Instant.now().toString(), SYSTEM);
+
         String failReason = null;
 
         // 1) Локальный health

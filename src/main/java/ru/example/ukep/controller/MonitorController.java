@@ -19,6 +19,9 @@ import java.util.List;
 @RequestMapping("/admin/monitor")
 public class MonitorController {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(MonitorController.class);
+
     private final MonitorEventRepository events;
     private final SettingsService settings;
     private final MonitoringService monitoring;
@@ -57,11 +60,15 @@ public class MonitorController {
                 .findRecentByTypeAndResult("EMAIL_FAIL", "FAIL",
                         org.springframework.data.domain.PageRequest.of(0, 10));
         model.addAttribute("emailErrors", lastErrors);
-        // Последняя проверка
-        java.util.List<MonitorEvent> all = events.findAllByOrderByCheckedAtDesc(
-                org.springframework.data.domain.PageRequest.of(0, 1));
-        if (!all.isEmpty()) {
-            model.addAttribute("lastCheckAt", all.get(0).getCheckedAt());
+        // Фактическое время последней проверки (обновляется каждые 5 минут, независимо от
+        // того, пишется ли OK-событие в историю). Читаем из настроек, не из monitor_events.
+        String lastCheckStr = settings.getOrDefault("monitor.last_check_at", "");
+        if (!lastCheckStr.isBlank()) {
+            try {
+                model.addAttribute("lastCheckAt", java.time.Instant.parse(lastCheckStr));
+            } catch (Exception ex) {
+                log.debug("lastCheckAt parse failed: {}", ex.getMessage());
+            }
         }
         return "admin-monitor";
     }
