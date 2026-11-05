@@ -104,6 +104,11 @@
                     📦 Скачать все подписи (.zip)
                 </a>
 
+                <a th:href="@{'/admin/users/' + ${user.id} + '/export-zip'}"
+                   class="btn-ghost" style="background:#f0f4ff; color:#2454ff; border-color:#c7d2fe;">
+                    📦 Скачать всё (ZIP)
+                </a>
+
                 <form th:if="${user.role.name() != 'ROLE_ADMIN'}"
                       method="post"
                       th:action="@{'/admin/users/' + ${user.id} + '/toggle'}"
