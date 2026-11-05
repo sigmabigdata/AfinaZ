@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="noindex">
+    <title>ПАО «НБД-Банк» · Проверка электронной подписи</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<main class="verify-page">
+    <div class="verify-header">
+        <img src="/img/logo.png" alt="НБД-Банк">
+        <h1>Проверка электронной подписи</h1>
+        <p class="subtitle">Загрузите документ и файл подписи (.sig) — мы проверим подпись
+            без авторизации. Ничего не сохраняется.</p>
+    </div>
+
+    <div class="verify-card">
+        <form id="verify-form" onsubmit="return false;">
+            <label class="verify-file-drop" for="verify-content">
+                <span class="icon">📄</span>
+                <b>Выберите документ</b>
+                <div class="filename" id="content-name">Файл не выбран</div>
+                <input type="file" id="verify-content" required>
+            </label>
+
+            <div style="height:14px"></div>
+
+            <label class="verify-file-drop" for="verify-sig">
+                <span class="icon">🔏</span>
+                <b>Выберите файл подписи (.sig / .p7s / .der)</b>
+                <div class="filename" id="sig-name">Файл не выбран</div>
+                <input type="file" id="verify-sig" accept=".sig,.p7s,.der" required>
+            </label>
+
+            <div style="margin-top:20px; text-align:center;">
+                <button type="submit" id="verify-btn" class="btn" style="min-width:220px;">
+                    ✓ Проверить подпись
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div id="verify-result"></div>
+
+    <div class="verify-footer">
+        Проверка выполняется локально на сервере ПАО «НБД-Банк».
+        Данные не сохраняются. <a th:href="@{/login}">Вход в личный кабинет →</a>
+    </div>
+</main>
+
+<script th:src="@{/js/verify.js}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    VerifyUI.initIndexPage();
+});
+</script>
+</body>
+</html>

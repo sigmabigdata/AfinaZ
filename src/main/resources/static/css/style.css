@@ -1141,3 +1141,170 @@ table.docs tr:hover td { background: #fafbff; }
 /* Подсветка строк доверенностей */
 .poa-row-expired td { background: #fdeaea !important; }
 .poa-row-warning td { background: #fff6e0 !important; }
+
+
+/* ============================================================
+   Публичная верификация подписи (/verify, /verify/{uuid})
+   ============================================================ */
+
+.verify-page {
+    max-width: 780px;
+    margin: 40px auto;
+    padding: 0 20px 60px;
+}
+.verify-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+.verify-header img {
+    height: 56px;
+    margin-bottom: 12px;
+}
+.verify-header h1 {
+    font-size: 26px;
+    margin: 0 0 6px;
+    color: #1f2430;
+}
+.verify-header .subtitle {
+    color: #6a7285;
+    font-size: 14px;
+    margin: 0;
+}
+.verify-card {
+    background: #fff;
+    border: 1px solid #e3e7ee;
+    border-radius: 16px;
+    padding: 28px 32px;
+    box-shadow: 0 4px 20px rgba(30, 40, 80, .06);
+    margin-bottom: 20px;
+}
+.verify-result {
+    padding: 20px 24px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+}
+.verify-result.ok {
+    background: #e6f7ec;
+    border: 1px solid #c2e7cd;
+    color: #166534;
+}
+.verify-result.err {
+    background: #fdeaea;
+    border: 1px solid #f5c7c7;
+    color: #a82323;
+}
+.verify-result.warn {
+    background: #fff6e0;
+    border: 1px solid #ffe3a3;
+    color: #a86a00;
+}
+.verify-result h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+}
+.verify-dl {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 10px 20px;
+    margin: 0;
+    padding: 0;
+}
+.verify-dl dt {
+    font-weight: 600;
+    color: #5a6478;
+    font-size: 13px;
+}
+.verify-dl dd {
+    margin: 0;
+    font-size: 14px;
+    color: #1f2430;
+    word-break: break-word;
+}
+.verify-sig-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+}
+.verify-sig-item {
+    background: #f8faff;
+    border: 1px solid #e3e7ee;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+.verify-sig-item .sig-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.verify-sig-item .sig-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2454ff;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.verify-sig-item .sig-subject {
+    font-weight: 600;
+    font-size: 14px;
+}
+.verify-file-drop {
+    display: block;
+    border: 2px dashed #cfd6e4;
+    border-radius: 12px;
+    padding: 24px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+.verify-file-drop:hover {
+    border-color: #2454ff;
+    background: #f8faff;
+}
+.verify-file-drop input[type=file] {
+    display: none;
+}
+.verify-file-drop .icon {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 8px;
+}
+.verify-file-drop .filename {
+    color: #1f2430;
+    font-weight: 500;
+    margin-top: 6px;
+    word-break: break-all;
+}
+.verify-footer {
+    text-align: center;
+    color: #6a7285;
+    font-size: 13px;
+    margin-top: 32px;
+}
+.verify-footer a {
+    color: #2454ff;
+}
+.verify-loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6a7285;
+}
+.verify-loading .spinner {
+    width: 42px;
+    height: 42px;
+    border: 3px solid #e3e7ee;
+    border-top-color: #2454ff;
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

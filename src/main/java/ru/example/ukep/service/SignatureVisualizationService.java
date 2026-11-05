@@ -6,6 +6,12 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.qrcode.QRCodeWriter;
+import com.google.zxing.common.BitMatrix;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import java.awt.image.BufferedImage;
 import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.cms.Attribute;
 import org.bouncycastle.asn1.cms.AttributeTable;
@@ -82,6 +88,9 @@ public class SignatureVisualizationService {
     private final DocumentService documentService;
     private final PowerOfAttorneyService poaService;
     private final Path storageRoot;
+
+    @org.springframework.beans.factory.annotation.Value("${app.base-url}")
+    private String baseUrl;
 
     public SignatureVisualizationService(DocumentRepository documentRepository,
                                          DocumentVisualizationRepository visRepo,
@@ -203,6 +212,15 @@ public class SignatureVisualizationService {
 
                     // 1. ФУТЕР НА КАЖДОЙ СТРАНИЦЕ (лого + текст)
                     drawFooter(cs, font, logo, pageWidth);
+
+                    // 1b. QR-КОД со ссылкой на публичную верификацию
+                    if (document.getPublicUuid() != null) {
+                        try {
+                            drawQr(cs, pdf, font, document, pageWidth);
+                        } catch (Exception qrEx) {
+                            log.debug("QR generation failed: {}", qrEx.getMessage());
+                        }
+                    }
 
                     // 2. ШТАМПЫ ПОДПИСЕЙ — ТОЛЬКО НА ПОСЛЕДНЕЙ СТРАНИЦЕ
                     if (pageNum == totalPages - 1) {
@@ -645,6 +663,63 @@ public class SignatureVisualizationService {
             return Time.getInstance(value).getDate().toInstant();
         } catch (Exception e) {
             log.debug("extractSigningTime failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Рисует QR-код в правом нижнем углу страницы (над футером).
+     * QR ведёт на /verify/{publicUuid}.
+     */
+    private void drawQr(PDPageContentStream cs, PDDocument pdf, PDFont font,
+                        Document document, float pageWidth) throws IOException {
+        if (baseUrl == null || baseUrl.isBlank()) return;
+        String verifyUrl = baseUrl.replaceAll("/+$", "")
+                + "/verify/" + document.getPublicUuid();
+
+        float qrSize = 52f;
+        float qrX = pageWidth - MARGIN - qrSize;
+        float qrY = 30f;  // чуть выше футера (footer at y=15..~30)
+
+        BufferedImage qrImage = generateQrImage(verifyUrl, 240);
+        if (qrImage == null) return;
+
+        PDImageXObject qrPdf = LosslessFactory.createFromImage(pdf, qrImage);
+        cs.drawImage(qrPdf, qrX, qrY, qrSize, qrSize);
+
+        // Подпись под QR мелким шрифтом
+        cs.setFont(font, 5.5f);
+        cs.setNonStrokingColor(0.4f, 0.4f, 0.4f);
+        String caption = "Проверить подпись";
+        float captionWidth = font.getStringWidth(caption) / 1000f * 5.5f;
+        cs.beginText();
+        cs.newLineAtOffset(qrX + (qrSize - captionWidth) / 2f, qrY - 7f);
+        cs.showText(caption);
+        cs.endText();
+        cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
+    }
+
+    /**
+     * Генерирует QR-код как BufferedImage (чёрный на белом).
+     * Возвращает null, если ZXing бросил исключение.
+     */
+    private BufferedImage generateQrImage(String text, int size) {
+        try {
+            java.util.Map<EncodeHintType, Object> hints = new java.util.HashMap<>();
+            hints.put(EncodeHintType.MARGIN, 0);
+            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+            BitMatrix matrix = new QRCodeWriter().encode(
+                    text, BarcodeFormat.QR_CODE, size, size, hints);
+
+            BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+            for (int x = 0; x < size; x++) {
+                for (int y = 0; y < size; y++) {
+                    img.setRGB(x, y, matrix.get(x, y) ? 0x000000 : 0xFFFFFF);
+                }
+            }
+            return img;
+        } catch (Exception e) {
+            log.warn("generateQrImage failed: {}", e.getMessage());
             return null;
         }
     }

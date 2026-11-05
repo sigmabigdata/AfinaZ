@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="noindex">
+    <title>ПАО «НБД-Банк» · Проверка документа</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<main class="verify-page">
+    <div class="verify-header">
+        <img src="/img/logo.png" alt="НБД-Банк">
+        <h1>Проверка подписи документа</h1>
+        <p class="subtitle">Результат независимой проверки электронной подписи
+            ПАО «НБД-Банк»</p>
+    </div>
+
+    <div id="verify-loading" class="verify-loading">
+        <div class="spinner"></div>
+        <div>Проверяем подпись…</div>
+    </div>
+
+    <div id="verify-output" style="display:none;"></div>
+
+    <div class="verify-footer">
+        Проверено <span id="verify-time">—</span>.
+        <a th:href="@{/verify}">Проверить другой документ</a> ·
+        <a th:href="@{/login}">Вход в личный кабинет →</a>
+    </div>
+</main>
+
+<script th:inline="javascript">
+    window.__VERIFY_UUID__ = /*[[${uuid}]]*/ '';
+</script>
+<script th:src="@{/js/verify.js}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    VerifyUI.initDocumentPage(window.__VERIFY_UUID__);
+});
+</script>
+</body>
+</html>
