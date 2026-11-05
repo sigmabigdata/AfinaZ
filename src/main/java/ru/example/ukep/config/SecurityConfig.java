@@ -179,6 +179,7 @@ public class SecurityConfig {
             .formLogin(f -> f.disable())
             .httpBasic(b -> b.disable())
             .logout(l -> l.disable())
+            .csrf(c -> c.disable())
             .headers(h -> h.frameOptions(f -> f.sameOrigin()))
             .exceptionHandling(e -> e
                 // Не залогинен — редирект на /login (для AJAX — 401)
