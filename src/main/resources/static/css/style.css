@@ -65,7 +65,7 @@ a:hover { text-decoration: underline; }
 }
 .admin-header .brand-logo {
     height: 38px;
-    /* filter убран: новый логотип — цветной PNG, инверсия его ломает */
+    filter: brightness(0) invert(1) brightness(0.9);
 }
 .auth-logo-img {
     height: 72px;
