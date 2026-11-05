@@ -1,6 +1,277 @@
 /* ============================================================
    Афина — единый стиль
    ============================================================ */
+
+/* ── Переменные темы (light) ── */
+:root {
+    --bg-page: #f4f6fb;
+    --bg-card: #ffffff;
+    --bg-subtle: #fafbff;
+    --bg-muted: #eef1f6;
+    --text-primary: #1f2430;
+    --text-secondary: #5a6478;
+    --text-muted: #6a7285;
+    --border-color: #e3e7ee;
+    --border-strong: #cfd6e4;
+    --accent: #2454ff;
+    --accent-hover: #1a3fd6;
+    --accent-soft: #e6efff;
+    --ok: #1e7a3d;
+    --ok-soft: #e6f7ec;
+    --warn: #a86a00;
+    --warn-soft: #fff6e0;
+    --err: #a82323;
+    --err-soft: #fdeaea;
+    --shadow: rgba(30, 40, 80, .08);
+    --shadow-lg: rgba(30, 40, 80, .15);
+}
+
+/* ── Тёмная тема ── */
+[data-theme="dark"] {
+    --bg-page: #0f172a;
+    --bg-card: #1e293b;
+    --bg-subtle: #1a2438;
+    --bg-muted: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+    --border-strong: #475569;
+    --accent: #7fa9ff;
+    --accent-hover: #5a8dff;
+    --accent-soft: #1e3a8a;
+    --ok: #4ade80;
+    --ok-soft: #14532d;
+    --warn: #fbbf24;
+    --warn-soft: #451a03;
+    --err: #f87171;
+    --err-soft: #7f1d1d;
+    --shadow: rgba(0, 0, 0, .3);
+    --shadow-lg: rgba(0, 0, 0, .5);
+}
+
+[data-theme="dark"] body {
+    background: var(--bg-page);
+    color: var(--text-primary);
+}
+[data-theme="dark"] header.app-header,
+[data-theme="dark"] header.admin-header {
+    background: var(--bg-card);
+    border-bottom-color: var(--border-color);
+}
+[data-theme="dark"] .admin-header {
+    background: #0b1220;
+}
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .panel,
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .form-card,
+[data-theme="dark"] .client-card,
+[data-theme="dark"] .folder-card,
+[data-theme="dark"] .doc-card,
+[data-theme="dark"] .user-card,
+[data-theme="dark"] .tpl-editor-panel,
+[data-theme="dark"] .cmdk-card,
+[data-theme="dark"] .sign-progress-card,
+[data-theme="dark"] .timeline-modal-card,
+[data-theme="dark"] .tpl-picker-card,
+[data-theme="dark"] .modal-card,
+[data-theme="dark"] .auth-card {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+[data-theme="dark"] table.docs {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+[data-theme="dark"] table.docs th {
+    background: #0f172a;
+    color: var(--text-secondary);
+}
+[data-theme="dark"] table.docs td,
+[data-theme="dark"] table.docs tr {
+    border-bottom-color: var(--border-color);
+}
+[data-theme="dark"] table.docs tr:hover td {
+    background: #1a2438;
+}
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(127, 169, 255, .15);
+}
+[data-theme="dark"] .tpl-editor-code,
+[data-theme="dark"] .cmdk-input {
+    background: var(--bg-subtle);
+    color: var(--text-primary);
+}
+[data-theme="dark"] .log-view {
+    background: #000;
+    color: #a5d6a7;
+}
+[data-theme="dark"] .badge {
+    background: #334155;
+    color: #cbd5e1;
+}
+[data-theme="dark"] .badge.ok { background: var(--ok-soft); color: var(--ok); }
+[data-theme="dark"] .badge.warn { background: var(--warn-soft); color: var(--warn); }
+[data-theme="dark"] .badge.err { background: var(--err-soft); color: var(--err); }
+[data-theme="dark"] .alert.ok { background: var(--ok-soft); color: var(--ok); border-color: #166534; }
+[data-theme="dark"] .alert.err { background: var(--err-soft); color: var(--err); border-color: #991b1b; }
+[data-theme="dark"] .alert.info { background: #1e3a8a; color: #bfdbfe; border-color: #1e40af; }
+[data-theme="dark"] .alert.warn { background: var(--warn-soft); color: var(--warn); border-color: #92400e; }
+[data-theme="dark"] .client-name {
+    background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+[data-theme="dark"] .empty {
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
+    color: var(--text-muted);
+}
+[data-theme="dark"] .folder-empty {
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
+    color: var(--text-muted);
+}
+[data-theme="dark"] .folder-card-header {
+    background: linear-gradient(180deg, #1e293b 0%, #1a2438 100%);
+}
+[data-theme="dark"] .modal {
+    background: rgba(0, 0, 0, 0.7);
+}
+[data-theme="dark"] .verify-card,
+[data-theme="dark"] .verify-sig-item {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+[data-theme="dark"] .verify-file-drop {
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
+}
+[data-theme="dark"] .verify-file-drop:hover {
+    background: #1a2438;
+}
+[data-theme="dark"] .timeline-details {
+    background: var(--bg-subtle);
+}
+[data-theme="dark"] .batch-bar {
+    background: #0b1220;
+}
+[data-theme="dark"] .stat-value,
+[data-theme="dark"] .metric-value,
+[data-theme="dark"] .metric-value-small {
+    color: var(--text-primary);
+}
+[data-theme="dark"] a {
+    color: var(--accent);
+}
+
+/* ── Кнопка переключения темы ── */
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.theme-toggle:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+.admin-header .theme-toggle {
+    border-color: #3a4a7a;
+    color: #cfd6e4;
+}
+.admin-header .theme-toggle:hover {
+    background: rgba(127, 169, 255, .15);
+}
+
+/* ── Skeleton-загрузка ── */
+@keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+.skeleton {
+    background: var(--bg-muted);
+    border-radius: 6px;
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+.skeleton-text {
+    height: 14px;
+    margin: 6px 0;
+}
+.skeleton-text.wide { width: 80%; }
+.skeleton-text.short { width: 40%; }
+.skeleton-title {
+    height: 22px;
+    width: 60%;
+    margin-bottom: 12px;
+}
+.skeleton-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+}
+.skeleton-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 18px 20px;
+}
+
+/* ── Улучшенные пустые состояния ── */
+.empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    background: var(--bg-card);
+    border: 2px dashed var(--border-strong);
+    border-radius: 14px;
+}
+.empty-state .icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+.empty-state h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+.empty-state p {
+    margin: 0 0 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.empty-state .empty-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {

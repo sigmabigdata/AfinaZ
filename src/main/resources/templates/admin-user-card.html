@@ -5,6 +5,7 @@
     <title>НБД-Банк · Админ · Карточка клиента</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <script src="https://www.cryptopro.ru/sites/default/files/products/cades/cadesplugin_api.js"></script>
+<script th:src="@{/js/theme.js}"></script>
 </head>
 <body data-api-prefix="/admin">
 <header class="admin-header">
@@ -148,8 +149,18 @@
         <button type="submit">+ Создать раздел</button>
     </form>
 
-    <div th:if="${#lists.isEmpty(folders)}" class="empty">
-        Разделов пока нет. Создайте первый раздел, чтобы загружать документы.
+    <div th:if="${#lists.isEmpty(folders)}" class="empty-state">
+        <span class="icon">📂</span>
+        <h3>У клиента нет разделов</h3>
+        <p>Создайте раздел выше, чтобы загрузить документы от имени клиента,
+           или отправьте клиенту ссылку для самостоятельной загрузки.</p>
+        <div class="empty-actions">
+            <form th:if="${user.enabled}" method="post"
+                  th:action="@{'/admin/users/' + ${user.id} + '/send-login-link'}"
+                  style="margin:0;">
+                <button type="submit" class="btn">✉ Отправить клиенту ссылку</button>
+            </form>
+        </div>
     </div>
 
     <!-- Плитки разделов -->
@@ -402,5 +413,6 @@ async function toggleApplyPoa(cb, docId) {
 }
 </script>
 <script th:src="@{/js/command-palette.js}"></script>
+<script th:src="@{/js/skeleton.js}"></script>
 </body>
 </html>

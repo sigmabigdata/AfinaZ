@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title th:text="${mode == 'create'} ? 'НБД-Банк · Новый шаблон' : 'НБД-Банк · Редактирование шаблона'">—</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+<script th:src="@{/js/theme.js}"></script>
 </head>
 <body>
 <header class="admin-header">
@@ -132,5 +133,6 @@
 </script>
 <script th:src="@{/js/template-editor.js}"></script>
 <script th:src="@{/js/command-palette.js}"></script>
+<script th:src="@{/js/skeleton.js}"></script>
 </body>
 </html>
