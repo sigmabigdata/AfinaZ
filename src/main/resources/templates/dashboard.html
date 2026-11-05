@@ -98,6 +98,10 @@
              style="margin:0 22px 16px; border-radius:10px; overflow-x: auto;"
              th:attr="data-id=${d.id}">
             <div class="doc-row">
+                <input type="checkbox" class="doc-checkbox"
+                       th:if="${not d.signed}"
+                       th:attr="data-id=${d.id}"
+                       title="Выбрать для массового подписания"/>
                 <div class="doc-name" th:text="${d.originalName}">file.pdf</div>
                 <div class="doc-meta">
                     <span th:text="${#numbers.formatDecimal(d.size/1024.0,1,1)} + ' KB'">0</span>
@@ -193,5 +197,6 @@
 <script type="module" th:src="@{/js/sign.js}"></script>
 <script th:src="@{/js/sign-progress.js}"></script>
 <script th:src="@{/js/file-drop.js}"></script>
+<script th:src="@{/js/batch-sign.js}"></script>
 </body>
 </html>
