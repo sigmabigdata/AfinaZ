@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>НБД-Банк · Админ · Шаблоны документов</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<header class="admin-header">
+    <a th:href="@{/admin}" class="brand">
+        <img src="/img/logo.png" alt="НБД-Банк" class="brand-logo">
+    </a>
+    <nav class="admin-nav">
+        <a th:href="@{/admin}">Дашборд</a>
+        <a th:href="@{/admin/users}">Клиенты</a>
+        <a th:href="@{/admin/templates}" class="active">Шаблоны</a>
+        <a th:href="@{/admin/system}">Система</a>
+        <a th:href="@{/admin/monitor}">Мониторинг</a>
+        <a th:href="@{/admin/crl}">CRL</a>
+        <a th:href="@{/admin/audit}">Аудит</a>
+        <a th:href="@{/admin/keys}">Ключи</a>
+        <a th:href="@{/admin/settings}">Настройки</a>
+        <a th:href="@{/admin/poa}">Доверенности</a>
+    </nav>
+    <form method="post" th:action="@{/admin/logout}" style="display:inline">
+        <button class="btn-ghost" type="submit">Выйти</button>
+    </form>
+</header>
+
+<main>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h1 style="margin:0;">Шаблоны документов</h1>
+        <a th:href="@{/admin/templates/new}" class="btn">+ Создать шаблон</a>
+    </div>
+
+    <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
+    <div th:if="${err}" class="alert err" th:text="${err}"></div>
+
+    <p class="muted small" style="margin: 4px 0 16px;">
+        Всего: <b th:text="${total}">0</b> ·
+        активных: <b th:text="${activeCount}">0</b>.
+        Шаблоны с плейсхолдерами <code>{{key}}</code> доступны клиентам для
+        быстрой генерации готовых документов (заявление, справка, поручение).
+    </p>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-icon">📄</div>
+            <div class="metric-label">Всего шаблонов</div>
+            <div class="metric-value" th:text="${total}">0</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon">✅</div>
+            <div class="metric-label">Активных</div>
+            <div class="metric-value" th:text="${activeCount}">0</div>
+            <div class="metric-sub">видны клиентам</div>
+        </div>
+    </div>
+
+    <table class="docs">
+        <thead>
+        <tr>
+            <th>Название</th>
+            <th>Описание</th>
+            <th>Порядок</th>
+            <th>Статус</th>
+            <th style="width:200px">Действия</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="t : ${templates}">
+            <td><b th:text="${t.name}">Заявление</b></td>
+            <td class="small muted" th:text="${t.description} ?: '—'">—</td>
+            <td th:text="${t.sortOrder}">0</td>
+            <td>
+                <span th:if="${t.active}" class="badge ok">Активен</span>
+                <span th:unless="${t.active}" class="badge warn">Выключен</span>
+            </td>
+            <td class="actions" style="min-width:auto;justify-content:flex-start;">
+                <a th:href="@{'/admin/templates/' + ${t.id} + '/preview.pdf'}"
+                   target="_blank" title="Превью PDF"
+                   class="btn-sig btn-sm">👁 Превью</a>
+                <a th:href="@{'/admin/templates/' + ${t.id} + '/edit'}"
+                   class="btn-ghost btn-sm" title="Редактировать">✎</a>
+                <form method="post"
+                      th:action="@{'/admin/templates/' + ${t.id} + '/toggle'}"
+                      style="display:inline;margin:0;">
+                    <button type="submit" class="btn-ghost btn-sm"
+                            th:text="${t.active ? '⏸' : '▶'}"
+                            th:title="${t.active ? 'Выключить' : 'Включить'}">⏸</button>
+                </form>
+                <form method="post"
+                      th:action="@{'/admin/templates/' + ${t.id} + '/delete'}"
+                      onsubmit="return confirm('Удалить шаблон?');"
+                      style="display:inline;margin:0;">
+                    <button type="submit" class="btn-danger btn-sm" title="Удалить">🗑</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(templates)}">
+            <td colspan="5" class="muted center">
+                Шаблонов нет. Нажмите «Создать шаблон».
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

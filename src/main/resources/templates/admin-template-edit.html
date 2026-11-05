@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${mode == 'create'} ? 'НБД-Банк · Новый шаблон' : 'НБД-Банк · Редактирование шаблона'">—</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<header class="admin-header">
+    <a th:href="@{/admin}" class="brand">
+        <img src="/img/logo.png" alt="НБД-Банк" class="brand-logo">
+    </a>
+    <nav class="admin-nav">
+        <a th:href="@{/admin}">Дашборд</a>
+        <a th:href="@{/admin/users}">Клиенты</a>
+        <a th:href="@{/admin/templates}" class="active">Шаблоны</a>
+        <a th:href="@{/admin/system}">Система</a>
+        <a th:href="@{/admin/monitor}">Мониторинг</a>
+        <a th:href="@{/admin/crl}">CRL</a>
+        <a th:href="@{/admin/audit}">Аудит</a>
+        <a th:href="@{/admin/keys}">Ключи</a>
+        <a th:href="@{/admin/settings}">Настройки</a>
+        <a th:href="@{/admin/poa}">Доверенности</a>
+    </nav>
+    <form method="post" th:action="@{/admin/logout}" style="display:inline">
+        <button class="btn-ghost" type="submit">Выйти</button>
+    </form>
+</header>
+
+<main>
+    <p><a th:href="@{/admin/templates}" class="btn-ghost">← К списку шаблонов</a></p>
+
+    <div th:if="${err}" class="alert err" th:text="${err}"></div>
+
+    <h1 th:text="${mode == 'create'} ? 'Новый шаблон' : 'Редактирование шаблона'">—</h1>
+
+    <form method="post"
+          th:action="${mode == 'create'} ? @{/admin/templates} : @{'/admin/templates/' + ${template.id}}"
+          id="tpl-form">
+
+        <div class="form-card" style="max-width:100%; margin-bottom:20px;">
+            <div style="display:grid; grid-template-columns:2fr 1fr 100px; gap:12px;">
+                <div class="form-field" style="margin:0;">
+                    <label>Название *</label>
+                    <input type="text" name="name" required
+                           th:value="${mode == 'edit'} ? ${template.name} : ''"
+                           placeholder="Заявление на открытие счёта"/>
+                </div>
+                <div class="form-field" style="margin:0;">
+                    <label>Описание</label>
+                    <input type="text" name="description"
+                           th:value="${mode == 'edit'} ? ${template.description} : ''"
+                           placeholder="Короткое описание для клиента"/>
+                </div>
+                <div class="form-field" style="margin:0;">
+                    <label>Порядок</label>
+                    <input type="number" name="sortOrder" min="0" max="999"
+                           th:value="${mode == 'edit'} ? ${template.sortOrder} : 0"/>
+                </div>
+            </div>
+            <div class="checkbox-field" th:if="${mode == 'edit'}">
+                <input type="checkbox" id="active" name="active" value="true"
+                       th:checked="${template.active}"/>
+                <label for="active" style="margin:0;font-weight:400;">Активен (виден клиентам)</label>
+            </div>
+        </div>
+
+        <div class="tpl-editor-grid">
+            <!-- ЛЕВАЯ КОЛОНКА: поля и HTML -->
+            <div class="tpl-editor-panel">
+                <h3>Поля формы</h3>
+                <p class="muted small" style="margin: 0 0 10px;">
+                    Каждое поле — плейсхолдер <code>{{key}}</code> в HTML.
+                    Клиент заполнит их при генерации.
+                </p>
+                <div id="fields-list"></div>
+                <button type="button" id="add-field" class="btn-ghost btn-sm"
+                        style="margin-top:8px;">+ Добавить поле</button>
+                <input type="hidden" name="fieldsJson" id="fields-json"
+                       th:value="${mode == 'edit'} ? ${template.fieldsJson} : ''"/>
+
+                <h3 style="margin-top:22px;">HTML-шаблон</h3>
+                <p class="muted small" style="margin: 0 0 8px;">
+                    Используйте <code>{{key}}</code> для подстановки.
+                    Разрешены HTML-теги: <code>h1, p, b, table, br</code>.
+                </p>
+                <textarea name="htmlContent" id="html-content" class="tpl-editor-code"
+                          required placeholder="<h1>ЗАЯВЛЕНИЕ</h1>&#10;<p>Я, {{full_name}}, ...</p>"
+                          th:text="${mode == 'edit'} ? ${template.htmlContent} : ''"></textarea>
+
+                <div class="tpl-placeholder-chips" id="chips">
+                    <!-- сюда JS вставит чипы из полей -->
+                </div>
+
+                <div class="tpl-actions-bar">
+                    <button type="button" id="btn-preview" class="btn-ghost">
+                        👁 Превью PDF
+                    </button>
+                    <button type="button" id="btn-validate" class="btn-ghost">
+                        ✓ Проверить плейсхолдеры
+                    </button>
+                    <div class="spacer"></div>
+                    <a th:href="@{/admin/templates}" class="btn-ghost">Отмена</a>
+                    <button type="submit" class="btn">
+                        <span th:text="${mode == 'create'} ? 'Создать' : 'Сохранить'">Сохранить</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ПРАВАЯ КОЛОНКА: превью -->
+            <div class="tpl-editor-panel">
+                <h3>Превью PDF</h3>
+                <iframe id="pdf-preview" class="tpl-editor-preview"
+                        th:src="${mode == 'edit'} ? @{'/admin/templates/' + ${template.id} + '/preview.pdf'} : 'about:blank'"></iframe>
+                <p class="muted small" style="margin-top:8px;">
+                    Превью использует демо-значения: ФИО «Иванов Иван Иванович»,
+                    email «client@example.ru», телефон «+7 (999) 123-45-67».
+                    Для реальных данных — откройте шаблон клиентом.
+                </p>
+            </div>
+        </div>
+    </form>
+
+    <!-- Результат валидации плейсхолдеров -->
+    <div id="validation-result" style="margin-top:20px;"></div>
+</main>
+
+<script th:inline="javascript">
+    window.TPL_ID = /*[[${mode == 'edit'} ? ${template.id} : 0]]*/ 0;
+    window.TPL_INITIAL_FIELDS_JSON = /*[[${mode == 'edit'} ? ${template.fieldsJson} : '[]']]*/ '[]';
+</script>
+<script th:src="@{/js/template-editor.js}"></script>
+</body>
+</html>
