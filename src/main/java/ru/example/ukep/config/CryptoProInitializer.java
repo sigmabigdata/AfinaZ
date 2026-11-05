@@ -25,6 +25,10 @@ public class CryptoProInitializer {
     @Value("${crypto.pro.enabled:true}")
     private boolean enabled;
 
+    /** Серийный номер лицензии JCSP (передается через .env.prod). */
+    @Value("${crypto.pro.jcp.license:}")
+    private String jcpLicense;
+
     @PostConstruct
     public void init() {
         System.setProperty("file.encoding", "UTF-8");
@@ -36,6 +40,7 @@ public class CryptoProInitializer {
         }
 
         installRevocationSystemProperties();
+        applyJcpLicense();
         registerJcspProvider();
         registerRevCheckProvider();
         disableNativeVerify();
@@ -45,6 +50,20 @@ public class CryptoProInitializer {
      * Без этих системных свойств CAdES падает с
      * "Could not determine revocation status".
      */
+    /**
+     * Устанавливает серийный номер лицензии JCSP через системное свойство.
+     * JCSP читает свойство ru.CryptoPro.JCP.license при инициализации провайдера.
+     */
+    private void applyJcpLicense() {
+        if (jcpLicense != null && !jcpLicense.isBlank()) {
+            System.setProperty("ru.CryptoPro.JCP.license", jcpLicense.trim());
+            log.info("Установлен серийный номер лицензии JCSP из конфигурации");
+        } else {
+            log.warn("Серийный номер лицензии JCSP не задан (JCP_LICENSE). " +
+                    "Используется демо-лицензия или лицензия из установки по умолчанию.");
+        }
+    }
+
     private void installRevocationSystemProperties() {
         System.setProperty("com.sun.security.enableCRLDP", "true");
         System.setProperty("com.ibm.security.enableCRLDP", "true");
