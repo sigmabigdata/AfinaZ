@@ -171,7 +171,7 @@ public class KeysController {
 
     private String readmeText() {
         return """
-                Афина · Бэкап ключей шифрования
+                ПАО "НБД-Банк" · Бэкап ключей шифрования
                 Скачано: %s
 
                 В архиве:

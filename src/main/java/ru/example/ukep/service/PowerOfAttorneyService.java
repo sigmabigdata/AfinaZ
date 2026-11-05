@@ -171,9 +171,9 @@ public class PowerOfAttorneyService {
         long actualDays = ChronoUnit.DAYS.between(LocalDate.now(), poa.getValidUntil());
         String subject;
         if (actualDays < 0) {
-            subject = "Афина · Доверенность ИСТЕКЛА: " + poa.getFio();
+            subject = "ПАО \"НБД-Банк\" · Доверенность ИСТЕКЛА: " + poa.getFio();
         } else {
-            subject = "Афина · Доверенность истекает через " + actualDays + " дн.: " + poa.getFio();
+            subject = "ПАО \"НБД-Банк\" · Доверенность истекает через " + actualDays + " дн.: " + poa.getFio();
         }
         String body = String.format("""
                 Доверенность требует внимания.
