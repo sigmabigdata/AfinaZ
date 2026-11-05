@@ -113,6 +113,10 @@
                 <div class="actions">
                     <a th:href="@{'/documents/' + ${d.id} + '/view'}" target="_blank" title="Просмотреть">👁</a>
                     <a th:href="@{'/documents/' + ${d.id} + '/download'}" title="Скачать">⬇</a>
+                    <button type="button" class="btn-timeline" th:attr="data-id=${d.id}"
+                            title="История документа"
+                            style="background:none;border:none;color:#2454ff;cursor:pointer;
+                                   padding:0 4px;font-size:16px;">🕒</button>
                     <button th:if="${not d.hasSignatureByUser(user.id)}" type="button"
                             class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
                     <span th:if="${d.hasSignatureByUser(user.id)}"
@@ -198,5 +202,6 @@
 <script th:src="@{/js/sign-progress.js}"></script>
 <script th:src="@{/js/file-drop.js}"></script>
 <script th:src="@{/js/batch-sign.js}"></script>
+<script th:src="@{/js/timeline.js}"></script>
 </body>
 </html>

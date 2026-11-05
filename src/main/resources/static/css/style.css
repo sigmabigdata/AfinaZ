@@ -1572,3 +1572,127 @@ table.docs tr:hover td { background: #fafbff; }
 .doc-row .doc-checkbox {
     flex-shrink: 0;
 }
+
+
+/* ============================================================
+   Timeline документа (лента событий)
+   ============================================================ */
+
+.timeline-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10005;
+    padding: 20px;
+}
+.timeline-modal-overlay.visible {
+    display: flex;
+}
+.timeline-modal-card {
+    background: #fff;
+    border-radius: 16px;
+    max-width: 680px;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+.timeline-modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #eef1f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+.timeline-modal-header h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+}
+.timeline-modal-header .sub {
+    font-size: 13px;
+    color: #6a7285;
+}
+.timeline-modal-body {
+    padding: 20px 24px 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+.timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+}
+.timeline-list::before {
+    content: "";
+    position: absolute;
+    left: 23px;
+    top: 20px;
+    bottom: 20px;
+    width: 2px;
+    background: #eef1f6;
+}
+.timeline-item {
+    display: flex;
+    gap: 16px;
+    padding: 12px 0;
+    position: relative;
+    z-index: 1;
+}
+.timeline-icon {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #f4f6fb;
+    border: 2px solid #e3e7ee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+.timeline-content {
+    flex: 1;
+    min-width: 0;
+    padding-top: 4px;
+}
+.timeline-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1f2430;
+    margin-bottom: 2px;
+}
+.timeline-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #6a7285;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+.timeline-meta .actor {
+    color: #2454ff;
+}
+.timeline-details {
+    font-size: 13px;
+    color: #5a6478;
+    background: #fafbff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-top: 4px;
+}
+.timeline-empty {
+    text-align: center;
+    color: #6a7285;
+    padding: 40px 20px;
+}
+.timeline-empty .icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
