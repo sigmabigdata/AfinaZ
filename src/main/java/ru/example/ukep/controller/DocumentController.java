@@ -35,14 +35,17 @@ public class DocumentController {
     private final UserRepository userRepository;
     private final PiiEncryptor pii;
     private final ru.example.ukep.service.FolderService folderService;
+    private final ru.example.ukep.service.SigningCertificateService certificateService;
 
     public DocumentController(DocumentService documentService, UserRepository userRepository,
                               PiiEncryptor pii,
-                              ru.example.ukep.service.FolderService folderService) {
+                              ru.example.ukep.service.FolderService folderService,
+                              ru.example.ukep.service.SigningCertificateService certificateService) {
         this.documentService = documentService;
         this.userRepository = userRepository;
         this.pii = pii;
         this.folderService = folderService;
+        this.certificateService = certificateService;
     }
 
     private User current(UserDetails p) {
@@ -149,6 +152,25 @@ public class DocumentController {
                          @AuthenticationPrincipal UserDetails p) throws IOException {
         documentService.delete(id, current(p));
         return REDIR_DASHBOARD;
+    }
+
+    /** Справка о подписании (PDF). */
+    @GetMapping("/{id}/signing-certificate")
+    public ResponseEntity<byte[]> signingCertificate(@PathVariable Long id,
+                                                     @AuthenticationPrincipal UserDetails p)
+            throws IOException {
+        Document doc = documentService.getOwned(id, current(p));
+        try {
+            byte[] pdf = certificateService.generate(id);
+            String fileName = "СПРАВКА_" + stripExtension(doc.getOriginalName()) + ".pdf";
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
+                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                    .body(pdf);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     private static String stripExtension(String name) {

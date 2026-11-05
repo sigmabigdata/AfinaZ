@@ -265,6 +265,10 @@
                             title="История документа"
                             style="background:none;border:none;color:#2454ff;cursor:pointer;
                                    padding:0 4px;font-size:16px;">🕒</button>
+                    <a th:if="${d.signed}"
+                       th:href="@{'/admin/documents/' + ${d.id} + '/signing-certificate'}"
+                       title="Справка о подписании (PDF)"
+                       style="color:#2454ff;padding:0 4px;font-size:16px;">📋</a>
 
                     <!-- Загрузить .sig — доступно всегда, документ станет подписанным -->
                     <form th:action="@{'/admin/documents/' + ${d.id} + '/upload-signature'}"

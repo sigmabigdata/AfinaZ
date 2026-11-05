@@ -35,6 +35,7 @@ public class DocumentVisualizationController {
     private final ru.example.ukep.service.SignatureVerifier signatureVerifier;
     private final ru.example.ukep.service.PowerOfAttorneyService poaService;
     private final ru.example.ukep.repository.DocumentSignatureRepository signatureRepository;
+    private final ru.example.ukep.service.SigningCertificateService certificateService;
 
     public DocumentVisualizationController(DocumentRepository documentRepository,
                                             DocumentService documentService,
@@ -42,7 +43,8 @@ public class DocumentVisualizationController {
                                             AuditService audit,
                                             ru.example.ukep.service.SignatureVerifier signatureVerifier,
                                             ru.example.ukep.service.PowerOfAttorneyService poaService,
-                                            ru.example.ukep.repository.DocumentSignatureRepository signatureRepository) {
+                                            ru.example.ukep.repository.DocumentSignatureRepository signatureRepository,
+                                            ru.example.ukep.service.SigningCertificateService certificateService) {
         this.documentRepository = documentRepository;
         this.documentService = documentService;
         this.visualizationService = visualizationService;
@@ -50,6 +52,7 @@ public class DocumentVisualizationController {
         this.signatureVerifier = signatureVerifier;
         this.poaService = poaService;
         this.signatureRepository = signatureRepository;
+        this.certificateService = certificateService;
     }
 
     /** Скачать существующую или сгенерировать визуализацию и сразу отдать. */
@@ -251,6 +254,32 @@ public class DocumentVisualizationController {
         if (name == null) return "file";
         int dot = name.lastIndexOf('.');
         return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    /** Справка о подписании (PDF для юристов/контрагентов). */
+    @GetMapping("/signing-certificate")
+    public Object signingCertificate(@PathVariable Long id,
+                                      java.security.Principal principal) {
+        Document doc = documentRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
+        try {
+            byte[] pdf = certificateService.generate(id);
+            String fileName = "СПРАВКА_"
+                    + stripExtension(doc.getOriginalName()) + ".pdf";
+            audit.event("SIGNING_CERTIFICATE", "SUCCESS",
+                    principal != null ? principal.getName() : "unknown",
+                    "DOCUMENT", String.valueOf(id), null,
+                    "PDF справка о подписании");
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
+                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("signing-certificate failed for doc {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("{\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
+        }
     }
 
     private static String escapeJson(String s) {
