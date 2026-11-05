@@ -89,39 +89,42 @@ public class SignApiController {
     /** Batch: клиент подписывает несколько своих документов одним запросом. */
     @PostMapping("/accept-batch")
     public ResponseEntity<Map<String, Object>> acceptUserBatch(
-            @RequestBody SignRequest req,
+            @RequestBody java.util.List<SignRequest> requests,
             @AuthenticationPrincipal UserDetails p) {
         User user = current(p);
-        if (req.getDocumentIds() == null || req.getDocumentIds().isEmpty()) {
+        if (requests == null || requests.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(K_ERROR, "Список документов пуст"));
         }
-        return doAcceptBatch(req.getDocumentIds(), user, user, req.getSignatureBase64(), false);
+        return doAcceptBatch(requests, user, false);
     }
 
     /** Batch: админ подписывает несколько документов. */
     @PostMapping("/admin/accept-batch")
     public ResponseEntity<Map<String, Object>> acceptAdminBatch(
-            @RequestBody SignRequest req,
+            @RequestBody java.util.List<SignRequest> requests,
             @AuthenticationPrincipal UserDetails p) {
         User admin = current(p);
         if (admin.getRole() != ru.example.ukep.entity.Role.ROLE_ADMIN) {
             return ResponseEntity.status(403).body(Map.of(K_ERROR, "Только для администратора"));
         }
-        if (req.getDocumentIds() == null || req.getDocumentIds().isEmpty()) {
+        if (requests == null || requests.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(K_ERROR, "Список документов пуст"));
         }
-        return doAcceptBatch(req.getDocumentIds(), admin, null, req.getSignatureBase64(), true);
+        return doAcceptBatch(requests, admin, true);
     }
 
     private ResponseEntity<Map<String, Object>> doAcceptBatch(
-            java.util.List<Long> ids, User signer, User owner,
-            String sig, boolean asAdmin) {
+            java.util.List<SignRequest> requests, User signer, boolean asAdmin) {
         var results = new java.util.ArrayList<Map<String, Object>>();
         int ok = 0, fail = 0;
-        for (Long id : ids) {
+        for (SignRequest req : requests) {
+            Long id = req.getDocumentId();
             Map<String, Object> r = new java.util.LinkedHashMap<>();
             r.put("documentId", id);
             try {
+                if (req.getSignatureBase64() == null || req.getSignatureBase64().isBlank()) {
+                    throw new IllegalArgumentException("Пустая подпись");
+                }
                 Document doc = asAdmin
                         ? documentRepository.findByIdWithOwner(id).orElseThrow(
                                 () -> new IllegalArgumentException("Документ не найден"))
@@ -131,7 +134,7 @@ public class SignApiController {
                     r.put("error", "Уже подписан");
                     fail++;
                 } else {
-                    var resp = doAccept(doc, signer, asAdmin ? doc.getOwner() : owner, sig);
+                    var resp = doAccept(doc, signer, asAdmin ? doc.getOwner() : signer, req.getSignatureBase64());
                     if (resp.getStatusCode().is2xxSuccessful()) {
                         r.put("ok", true);
                         ok++;
@@ -155,7 +158,7 @@ public class SignApiController {
         return ResponseEntity.ok(Map.of(
                 "ok", ok,
                 "fail", fail,
-                "total", ids.size(),
+                "total", requests.size(),
                 "results", results));
     }
 
