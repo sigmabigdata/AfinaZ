@@ -86,6 +86,79 @@ public class SignApiController {
         return doAccept(doc, admin, doc.getOwner(), req.getSignatureBase64());
     }
 
+    /** Batch: клиент подписывает несколько своих документов одним запросом. */
+    @PostMapping("/accept-batch")
+    public ResponseEntity<Map<String, Object>> acceptUserBatch(
+            @RequestBody SignRequest req,
+            @AuthenticationPrincipal UserDetails p) {
+        User user = current(p);
+        if (req.getDocumentIds() == null || req.getDocumentIds().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(K_ERROR, "Список документов пуст"));
+        }
+        return doAcceptBatch(req.getDocumentIds(), user, user, req.getSignatureBase64(), false);
+    }
+
+    /** Batch: админ подписывает несколько документов. */
+    @PostMapping("/admin/accept-batch")
+    public ResponseEntity<Map<String, Object>> acceptAdminBatch(
+            @RequestBody SignRequest req,
+            @AuthenticationPrincipal UserDetails p) {
+        User admin = current(p);
+        if (admin.getRole() != ru.example.ukep.entity.Role.ROLE_ADMIN) {
+            return ResponseEntity.status(403).body(Map.of(K_ERROR, "Только для администратора"));
+        }
+        if (req.getDocumentIds() == null || req.getDocumentIds().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(K_ERROR, "Список документов пуст"));
+        }
+        return doAcceptBatch(req.getDocumentIds(), admin, null, req.getSignatureBase64(), true);
+    }
+
+    private ResponseEntity<Map<String, Object>> doAcceptBatch(
+            java.util.List<Long> ids, User signer, User owner,
+            String sig, boolean asAdmin) {
+        var results = new java.util.ArrayList<Map<String, Object>>();
+        int ok = 0, fail = 0;
+        for (Long id : ids) {
+            Map<String, Object> r = new java.util.LinkedHashMap<>();
+            r.put("documentId", id);
+            try {
+                Document doc = asAdmin
+                        ? documentRepository.findByIdWithOwner(id).orElseThrow(
+                                () -> new IllegalArgumentException("Документ не найден"))
+                        : documentService.getOwned(id, signer);
+                if (documentService.hasSignatureByUser(doc.getId(), signer.getId())) {
+                    r.put("ok", false);
+                    r.put("error", "Уже подписан");
+                    fail++;
+                } else {
+                    var resp = doAccept(doc, signer, asAdmin ? doc.getOwner() : owner, sig);
+                    if (resp.getStatusCode().is2xxSuccessful()) {
+                        r.put("ok", true);
+                        ok++;
+                    } else {
+                        r.put("ok", false);
+                        r.put("error", resp.getBody());
+                        fail++;
+                    }
+                }
+            } catch (IllegalArgumentException e) {
+                r.put("ok", false);
+                r.put("error", e.getMessage());
+                fail++;
+            } catch (Exception e) {
+                r.put("ok", false);
+                r.put("error", "Ошибка: " + e.getMessage());
+                fail++;
+            }
+            results.add(r);
+        }
+        return ResponseEntity.ok(Map.of(
+                "ok", ok,
+                "fail", fail,
+                "total", ids.size(),
+                "results", results));
+    }
+
     /**
      * @param doc    документ
      * @param signer кто подписывает (клиент или админ) — привязывается к подписи

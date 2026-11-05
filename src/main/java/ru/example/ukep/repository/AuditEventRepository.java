@@ -50,4 +50,8 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, Long> {
 
     @Query("select distinct e.eventType from AuditEvent e order by e.eventType")
     List<String> findDistinctEventTypes();
+
+    /** Лента событий по документу (для timeline). */
+    List<AuditEvent> findByTargetTypeAndTargetIdOrderByEventTimeDesc(
+            String targetType, String targetId, Pageable pageable);
 }

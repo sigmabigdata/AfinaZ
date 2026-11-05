@@ -55,6 +55,10 @@ public class Document {
     @Column(nullable = false)
     private Instant uploadedAt = Instant.now();
 
+    @Column(name = "public_uuid", nullable = false, unique = true,
+            columnDefinition = "UUID")
+    private java.util.UUID publicUuid = java.util.UUID.randomUUID();
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     private User owner;
 
@@ -83,6 +87,7 @@ public class Document {
     public boolean isEncrypted() { return encrypted; }
     public boolean isApplyPoa() { return applyPoa; }
     public Instant getUploadedAt() { return uploadedAt; }
+    public java.util.UUID getPublicUuid() { return publicUuid; }
     public User getOwner() { return owner; }
     public DocumentFolder getFolder() { return folder; }
     public List<DocumentSignature> getSignatures() { return signatures; }
@@ -112,6 +117,7 @@ public class Document {
     public void setEncrypted(boolean encrypted) { this.encrypted = encrypted; }
     public void setApplyPoa(boolean applyPoa) { this.applyPoa = applyPoa; }
     public void setUploadedAt(Instant uploadedAt) { this.uploadedAt = uploadedAt; }
+    public void setPublicUuid(java.util.UUID publicUuid) { this.publicUuid = publicUuid; }
     public void setOwner(User owner) { this.owner = owner; }
     public void setFolder(DocumentFolder folder) { this.folder = folder; }
     public void setSignatures(List<DocumentSignature> signatures) { this.signatures = signatures; }
