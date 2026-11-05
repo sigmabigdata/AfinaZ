@@ -194,17 +194,17 @@ button.link:hover { background: none; text-decoration: underline; }
 
 /* ================== Таблица ================== */
 table.docs {
+    display: block;
     width: 100%;
+    overflow-x: auto;
     border-collapse: separate;
     border-spacing: 0;
     background: #fff;
     border: 1px solid #e3e7ee;
     border-radius: 12px;
-    overflow: hidden;
 }
 table.docs th, table.docs td {
     padding: 12px 16px;
-    min-width: max-content;
     text-align: left;
     border-bottom: 1px solid #eef1f6;
     vertical-align: middle;
@@ -220,12 +220,10 @@ table.docs tr:hover td { background: #fafbff; }
 
 .actions {
     display: flex;
-    flex-wrap: nowrap; /* Запрет переноса */
-    gap: 2px;
+    flex-wrap: wrap;
+    gap: 4px;
     align-items: center;
     justify-content: flex-end;
-    white-space: nowrap;
-    min-width: 210px; /* Гарантированное место под 7-8 иконок */
 }
 .actions form { display: inline-flex; margin: 0; padding: 0; }
 .actions a, .actions button, .actions label {
@@ -501,19 +499,21 @@ table.docs tr:hover td { background: #fafbff; }
 }
 .doc-card:hover { box-shadow: 0 4px 16px rgba(30,40,80,.06); }
 .doc-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     padding: 16px 22px;
 }
 .doc-name { 
+    flex: 1 1 200px;
+    min-width: 0;
     font-weight: 600; font-size: 15px; 
     word-break: break-all; 
-    max-width: 220px; /* Ограничиваем ширину */
+    max-width: 320px;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap; /* Обрезаем в одну строку */
+    white-space: nowrap;
 }
 .doc-meta {
     display: flex; gap: 8px; align-items: center;

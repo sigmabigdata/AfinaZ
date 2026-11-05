@@ -95,7 +95,7 @@
         </div>
 
         <div th:each="d : ${documentsByFolder.get(f.id)}" class="doc-card"
-             style="margin:0 22px 16px; border-radius:10px;"
+             style="margin:0 22px 16px; border-radius:10px; overflow-x: auto;"
              th:attr="data-id=${d.id}">
             <div class="doc-row">
                 <div class="doc-name" th:text="${d.originalName}">file.pdf</div>
