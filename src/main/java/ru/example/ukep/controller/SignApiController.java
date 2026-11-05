@@ -57,6 +57,12 @@ public class SignApiController {
                                         @AuthenticationPrincipal UserDetails p) {
         User user = current(p);
         Document doc = documentService.getOwned(req.getDocumentId(), user);
+        // Pre-check ДО криптопроверки: если уже подписал — отказываем мгновенно
+        if (documentService.hasSignatureByUser(doc.getId(), user.getId())) {
+            audit.signFail(safeOwnerEmail(user), doc.getId(), "Повторное подписание (user)");
+            return ResponseEntity.status(409).body(Map.of(
+                K_ERROR, "Вы уже подписали этот документ. Повторное подписание невозможно."));
+        }
         return doAccept(doc, user, user, req.getSignatureBase64());
     }
 
@@ -70,6 +76,12 @@ public class SignApiController {
         }
         Document doc = documentRepository.findByIdWithOwner(req.getDocumentId())
                 .orElseThrow(() -> new IllegalArgumentException("Документ не найден"));
+        // Pre-check ДО криптопроверки: если админ уже подписал — отказываем мгновенно
+        if (documentService.hasSignatureByUser(doc.getId(), admin.getId())) {
+            audit.signFail(safeOwnerEmail(admin), doc.getId(), "Повторное подписание (admin)");
+            return ResponseEntity.status(409).body(Map.of(
+                K_ERROR, "Вы уже подписали этот документ. Повторное подписание невозможно."));
+        }
         // signer = admin (кто подписывает), owner = doc.getOwner() (чей документ)
         return doAccept(doc, admin, doc.getOwner(), req.getSignatureBase64());
     }

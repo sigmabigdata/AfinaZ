@@ -273,6 +273,9 @@
                     </form>
                     <button th:if="${not d.hasSignatureByUser(currentAdminId)}" type="button"
                             class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
+                    <span th:if="${d.hasSignatureByUser(currentAdminId)}"
+                          class="badge ok" title="Вы уже подписали этот документ"
+                          style="padding:4px 8px;">✓ Вы подписали</span>
 
                     <form method="post"
                           th:action="@{'/admin/documents/' + ${d.id} + '/delete'}"

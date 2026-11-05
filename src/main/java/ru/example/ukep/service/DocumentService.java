@@ -172,6 +172,12 @@ public class DocumentService {
         return sig;
     }
 
+    /** Есть ли у пользователя подпись на этом документе. */
+    public boolean hasSignatureByUser(Long documentId, Long userId) {
+        if (documentId == null || userId == null) return false;
+        return signatureRepository.existsByDocumentIdAndSignerUserId(documentId, userId);
+    }
+
     /** Получить подпись по id. */
     public DocumentSignature getSignature(Long signatureId) {
         return signatureRepository.findById(signatureId)
