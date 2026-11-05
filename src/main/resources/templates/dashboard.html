@@ -27,14 +27,20 @@
 
     <h1>Мои документы</h1>
 
-    <!-- Создать раздел -->
-    <form method="post" th:action="@{/folders/create}"
-          class="upload-form" style="margin-bottom:24px;">
-        <input type="text" name="name" required
-               placeholder="Название нового раздела (например: Учредительные документы)"
-               style="flex:1; padding:10px 12px; border:1px solid #cfd6e4; border-radius:8px; font-size:14px;"/>
-        <button type="submit">+ Создать раздел</button>
-    </form>
+    <!-- Действия -->
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; align-items:stretch;">
+        <form method="post" th:action="@{/folders/create}" class="upload-form"
+              style="flex:1; min-width:280px; margin:0;">
+            <input type="text" name="name" required
+                   placeholder="Название нового раздела (например: Учредительные документы)"
+                   style="flex:1; padding:10px 12px; border:1px solid #cfd6e4; border-radius:8px; font-size:14px;"/>
+            <button type="submit">+ Создать раздел</button>
+        </form>
+        <button type="button" id="btn-use-template" class="btn"
+                style="background:linear-gradient(135deg,#2454ff,#7a3fff); border:none; white-space:nowrap;">
+            ✨ Из шаблона
+        </button>
+    </div>
 
     <div th:if="${#lists.isEmpty(folders)}" class="empty">
         Разделов пока нет. Создайте первый раздел, чтобы начать загружать документы.
@@ -206,6 +212,20 @@
 <script th:src="@{/js/sign-progress.js}"></script>
 <script th:src="@{/js/file-drop.js}"></script>
 <script th:src="@{/js/batch-sign.js}"></script>
+<script th:inline="javascript">
+    window.__FOLDERS__ = /*[[${folders}]]*/ [];
+</script>
 <script th:src="@{/js/timeline.js}"></script>
+<script th:src="@{/js/template-use.js}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('btn-use-template');
+        if (btn) {
+            btn.addEventListener('click', function () {
+                if (window.TemplateUse) window.TemplateUse.open();
+            });
+        }
+    });
+</script>
 </body>
 </html>

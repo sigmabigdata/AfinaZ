@@ -78,26 +78,41 @@ public class DocumentService {
     @Transactional
     public Document upload(MultipartFile file, User owner, DocumentFolder folder) throws IOException {
         if (file.isEmpty()) throw new IllegalArgumentException("Файл пустой");
+        return createDocument(file.getBytes(), file.getOriginalFilename(),
+                file.getContentType(), owner, folder);
+    }
+
+    /**
+     * Создаёт документ из готовых байтов (используется шаблонами и другими
+     * сценариями, где нет MultipartFile).
+     */
+    @Transactional
+    public Document createDocument(byte[] original, String originalName,
+                                    String contentType, User owner,
+                                    DocumentFolder folder) throws IOException {
+        if (original == null || original.length == 0) {
+            throw new IllegalArgumentException("Файл пустой");
+        }
         if (folder == null) {
             throw new IllegalArgumentException("Не выбран раздел для документа");
         }
         if (!folder.getOwner().getId().equals(owner.getId())) {
-            throw new IllegalArgumentException(
-                    "Раздел принадлежит другому клиенту");
+            throw new IllegalArgumentException("Раздел принадлежит другому клиенту");
         }
-        byte[] original = file.getBytes();
-        FileEncryptor.Encrypted enc = encryptor.encrypt(original);
 
-        String baseName = UUID.randomUUID() + "_" + sanitize(file.getOriginalFilename());
+        FileEncryptor.Encrypted enc = encryptor.encrypt(original);
+        String safeName = (originalName == null || originalName.isBlank())
+                ? "document.pdf" : originalName;
+        String baseName = UUID.randomUUID() + "_" + sanitize(safeName);
         String storedName = baseName + ".enc";
         Path target = storageRoot.resolve(storedName);
         Files.write(target, enc.bytes(),
                 StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
 
         Document doc = new Document();
-        doc.setOriginalName(file.getOriginalFilename());
+        doc.setOriginalName(safeName);
         doc.setStoredName(storedName);
-        doc.setContentType(file.getContentType());
+        doc.setContentType(contentType == null ? "application/octet-stream" : contentType);
         doc.setSize(original.length);
         doc.setFileSha256(sha256Bytes(original));
         doc.setEncryptionIv(enc.ivBase64());
