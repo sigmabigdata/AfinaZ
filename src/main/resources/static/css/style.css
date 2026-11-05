@@ -2409,3 +2409,205 @@ table.docs tr:hover td { background: #fafbff; }
     background: rgba(127, 169, 255, 0.15);
     color: #fff;
 }
+
+
+/* ============================================================
+   Анимация «падающего штампа» после подписания
+   ============================================================ */
+
+.stamp-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10002;
+    pointer-events: none;
+}
+.stamp-overlay.visible {
+    display: flex;
+}
+.stamp-overlay .stamp {
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    border: 6px solid #2454ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2454ff;
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 20px;
+    transform: scale(3) rotate(-15deg);
+    opacity: 0;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 0 3px #2454ff inset, 0 0 40px rgba(36, 84, 255, 0.4);
+    animation: stampSlam 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
+    position: relative;
+}
+.stamp-overlay .stamp::before,
+.stamp-overlay .stamp::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    border: 2px dashed #2454ff;
+    inset: 8px;
+    opacity: 0.5;
+}
+.stamp-overlay .stamp::after {
+    inset: 16px;
+    border-style: solid;
+    border-width: 1px;
+}
+@keyframes stampSlam {
+    0% {
+        transform: scale(3) rotate(-15deg);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(0.95) rotate(-8deg);
+        opacity: 1;
+    }
+    80% {
+        transform: scale(1.05) rotate(-10deg);
+    }
+    100% {
+        transform: scale(1) rotate(-8deg);
+        opacity: 1;
+    }
+}
+.stamp-overlay .confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #fbbf24;
+    animation: confettiFall 1.2s ease-out forwards;
+}
+@keyframes confettiFall {
+    0%   { transform: translate(0, 0) rotate(0); opacity: 1; }
+    100% { transform: translate(var(--dx), 400px) rotate(720deg); opacity: 0; }
+}
+
+/* ============================================================
+   Print-friendly CSS
+   ============================================================ */
+
+@media print {
+    /* Скрываем всё интерактивное */
+    header.app-header,
+    header.admin-header,
+    .admin-nav,
+    .cmdk-trigger,
+    .theme-toggle,
+    .header-user button,
+    .upload-form,
+    .actions,
+    .batch-bar,
+    .folder-actions,
+    .doc-checkbox,
+    .client-actions,
+    .form-actions,
+    .sys-actions,
+    .filters-form,
+    #status-toast,
+    .alert,
+    .toast,
+    .cmdk-overlay,
+    .tpl-picker-overlay,
+    .sign-progress-overlay,
+    .timeline-modal-overlay,
+    .modal,
+    .btn,
+    .btn-ghost,
+    .btn-danger,
+    .btn-sig,
+    .verify-footer,
+    button,
+    .no-print {
+        display: none !important;
+    }
+
+    /* Обнуляем фоны и тени */
+    body {
+        background: #fff !important;
+        color: #000 !important;
+        font-size: 11pt;
+    }
+    main {
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: none !important;
+    }
+
+    /* Карточки — плоские, с тонкими рамками */
+    .stat-card, .panel, .doc-card, .folder-card, .client-card,
+    .user-card, .form-card, .tpl-editor-panel, .metric-card {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        background: #fff !important;
+        page-break-inside: avoid;
+    }
+
+    /* Убираем цветные градиенты в штампах */
+    .badge.ok,
+    .badge.warn,
+    .badge.err,
+    .badge.admin {
+        border: 1px solid #999;
+        background: transparent !important;
+        color: #000 !important;
+    }
+
+    /* Таблицы — печатаем аккуратно */
+    table.docs {
+        display: table !important;
+        width: 100%;
+        border-collapse: collapse;
+        page-break-inside: auto;
+    }
+    table.docs th, table.docs td {
+        border: 1px solid #ccc !important;
+        padding: 6px 8px !important;
+        background: #fff !important;
+        color: #000 !important;
+        page-break-inside: avoid;
+    }
+    table.docs thead {
+        display: table-header-group;
+    }
+    table.docs tr {
+        page-break-inside: avoid;
+    }
+
+    /* Печатаем ссылки с URL */
+    a[href^="http"]:not([href*="afinasystems"])::after {
+        content: " (" attr(href) ")";
+        font-size: 8pt;
+        color: #666;
+    }
+
+    /* Заголовки */
+    h1, h2, h3 {
+        color: #000 !important;
+        page-break-after: avoid;
+    }
+
+    /* Скрываем разделы, которые явно помечены как "не для печати" */
+    .print-hide {
+        display: none !important;
+    }
+
+    /* Показываем только "печатные" блоки */
+    .print-only {
+        display: block !important;
+    }
+}
+
+.print-only {
+    display: none;
+}

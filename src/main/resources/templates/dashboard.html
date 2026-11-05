@@ -31,6 +31,67 @@
 
     <h1>Мои документы</h1>
 
+    <!-- Онбординг: показываем пока не выполнены все 3 шага -->
+    <div th:if="${allSignedCount == 0}"
+         class="onboarding-checklist"
+         style="background:linear-gradient(135deg,#f0f4ff 0%,#faf5ff 100%);
+                border:1px solid #c7d2fe; border-radius:14px; padding:22px 26px;
+                margin-bottom:24px;">
+        <h2 style="margin:0 0 4px;font-size:18px;">👋 Добро пожаловать в ПАО «НБД-Банк»!</h2>
+        <p class="muted" style="margin:0 0 16px;font-size:14px;">
+            Пройдите 3 шага, чтобы начать работу с электронной подписью.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+
+            <!-- Шаг 1: раздел -->
+            <div style="background:#fff;border-radius:10px;padding:14px 16px;border:2px solid"
+                 th:style="${not #lists.isEmpty(folders)} ? 'border-color:#1e7a3d;background:#f0fdf4;' : 'border-color:#e3e7ee;'">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <div style="width:28px;height:28px;border-radius:50%;display:flex;
+                                align-items:center;justify-content:center;font-weight:700;color:#fff;"
+                         th:style="${not #lists.isEmpty(folders)} ? 'background:#1e7a3d;' : 'background:#94a3b8;'">
+                        <span th:text="${not #lists.isEmpty(folders)} ? '✓' : '1'">1</span>
+                    </div>
+                    <b style="font-size:14px;">Создайте раздел</b>
+                </div>
+                <p class="muted small" style="margin:0;">
+                    Раздел — папка для документов. Например: «Учредительные».
+                </p>
+            </div>
+
+            <!-- Шаг 2: загрузить документ -->
+            <div style="background:#fff;border-radius:10px;padding:14px 16px;border:2px solid"
+                 th:style="${allDocsCount > 0} ? 'border-color:#1e7a3d;background:#f0fdf4;' : 'border-color:#e3e7ee;'">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <div style="width:28px;height:28px;border-radius:50%;display:flex;
+                                align-items:center;justify-content:center;font-weight:700;color:#fff;"
+                         th:style="${allDocsCount > 0} ? 'background:#1e7a3d;' : 'background:#94a3b8;'">
+                        <span th:text="${allDocsCount > 0} ? '✓' : '2'">2</span>
+                    </div>
+                    <b style="font-size:14px;">Загрузите документ</b>
+                </div>
+                <p class="muted small" style="margin:0;">
+                    PDF, DOC или изображение — до 50 МБ. Или сгенерируйте из шаблона.
+                </p>
+            </div>
+
+            <!-- Шаг 3: подписать -->
+            <div style="background:#fff;border-radius:10px;padding:14px 16px;border:2px solid #e3e7ee;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <div style="width:28px;height:28px;border-radius:50%;display:flex;
+                                align-items:center;justify-content:center;font-weight:700;color:#fff;
+                                background:#94a3b8;">
+                        3
+                    </div>
+                    <b style="font-size:14px;">Подпишите документ</b>
+                </div>
+                <p class="muted small" style="margin:0;">
+                    Нажмите ✍ — откроется плагин КриптоПро для ввода PIN.
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- Действия -->
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; align-items:stretch;">
         <form method="post" th:action="@{/folders/create}" class="upload-form"
@@ -228,6 +289,7 @@
 
 <script type="module" th:src="@{/js/sign.js}"></script>
 <script th:src="@{/js/sign-progress.js}"></script>
+<script th:src="@{/js/stamp.js}"></script>
 <script th:src="@{/js/file-drop.js}"></script>
 <script th:src="@{/js/batch-sign.js}"></script>
 <script th:inline="javascript">

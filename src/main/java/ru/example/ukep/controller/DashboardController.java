@@ -58,6 +58,13 @@ public class DashboardController {
         model.addAttribute("user", user);
         model.addAttribute("folders", folders);
         model.addAttribute("documentsByFolder", byFolder);
+
+        // Для онбординга
+        long totalDocs = documentRepository.countByOwner(user);
+        long signedDocs = documentRepository.countByOwnerAndSignedTrue(user);
+        model.addAttribute("allDocsCount", totalDocs);
+        model.addAttribute("allSignedCount", signedDocs);
+
         return "dashboard";
     }
 }

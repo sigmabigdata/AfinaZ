@@ -74,7 +74,13 @@ document.addEventListener('DOMContentLoaded', function () {
             var data = await resp.json().catch(function () { return {}; });
             if (resp.ok && data.valid) {
                 if (progress) progress.success('Документ подписан');
-                setTimeout(function () { location.reload(); }, 1300);
+                setTimeout(function () {
+                    if (window.StampEffect) {
+                        StampEffect.play('ПОДПИСАНО', function () { location.reload(); });
+                    } else {
+                        location.reload();
+                    }
+                }, 500);
             } else {
                 var msg = 'Подпись не принята: ' + (data.error || resp.statusText);
                 if (progress) {
