@@ -22,6 +22,7 @@
         <a th:href="@{/admin/settings}">Настройки</a>
         <a th:href="@{/admin/poa}">Доверенности</a>
     </nav>
+    <button type="button" class="cmdk-trigger" title="Поиск (⌘K)" style="margin-right:8px;">🔍 <span style="opacity:0.6;">⌘K</span></button>
     <form method="post" th:action="@{/admin/logout}" style="display:inline">
         <button class="btn-ghost" type="submit">Выйти</button>
     </form>
@@ -130,5 +131,6 @@
     window.TPL_INITIAL_FIELDS_JSON = /*[[${mode == 'edit'} ? ${template.fieldsJson} : '[]']]*/ '[]';
 </script>
 <script th:src="@{/js/template-editor.js}"></script>
+<script th:src="@{/js/command-palette.js}"></script>
 </body>
 </html>

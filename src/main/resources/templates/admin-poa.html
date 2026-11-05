@@ -22,6 +22,7 @@
         <a th:href="@{/admin/poa}" class="active">Доверенности</a>
         <a th:href="@{/admin/settings}">Настройки</a>
     </nav>
+    <button type="button" class="cmdk-trigger" title="Поиск (⌘K)" style="margin-right:8px;">🔍 <span style="opacity:0.6;">⌘K</span></button>
     <form method="post" th:action="@{/admin/logout}" style="display:inline">
         <button class="btn-ghost" type="submit">Выйти</button>
     </form>
@@ -131,5 +132,6 @@
         </table>
     </section>
 </main>
+<script th:src="@{/js/command-palette.js}"></script>
 </body>
 </html>

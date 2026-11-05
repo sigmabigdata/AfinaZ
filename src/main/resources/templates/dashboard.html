@@ -14,6 +14,9 @@
         <img src="/img/logo.png" alt="НБД-Банк" class="brand-logo">
     </a>
     <div class="header-user">
+        <button type="button" class="cmdk-trigger" title="Поиск (⌘K)">
+            🔍 <span style="opacity:0.6;">⌘K</span>
+        </button>
         <span th:text="${user.fullName}">Пользователь</span>
         <form method="post" th:action="@{/logout}" style="display:inline">
             <button class="btn-ghost btn-sm" type="submit">Выйти</button>
@@ -217,6 +220,7 @@
 </script>
 <script th:src="@{/js/timeline.js}"></script>
 <script th:src="@{/js/template-use.js}"></script>
+<script th:src="@{/js/command-palette.js}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var btn = document.getElementById('btn-use-template');
