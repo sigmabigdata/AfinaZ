@@ -41,9 +41,6 @@ RUN mkdir -p /root/.m2/repository && \
     install_jar XAdES.jar      $G xades             $V && \
     install_jar XMLDSigRI.jar  $G xmldsigri         $V && \
     install_jar Rutoken.jar    $G rutoken           $V && \
-    install_jar bcprov-jdk15on-1.70.jar org.bouncycastle bcprov-jdk15on 1.70 && \
-    install_jar bcpkix-jdk15on-1.70.jar org.bouncycastle bcpkix-jdk15on 1.70 && \
-    install_jar bcutil-jdk15on-1.70.jar org.bouncycastle bcutil-jdk15on 1.70 && \
     echo "✓ All local jars installed to ~/.m2"
 
 

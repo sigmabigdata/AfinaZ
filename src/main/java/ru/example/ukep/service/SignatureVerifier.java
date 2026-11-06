@@ -603,23 +603,73 @@ public class SignatureVerifier {
         }
     }
 
+    /**
+     * Проверяет подпись leaf-сертификата его issuer'ом.
+     * Пробует несколько имён алгоритмов × провайдеров — из-за разницы
+     * регистрации ГОСТ-2012 в BC 1.78 и JCSP 5.0.
+     */
     private boolean verifySignature(X509Certificate cert, X509Certificate issuer) {
+        byte[] tbs = null;
+        byte[] sig = null;
         try {
-            cert.verify(issuer.getPublicKey(), "BC");
-            return true;
-        } catch (Exception bcError) {
-            log.debug("verifySignature: BC failed ({}): {}", bcError.getClass().getSimpleName(), bcError.getMessage());
+            tbs = cert.getTBSCertificate();
+            sig = cert.getSignature();
+        } catch (Exception e) {
+            log.debug("verifySignature: getTBSCertificate failed: {}", e.getMessage());
         }
-        try {
-            cert.verify(issuer.getPublicKey(), "JCSP");
-            return true;
-        } catch (Exception jcspError) {
-            log.warn("verifySignature: BOTH BC and JCSP failed for '{}' <- '{}': {}",
-                    extractCn(cert.getSubjectX500Principal().getName()),
-                    extractCn(issuer.getSubjectX500Principal().getName()),
-                    jcspError.getMessage());
-            return false;
+
+        String[] algos = {
+                cert.getSigAlgName(),                       // как в cert
+                "GOST3411-2012-256withECGOST3410-2012-256",
+                "GOST3411-2012-512withECGOST3410-2012-512",
+                "GOST3411-2012-256WITHECGOST3410-2012-256",  // uppercase WITH
+                "GOST3411withECGOST3410",                   // 2001
+                "ECGOST3410-2012",                          // fallback
+        };
+        String[] providers = {"BC", "JCSP"};
+
+        // Попытка 1: cert.verify (стандартный API — берёт алгоритм из cert)
+        for (String provider : providers) {
+            try {
+                cert.verify(issuer.getPublicKey(), provider);
+                log.info("verifySignature: OK ({}): '{}' <- '{}'",
+                        provider,
+                        extractCn(cert.getSubjectX500Principal().getName()),
+                        extractCn(issuer.getSubjectX500Principal().getName()));
+                return true;
+            } catch (Exception e) {
+                log.debug("verifySignature: cert.verify({}) failed: {}",
+                        provider, e.getMessage());
+            }
         }
+
+        // Попытка 2: явный перебор имён алгоритмов (низкоуровневая)
+        if (tbs != null && sig != null) {
+            for (String alg : algos) {
+                if (alg == null || alg.isBlank()) continue;
+                for (String provider : providers) {
+                    try {
+                        var s = java.security.Signature.getInstance(alg, provider);
+                        s.initVerify(issuer.getPublicKey());
+                        s.update(tbs);
+                        if (s.verify(sig)) {
+                            log.info("verifySignature: OK explicit (alg={}, provider={}): '{}' <- '{}'",
+                                    alg, provider,
+                                    extractCn(cert.getSubjectX500Principal().getName()),
+                                    extractCn(issuer.getSubjectX500Principal().getName()));
+                            return true;
+                        }
+                    } catch (Exception ignored) {
+                        // пробуем дальше
+                    }
+                }
+            }
+        }
+
+        log.warn("verifySignature: ALL attempts failed for '{}' <- '{}'",
+                extractCn(cert.getSubjectX500Principal().getName()),
+                extractCn(issuer.getSubjectX500Principal().getName()));
+        return false;
     }
 
     private boolean isSelfSigned(X509Certificate cert) {
