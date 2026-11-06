@@ -200,26 +200,31 @@
     function signAllInSection(folderId) {
         var card = document.querySelector('.folder-card[data-folder-id="' + folderId + '"]');
         if (!card) {
-            alert('Раздел не найден');
+            alert('Раздел не найден на странице');
             return;
         }
         var cbs = card.querySelectorAll('.doc-checkbox');
         if (cbs.length === 0) {
-            alert('В этом разделе нет неподписанных документов');
+            alert('В этом разделе все документы уже подписаны');
             return;
         }
         var n = cbs.length;
-        if (!confirm('Подписать ' + n + ' неподписанных документа(ов) в разделе?\n'
+        if (!confirm('Подписать ' + n + ' неподписанных документа(ов) в разделе?
+'
                 + 'Потребуется один PIN-код для всех.')) {
             return;
         }
 
+        console.log('[signAllInSection] folderId=', folderId, 'unsigned=', n);
+
+        // НЕ выставляем cb.checked (не показываем галочки),
+        // НЕ вызываем updateBar() (не показываем плавающую панель).
+        // Просто заполняем selected и сразу запускаем подписание.
         selected.clear();
         cbs.forEach(function (cb) {
-            cb.checked = true;
             selected.add(Number(cb.dataset.id));
         });
-        updateBar();
+
         signSelected();
     }
 
