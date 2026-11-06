@@ -691,13 +691,13 @@ public class SignatureVisualizationService {
 
     /**
      * Рисует QR-код в правом нижнем углу страницы (над футером).
-     * QR ведёт на /verify/{publicUuid}.
+     * QR ведёт на /info/{publicUuid}.
      */
     private void drawQr(PDPageContentStream cs, PDDocument pdf, PDFont font,
                         Document document, float pageWidth, float pageHeight) throws IOException {
         if (baseUrl == null || baseUrl.isBlank()) return;
         String verifyUrl = baseUrl.replaceAll("/+$", "")
-                + "/verify/" + document.getPublicUuid();
+                + "/info/" + document.getPublicUuid();
 
         // QR в 2 раза меньше (52 → 26) и в ПРАВОМ ВЕРХНЕМ углу
         float qrSize = 26f;

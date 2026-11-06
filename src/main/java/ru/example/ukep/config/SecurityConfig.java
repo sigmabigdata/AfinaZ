@@ -171,6 +171,8 @@ public class SecurityConfig {
                 .requestMatchers("/", "/login", "/login/confirm", "/error",
                                  "/actuator/health", "/actuator/info",
                                  "/ping",
+                                 "/info", "/info/**",
+                                 "/api/info/**",
                                  "/css/**", "/js/**", "/img/**", "/favicon.ico",
                                  "/h2-console/**").permitAll()
                 .anyRequest().authenticated())

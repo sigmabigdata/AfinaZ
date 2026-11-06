@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>ПАО «НБД-Банк» · Информация о подписании</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<main class="info-page">
+    <div class="info-header">
+        <img src="/img/logo.png" alt="НБД-Банк" class="info-logo">
+        <h1>Информация о подписании документа</h1>
+        <p class="info-subtitle">
+            Сведения о подписях документа, зарегистрированного в системе ПАО «НБД-Банк».
+            Это <b>информационная страница</b> — не юридически значимая проверка.
+        </p>
+    </div>
+
+    <div id="info-loading" class="info-loading">
+        <div class="info-spinner"></div>
+        <div>Загружаем информацию…</div>
+    </div>
+
+    <div id="info-output" style="display:none;"></div>
+
+    <div class="info-footer">
+        Проверено <span id="info-time">—</span>.
+        <a th:href="@{/login}">Вход в личный кабинет →</a>
+    </div>
+
+    <div class="info-disclaimer">
+        <b>Для юридически значимой проверки</b> используйте аккредитованный
+        удостоверяющий центр, КриптоПро CSP или портал Госуслуг.
+    </div>
+</main>
+
+<script th:inline="javascript">
+    window.__INFO_UUID__ = /*[[${uuid}]]*/ '';
+</script>
+<script th:src="@{/js/info.js}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    InfoUI.init(window.__INFO_UUID__);
+});
+</script>
+</body>
+</html>

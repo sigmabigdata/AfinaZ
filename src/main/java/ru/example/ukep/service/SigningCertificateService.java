@@ -217,7 +217,7 @@ public class SigningCertificateService {
 
     private void drawQrBlock(PDPageContentStream cs, PDDocument pdf, PDFont font,
                               Document doc, float left, float right, float y) throws IOException {
-        String url = baseUrl.replaceAll("/+$", "") + "/verify/" + doc.getPublicUuid();
+        String url = baseUrl.replaceAll("/+$", "") + "/info/" + doc.getPublicUuid();
         BufferedImage qr = generateQr(url, 200);
         if (qr == null) return;
 
