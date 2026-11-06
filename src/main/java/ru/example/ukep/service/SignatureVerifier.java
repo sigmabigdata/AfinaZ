@@ -841,7 +841,7 @@ public class SignatureVerifier {
 
             // ─── 7. Срок всех звеньев ───
             boolean allValidDates = false;
-            String datesDetails;
+            String datesDetails = null;
             if (chainOk) {
                 allValidDates = true;
                 for (X509Certificate cc : chain) {
