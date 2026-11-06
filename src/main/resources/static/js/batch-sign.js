@@ -18,52 +18,14 @@
     var isAdmin = (API_PREFIX === '/admin');
 
     function init() {
-        injectBatchBar();
-        // Делегируем обработку чекбоксов
-        document.addEventListener('change', function (e) {
-            if (!e.target.classList.contains('doc-checkbox')) return;
-            var id = Number(e.target.dataset.id);
-            if (e.target.checked) {
-                selected.add(id);
-            } else {
-                selected.delete(id);
-            }
-            updateBar();
-        });
+        // Никаких чекбоксов и плавающей панели.
+        // Кнопки "Подписать всё" работают через inline onclick,
+        // который вызывает window.BatchSign.signAllInSection(folderId).
+        console.log('[batch-sign] loaded. API_PREFIX=', API_PREFIX, '| isAdmin=', isAdmin);
     }
 
-    function injectBatchBar() {
-        var bar = document.createElement('div');
-        bar.className = 'batch-bar';
-        bar.id = 'batch-bar';
-        bar.innerHTML = ''
-            + '<span>Выбрано: <span class="count" id="batch-count">0</span></span>'
-            + '<button id="batch-sign-btn">✍ Подписать выбранные</button>'
-            + '<button class="ghost" id="batch-clear-btn">Сбросить</button>';
-        document.body.appendChild(bar);
 
-        document.getElementById('batch-sign-btn').addEventListener('click', signSelected);
-        document.getElementById('batch-clear-btn').addEventListener('click', clearSelection);
-    }
 
-    function updateBar() {
-        var count = selected.size;
-        document.getElementById('batch-count').textContent = count;
-        var bar = document.getElementById('batch-bar');
-        if (count > 0) {
-            bar.classList.add('visible');
-        } else {
-            bar.classList.remove('visible');
-        }
-    }
-
-    function clearSelection() {
-        selected.clear();
-        document.querySelectorAll('.doc-checkbox').forEach(function (cb) {
-            cb.checked = false;
-        });
-        updateBar();
-    }
 
     async function fetchFileBase64(id) {
         var resp = await fetch(API_PREFIX + '/documents/' + id + '/view', { credentials: 'same-origin' });
@@ -188,7 +150,6 @@
             cb.checked = true;
             selected.add(Number(cb.dataset.id));
         });
-        updateBar();
 
         // Запускаем подписание (использует существующий flow)
         signSelected();

@@ -199,6 +199,13 @@
             <div class="folder-actions">
                 <button type="button"
                         th:attr="data-folder-id=${f.id}"
+                        onclick="if(window.BatchSign &amp;&amp; window.BatchSign.signAllInSection){window.BatchSign.signAllInSection(this.getAttribute('data-folder-id'))}else{alert('Batch недоступен. Обновите страницу.')}"
+                        title="Подписать все неподписанные в разделе"
+                        style="background: linear-gradient(135deg,#2454ff,#7a3fff); color: #ffffff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; line-height: 1.2;">
+                    ✍ Подписать всё
+                </button>
+                <button type="button"
+                        th:attr="data-folder-id=${f.id}"
                         onclick="if(window.BatchSign &amp;&amp; window.BatchSign.signAllInSection){window.BatchSign.signAllInSection(this.getAttribute('data-folder-id'))}else{alert('Batch недоступен')}"
                         title="Подписать все неподписанные в разделе"
                         style="background: linear-gradient(135deg,#2454ff,#7a3fff); color: #ffffff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; line-height: 1.2;">
