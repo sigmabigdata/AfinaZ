@@ -55,6 +55,12 @@
                        color:#fff; white-space:nowrap;">
             ✨ Из шаблона
         </button>
+        <button type="button" id="btn-sign-all" class="btn"
+                style="background:linear-gradient(135deg,#2454ff,#7a3fff); border:none;
+                       color:#fff; white-space:nowrap;"
+                title="Подписать все неподписанные документы одним PIN-кодом">
+            ✍ Подписать всё
+        </button>
     </div>
 
     <div th:if="${#lists.isEmpty(folders)}" class="empty-state">
@@ -224,6 +230,16 @@
         var btn = document.getElementById('btn-use-template');
         if (btn && window.TemplateUse) {
             btn.addEventListener('click', function () { window.TemplateUse.open(); });
+        }
+        var signAllBtn = document.getElementById('btn-sign-all');
+        if (signAllBtn) {
+            signAllBtn.addEventListener('click', function () {
+                if (window.BatchSign && window.BatchSign.signAllUnsigned) {
+                    window.BatchSign.signAllUnsigned();
+                } else {
+                    alert('Batch-подписание недоступно. Обновите страницу.');
+                }
+            });
         }
     });
 </script>

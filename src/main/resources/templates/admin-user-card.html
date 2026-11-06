@@ -111,6 +111,13 @@
                     📦 Скачать всё (ZIP)
                 </a>
 
+                <button type="button" id="btn-sign-all" class="btn"
+                        style="background:linear-gradient(135deg,#2454ff,#7a3fff); border:none;
+                               color:#fff; white-space:nowrap;"
+                        title="Подписать все неподписанные документы клиента">
+                    ✍ Подписать всё
+                </button>
+
                 <form th:if="${user.role.name() != 'ROLE_ADMIN'}"
                       method="post"
                       th:action="@{'/admin/users/' + ${user.id} + '/toggle'}"
@@ -373,6 +380,20 @@
 </script>
 
 <script type="module" th:src="@{/js/sign.js}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var signAllBtn = document.getElementById('btn-sign-all');
+        if (signAllBtn) {
+            signAllBtn.addEventListener('click', function () {
+                if (window.BatchSign && window.BatchSign.signAllUnsigned) {
+                    window.BatchSign.signAllUnsigned();
+                } else {
+                    alert('Batch-подписание недоступно. Обновите страницу.');
+                }
+            });
+        }
+    });
+</script>
 <script th:src="@{/js/cert-selector.js}"></script>
 <script th:src="@{/js/sign-progress.js}"></script>
 <script th:src="@{/js/stamp.js}"></script>

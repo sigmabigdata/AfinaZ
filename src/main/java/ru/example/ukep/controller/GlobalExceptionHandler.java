@@ -19,8 +19,13 @@ public class GlobalExceptionHandler {
                 .body(Map.of(K_ERROR, "Файл слишком большой"));
     }
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBad(IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body(Map.of(K_ERROR, e.getMessage()));
+        log.warn("IllegalArgumentException: {}", e.getMessage(), e);
+        String msg = e.getMessage() != null ? e.getMessage() : "Ошибка запроса";
+        return ResponseEntity.badRequest().body(Map.of(K_ERROR, msg));
     }
 }

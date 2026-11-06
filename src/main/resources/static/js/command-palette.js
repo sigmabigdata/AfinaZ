@@ -153,11 +153,19 @@
 
     async function search(q) {
         try {
-            var url = '/api/search?limit=10';
-            if (q && q.trim()) url += '&q=' + encodeURIComponent(q.trim());
+            var params = new URLSearchParams();
+            params.set('limit', '10');
+            if (q && q.trim()) params.set('q', q.trim());
+            var url = '/api/search?' + params.toString();
+            console.log('[cmdk] search:', q, '| URL:', url);
             var resp = await fetch(url, { credentials: 'same-origin' });
             if (!resp.ok) {
-                bodyEl.innerHTML = '<div class="cmdk-empty">Ошибка: HTTP ' + resp.status + '</div>';
+                var errText = '';
+                try { errText = await resp.text(); } catch (ex) {}
+                console.error('[cmdk] HTTP', resp.status, errText);
+                bodyEl.innerHTML = '<div class="cmdk-empty">Ошибка: HTTP '
+                    + resp.status + (errText ? ' — ' + escapeHtml(errText.substring(0, 200)) : '')
+                    + '</div>';
                 return;
             }
             var data = await resp.json();

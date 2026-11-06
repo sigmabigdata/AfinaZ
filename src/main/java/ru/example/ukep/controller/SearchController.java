@@ -46,9 +46,25 @@ public class SearchController {
     }
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> search(@RequestParam("q") String q,
+    public ResponseEntity<Map<String, Object>> search(@RequestParam(value = "q", required = false) String q,
                                                        @RequestParam(defaultValue = "10") int limit,
                                                        @AuthenticationPrincipal UserDetails p) {
+        try {
+            return doSearch(q, limit, p);
+        } catch (Exception e) {
+            log.error("Search failed: q='{}', limit={}, user={}",
+                    q, limit, p != null ? p.getUsername() : "anonymous", e);
+            java.util.Map<String, Object> err = new java.util.LinkedHashMap<>();
+            err.put("error", "Ошибка поиска: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+            err.put("pages", java.util.List.of());
+            err.put("actions", java.util.List.of());
+            err.put("users", java.util.List.of());
+            err.put("documents", java.util.List.of());
+            return ResponseEntity.ok(err);
+        }
+    }
+
+    private ResponseEntity<Map<String, Object>> doSearch(String q, int limit, UserDetails p) {
         if (p == null) return ResponseEntity.status(401).build();
 
         String query = q == null ? "" : q.trim().toLowerCase();

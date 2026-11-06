@@ -165,6 +165,39 @@
         return btoa(binary);
     }
 
+    /**
+     * Подписать ВСЕ неподписанные документы.
+     * Собирает все .doc-checkbox (они существуют только для неподписанных),
+     * ставит галочки и запускает batch-подписание.
+     */
+    function signAllUnsigned() {
+        var cbs = document.querySelectorAll('.doc-checkbox');
+        if (cbs.length === 0) {
+            alert('Нет неподписанных документов');
+            return;
+        }
+        var n = cbs.length;
+        if (!confirm('Подписать все ' + n + ' неподписанных документа(ов)?\n'
+                + 'Потребуется один PIN-код для всех.')) {
+            return;
+        }
+
+        // Очищаем текущий выбор и заполняем всеми неподписанными
+        selected.clear();
+        cbs.forEach(function (cb) {
+            cb.checked = true;
+            selected.add(Number(cb.dataset.id));
+        });
+        updateBar();
+
+        // Запускаем подписание (использует существующий flow)
+        signSelected();
+    }
+
+    window.BatchSign = {
+        signAllUnsigned: signAllUnsigned
+    };
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
