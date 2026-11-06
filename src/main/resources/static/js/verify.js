@@ -132,19 +132,19 @@
         html += certCheck && certCheck.passed ? 'ДЕЙСТВИТЕЛЕН' : 'НЕДЕЙСТВИТЕЛЕН';
         html += '</div></div>';
 
-        // Владелец сертификата
+        // Владелец сертификата — читаемый вид
         if (data.signerFullSubject) {
             html += '<div class="gos-row">';
             html += '<div class="gos-label">Владелец сертификата</div>';
-            html += '<div class="gos-value mono">' + esc(data.signerFullSubject) + '</div>';
+            html += '<div class="gos-value">' + esc(data.signerFullSubject) + '</div>';
             html += '</div>';
         }
 
-        // Издатель
+        // Издатель сертификата — читаемый вид
         if (data.signerIssuerFull) {
             html += '<div class="gos-row">';
             html += '<div class="gos-label">Издатель сертификата</div>';
-            html += '<div class="gos-value mono">' + esc(data.signerIssuerFull) + '</div>';
+            html += '<div class="gos-value">' + esc(data.signerIssuerFull) + '</div>';
             html += '</div>';
         }
 
@@ -205,6 +205,22 @@
                 }
                 html += '</div></div>';
             });
+            html += '</div></details>';
+        }
+
+        // ─── Технический subject (в details) ───
+        if (data.signerFullSubjectTech) {
+            html += '<details class="gos-details">';
+            html += '<summary>Технический X.500 subject</summary>';
+            html += '<div style="padding: 16px 18px;">';
+            html += '<div class="gos-value mono" style="word-break: break-all;">'
+                + esc(data.signerFullSubjectTech) + '</div>';
+            if (data.signerIssuerFullTech) {
+                html += '<div style="margin-top:12px; font-size:12px; color:#64748b; margin-bottom:6px;">'
+                    + 'Issuer (технический):</div>';
+                html += '<div class="gos-value mono" style="word-break: break-all;">'
+                    + esc(data.signerIssuerFullTech) + '</div>';
+            }
             html += '</div></details>';
         }
 
