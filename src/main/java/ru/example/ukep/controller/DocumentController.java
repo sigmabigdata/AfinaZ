@@ -135,11 +135,10 @@ public class DocumentController {
         byte[] sigBytes = Base64.getDecoder().decode(
                 doc.getSignatureBase64().replaceAll("\\s+", ""));
 
-        String baseName = stripExtension(doc.getOriginalName());
+        String fileName = doc.getOriginalName() + ".sig";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                        URLEncoder.encode(baseName + ".sig", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(fileName))
                 .body(sigBytes);
     }
 
@@ -244,8 +243,7 @@ public class DocumentController {
                     + stripExtension(doc.getOriginalName()) + ".pdf";
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(fileName))
                     .body(bytes);
         } catch (IllegalStateException e) {
             String msg = e.getMessage() == null ? "Ошибка" : e.getMessage();
@@ -365,8 +363,7 @@ public class DocumentController {
             String fileName = "СПРАВКА_" + stripExtension(doc.getOriginalName()) + ".pdf";
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(fileName))
                     .body(pdf);
         } catch (Exception e) {
             log.error("signing-certificate failed for doc {}", id, e);
