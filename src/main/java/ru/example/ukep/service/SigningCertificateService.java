@@ -274,20 +274,39 @@ public class SigningCertificateService {
         }
     }
 
-    private PDFont loadFont(PDDocument pdf) throws IOException {
-        String[] paths = {
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-        };
-        for (String p : paths) {
+    /** Все известные пути к TTF-шрифтам с поддержкой кириллицы. */
+    private static final String[] FONT_PATHS = {
+        // Linux / Debian / Astra
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        // macOS
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        // Windows
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\Arial.ttf",
+    };
+
+    /** Возвращает первый существующий шрифт или null. */
+    public static Path findCyrillicFont() {
+        for (String p : FONT_PATHS) {
             Path f = Paths.get(p);
-            if (Files.isRegularFile(f)) {
-                try (InputStream is = Files.newInputStream(f)) {
-                    return PDType0Font.load(pdf, is);
-                }
+            if (Files.isRegularFile(f)) return f;
+        }
+        return null;
+    }
+
+    private PDFont loadFont(PDDocument pdf) throws IOException {
+        Path f = findCyrillicFont();
+        if (f != null) {
+            try (InputStream is = Files.newInputStream(f)) {
+                return PDType0Font.load(pdf, is);
             }
         }
-        log.warn("DejaVuSans.ttf не найден — используется Helvetica (кириллица не отобразится)");
+        log.warn("TTF с кириллицей не найден — используется Helvetica (кириллица не отобразится)");
         return org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA;
     }
 

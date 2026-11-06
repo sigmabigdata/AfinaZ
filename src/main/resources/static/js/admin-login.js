@@ -81,11 +81,11 @@ btn.addEventListener('click', async () => {
             return;
         }
 
-        // Первый сертификат с закрытым ключом.
-        // В crypto-pro-cadesplugin поле privateKey — объект, а не boolean.
-        let certShort = certs[0];
-        for (const c of certs) {
-            if (c.privateKey) { certShort = c; break; }
+        // Явный выбор сертификата (CertSelector вернёт его без модалки, если один)
+        const certShort = await window.CertSelector.choose(certs);
+        if (!certShort) {
+            setStatus('');
+            return;
         }
         console.log('[admin-login] cert:', certShort);
 

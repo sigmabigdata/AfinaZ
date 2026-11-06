@@ -251,10 +251,11 @@ public class ClientExportService {
 
     private void addTextFile(ZipOutputStream zip, String name, String content) throws IOException {
         zip.putNextEntry(new ZipEntry(name));
-        try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(zip, StandardCharsets.UTF_8))) {
-            pw.write(content);
-            pw.flush();
-        }
+        // ВАЖНО: не используем try-with-resources — PrintWriter.close() закроет
+        // и ZipOutputStream, после чего следующий putNextEntry() бросит IOException.
+        PrintWriter pw = new PrintWriter(new OutputStreamWriter(zip, StandardCharsets.UTF_8));
+        pw.write(content);
+        pw.flush();
         zip.closeEntry();
     }
 

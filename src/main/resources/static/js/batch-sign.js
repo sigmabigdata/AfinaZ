@@ -99,7 +99,11 @@
             var api = await cadesplugin();
             var certs = await api.getCertsList();
             if (!certs || certs.length === 0) throw new Error('В хранилище «Личные» нет сертификатов');
-            var cert = certs[0];
+            var cert = await CertSelector.choose(certs);
+            if (!cert) {
+                if (progress) progress.fail('Подписание отменено');
+                return;
+            }
             if (progress) progress.done(0);
 
             // Шаг 1: подписываем каждый файл

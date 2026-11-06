@@ -199,9 +199,9 @@
                     <a th:href="@{'/documents/' + ${d.id} + '/view'}" target="_blank" title="Просмотреть">👁</a>
                     <a th:href="@{'/documents/' + ${d.id} + '/download'}" title="Скачать">⬇</a>
                     <button type="button" class="btn-timeline" th:attr="data-id=${d.id}"
-                            title="История документа"
+                            title="История документа (кто, когда, что делал)"
                             style="background:none;border:none;color:#2454ff;cursor:pointer;
-                                   padding:0 4px;font-size:16px;">🕒</button>
+                                   padding:0 4px;font-size:16px;">📜</button>
                     <a th:if="${d.signed}"
                        th:href="@{'/documents/' + ${d.id} + '/signing-certificate'}"
                        title="Справка о подписании (PDF)"
@@ -288,6 +288,7 @@
 </script>
 
 <script type="module" th:src="@{/js/sign.js}"></script>
+<script th:src="@{/js/cert-selector.js}"></script>
 <script th:src="@{/js/sign-progress.js}"></script>
 <script th:src="@{/js/stamp.js}"></script>
 <script th:src="@{/js/file-drop.js}"></script>
