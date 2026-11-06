@@ -3,8 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>НБД-Банк · Личный кабинет</title>
-    <meta name="_csrf" th:content="${_csrf.token}"/>
-    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <script src="https://www.cryptopro.ru/sites/default/files/products/cades/cadesplugin_api.js"></script>
 </head>
@@ -127,6 +125,7 @@
                 <a th:if="${d.signed}"
                    th:href="@{'/documents/' + ${d.id} + '/visualization'}"
                    target="_blank" title="Визуализация подписи (PDF)">📄</a>
+                <span th:unless="${d.signed}" class="spacer"></span>
                 <span th:unless="${d.signed}" class="spacer"></span>
                 <a th:if="${d.signed}"
                    th:href="@{'/documents/' + ${d.id} + '/signing-certificate'}"

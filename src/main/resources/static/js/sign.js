@@ -64,8 +64,6 @@ document.addEventListener('DOMContentLoaded', function () {
             // Шаг 3: проверка на сервере
             if (progress) progress.active(3);
             var headers = { 'Content-Type': 'application/json' };
-            var csrf = getCsrf();
-            if (csrf) headers[getCsrfHeader() || 'X-CSRF-TOKEN'] = csrf;
 
             var endpoint = (API_PREFIX === '/admin') ? '/api/sign/admin/accept' : '/api/sign/accept';
 
@@ -127,6 +125,4 @@ document.addEventListener('DOMContentLoaded', function () {
             binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
         return btoa(binary);
     }
-    function getCsrf() { var m = document.querySelector('meta[name="_csrf"]'); return m ? m.getAttribute('content') : null; }
-    function getCsrfHeader() { var m = document.querySelector('meta[name="_csrf_header"]'); return m ? m.getAttribute('content') : null; }
 });
