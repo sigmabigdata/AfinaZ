@@ -140,7 +140,7 @@
                 var msg = 'Подписано ' + data.ok + ' из ' + data.total;
                 if (data.fail > 0) msg += ' (ошибок: ' + data.fail + ')';
                 if (progress) progress.success(msg);
-                setTimeout(function () { location.reload(); }, 1500);
+                setTimeout(hardReload, 1500);
             } else {
                 if (progress) progress.fail('Сервер вернул ошибку: ' + (data.error || resp.statusText));
             }

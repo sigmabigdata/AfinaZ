@@ -901,10 +901,12 @@ public class SignatureVerifier {
             result.put("valid", allOk);
             result.put("checks", checks);
             result.put("signerSubject", extractCn(leaf.getSubjectX500Principal().getName()));
-            result.put("signerFullSubject", leaf.getSubjectX500Principal().getName());
+            result.put("signerFullSubject", CertificateSubjectFormatter.format(leaf));
+            result.put("signerFullSubjectTech", leaf.getSubjectX500Principal().getName());
             result.put("signerSerial", leaf.getSerialNumber().toString(16).toUpperCase());
             result.put("signerIssuer", extractCn(leaf.getIssuerX500Principal().getName()));
-            result.put("signerIssuerFull", leaf.getIssuerX500Principal().getName());
+            result.put("signerIssuerFull", CertificateSubjectFormatter.formatIssuer(leaf));
+            result.put("signerIssuerFullTech", leaf.getIssuerX500Principal().getName());
             result.put("signerThumbprint", thumbprintSha1(leaf));
             result.put("signerKeyUsage", keyUsageStr(leaf));
             result.put("crlReport", crlReport);
