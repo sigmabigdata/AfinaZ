@@ -96,7 +96,7 @@
     <section class="panel">
         <h2>Загруженные CRL</h2>
 
-        <form method="post" th:action="@{/admin/crl/delete-selected}"
+        <form method="post" th:action="@{/admin/crl/delete-selected}" id="delete-crls-form"
               onsubmit="return confirm('Удалить выбранные CRL?');"
               style="margin-bottom:12px;">
             <button type="submit" class="btn-danger btn-sm">🗑 Удалить выбранные</button>
@@ -122,7 +122,7 @@
             <tbody>
             <tr th:each="c : ${crls}">
                 <td>
-                    <input type="checkbox" name="names" th:value="${c.fileName}"/>
+                    <input type="checkbox" name="names" form="delete-crls-form" th:value="${c.fileName}"/>
                 </td>
                 <td>
                     <code th:text="${c.fileName}">file.crl</code>

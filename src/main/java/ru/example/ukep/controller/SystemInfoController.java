@@ -12,6 +12,7 @@ import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.BackupService;
 import ru.example.ukep.service.LogService;
 import ru.example.ukep.service.SystemInfoService;
+import ru.example.ukep.util.FileNames;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -122,9 +123,7 @@ public class SystemInfoController {
             byte[] data = backups.read(name);
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename*=UTF-8''" +
-                            URLEncoder.encode(name, StandardCharsets.UTF_8))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(name))
                     .body(data);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

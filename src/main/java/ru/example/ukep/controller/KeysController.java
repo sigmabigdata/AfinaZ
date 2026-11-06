@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.KeysService;
+import ru.example.ukep.util.FileNames;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -97,8 +98,7 @@ public class KeysController {
 
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"" + zipName + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(zipName))
                     .body(zipBytes);
 
         } catch (Exception e) {

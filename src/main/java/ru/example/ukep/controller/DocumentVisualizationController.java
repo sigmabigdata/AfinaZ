@@ -12,6 +12,7 @@ import ru.example.ukep.repository.DocumentRepository;
 import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.DocumentService;
 import ru.example.ukep.service.SignatureVisualizationService;
+import ru.example.ukep.util.FileNames;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -83,8 +84,7 @@ public class DocumentVisualizationController {
                     + stripExtension(doc.getOriginalName()) + ".pdf";
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(fileName))
                     .body(bytes);
         } catch (IllegalStateException e) {
             log.warn("Визуализация недоступна для doc {}: {}", id, e.getMessage());
@@ -286,8 +286,7 @@ public class DocumentVisualizationController {
                     "PDF справка о подписании");
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(fileName))
                     .body(pdf);
         } catch (Exception e) {
             log.error("signing-certificate failed for doc {}", id, e);

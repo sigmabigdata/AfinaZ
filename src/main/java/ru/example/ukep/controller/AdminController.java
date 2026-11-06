@@ -18,6 +18,7 @@ import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.DocumentService;
 import ru.example.ukep.service.EmailService;
 import ru.example.ukep.service.UserService;
+import ru.example.ukep.util.FileNames;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -265,8 +266,8 @@ public class AdminController {
                 : MediaType.APPLICATION_OCTET_STREAM;
         return ResponseEntity.ok()
                 .contentType(mt)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" +
-                        URLEncoder.encode(doc.getOriginalName(), StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        FileNames.inline(doc.getOriginalName()))
                 .body(r);
     }
 
@@ -277,8 +278,8 @@ public class AdminController {
         Resource r = documentService.loadAsResource(doc);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                        URLEncoder.encode(doc.getOriginalName(), StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        FileNames.attachment(doc.getOriginalName()))
                 .body(r);
     }
 
@@ -288,13 +289,10 @@ public class AdminController {
                 .orElseThrow(() -> new IllegalArgumentException(DOC_NOT_FOUND));
         if (!doc.isSigned() || doc.getSignatureBase64() == null) return ResponseEntity.notFound().build();
         byte[] sig = Base64.getDecoder().decode(doc.getSignatureBase64().replaceAll("\\s+", ""));
-        String n = doc.getOriginalName();
-        int dot = n.lastIndexOf('.');
-        if (dot > 0) n = n.substring(0, dot);
+        String n = doc.getOriginalName() + ".sig";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                        URLEncoder.encode(n + ".sig", StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(n))
                 .body(sig);
     }
 
@@ -331,8 +329,7 @@ public class AdminController {
         String zn = "signatures_user_" + user.getId() + ".zip";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                        URLEncoder.encode(zn, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(zn))
                 .body(baos.toByteArray());
     }
 
@@ -411,12 +408,10 @@ public class AdminController {
             return ResponseEntity.notFound().build();
         }
         byte[] bytes = Base64.getDecoder().decode(sig.getSignatureBase64().replaceAll("\\s+", ""));
-        String base = stripExtension(doc.getOriginalName());
-        String fileName = base + "_sig_" + sig.getId() + ".sig";
+        String fileName = doc.getOriginalName() + ".sig";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                        URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(fileName))
                 .body(bytes);
     }
 

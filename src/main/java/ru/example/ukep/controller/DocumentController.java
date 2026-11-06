@@ -23,6 +23,7 @@ import ru.example.ukep.service.FolderService;
 import ru.example.ukep.service.SignatureVerifier;
 import ru.example.ukep.service.SignatureVisualizationService;
 import ru.example.ukep.service.SigningCertificateService;
+import ru.example.ukep.util.FileNames;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -107,8 +108,8 @@ public class DocumentController {
                 : MediaType.APPLICATION_OCTET_STREAM;
         return ResponseEntity.ok()
                 .contentType(mt)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" +
-                        URLEncoder.encode(doc.getOriginalName(), StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        FileNames.inline(doc.getOriginalName()))
                 .body(r);
     }
 
@@ -119,8 +120,8 @@ public class DocumentController {
         Resource r = documentService.loadAsResource(doc);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                        URLEncoder.encode(doc.getOriginalName(), StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        FileNames.attachment(doc.getOriginalName()))
                 .body(r);
     }
 
@@ -173,8 +174,7 @@ public class DocumentController {
         String zipName = base + "_signed.zip";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                        URLEncoder.encode(zipName, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(zipName))
                 .body(baos.toByteArray());
     }
 
@@ -199,12 +199,10 @@ public class DocumentController {
             return ResponseEntity.notFound().build();
         }
         byte[] bytes = Base64.getDecoder().decode(sig.getSignatureBase64().replaceAll("\\s+", ""));
-        String base = stripExtension(doc.getOriginalName());
-        String fileName = base + "_sig_" + sig.getId() + ".sig";
+        String fileName = doc.getOriginalName() + ".sig";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                        URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, FileNames.attachment(fileName))
                 .body(bytes);
     }
 
