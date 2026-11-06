@@ -75,7 +75,8 @@
                   total=${#lists.size(docs)},
                   signed=${#lists.size(docs.?[signed])},
                   unsigned=${total - signed}"
-         class="folder-card">
+         class="folder-card"
+         th:attr="data-folder-id=${f.id}">
 
         <div class="folder-card-header">
             <div class="folder-card-title-block">
@@ -96,6 +97,16 @@
                 </div>
             </div>
             <div class="folder-actions">
+                <button type="button" class="btn-sign-all-section"
+                        th:if="${unsigned > 0}"
+                        th:attr="data-folder-id=${f.id}"
+                        title="Подписать все неподписанные документы в этом разделе"
+                        style="background:linear-gradient(135deg,#2454ff,#7a3fff);
+                               border:none; color:#fff; padding:6px 14px;
+                               border-radius:8px; font-size:13px; cursor:pointer;
+                               white-space:nowrap;">
+                    ✍ Подписать всё (<span th:text="${unsigned}">0</span>)
+                </button>
                 <form method="post" th:action="@{'/folders/' + ${f.id} + '/delete'}"
                       onsubmit="return confirm('Удалить раздел и все его документы?');"
                       style="display:inline">
@@ -241,6 +252,17 @@
                 }
             });
         }
+        // Кнопки "Подписать всё" в каждом разделе
+        document.querySelectorAll('.btn-sign-all-section').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var folderId = b.dataset.folderId;
+                if (window.BatchSign && window.BatchSign.signAllInSection) {
+                    window.BatchSign.signAllInSection(folderId);
+                } else {
+                    alert('Batch-подписание недоступно. Обновите страницу.');
+                }
+            });
+        });
     });
 </script>
 </body>

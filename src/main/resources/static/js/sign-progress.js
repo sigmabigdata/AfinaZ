@@ -110,7 +110,7 @@
         steps.forEach(function (_, i) { done(i); });
         card.querySelector('.sub').textContent = message || 'Документ успешно подписан';
         // авто-закрытие через 1.2с
-        autoCloseTimer = setTimeout(close, 1200);
+        autoCloseTimer = setTimeout(close, 1400);
     }
 
     function fail(message) {

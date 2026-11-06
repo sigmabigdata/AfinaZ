@@ -194,8 +194,45 @@
         signSelected();
     }
 
+    /**
+     * Подписать все неподписанные документы В КОНКРЕТНОМ РАЗДЕЛЕ.
+     */
+    function signAllInSection(folderId) {
+        var card = document.querySelector('.folder-card[data-folder-id="' + folderId + '"]');
+        if (!card) {
+            alert('Раздел не найден');
+            return;
+        }
+        var cbs = card.querySelectorAll('.doc-checkbox');
+        if (cbs.length === 0) {
+            alert('В этом разделе нет неподписанных документов');
+            return;
+        }
+        var n = cbs.length;
+        if (!confirm('Подписать ' + n + ' неподписанных документа(ов) в разделе?\n'
+                + 'Потребуется один PIN-код для всех.')) {
+            return;
+        }
+
+        selected.clear();
+        cbs.forEach(function (cb) {
+            cb.checked = true;
+            selected.add(Number(cb.dataset.id));
+        });
+        updateBar();
+        signSelected();
+    }
+
+    /** Hard reload с cache-bust, чтобы точно подхватились новые данные. */
+    function hardReload() {
+        var url = new URL(location.href);
+        url.searchParams.set('_t', Date.now());
+        location.href = url.toString();
+    }
+
     window.BatchSign = {
-        signAllUnsigned: signAllUnsigned
+        signAllUnsigned: signAllUnsigned,
+        signAllInSection: signAllInSection
     };
 
     if (document.readyState === 'loading') {
