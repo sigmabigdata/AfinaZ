@@ -1,46 +1,84 @@
 /**
  * Массовое подписание документов.
+ * Работает на /dashboard (клиент) и /admin/users/{id} (админ).
  *
- * Работает на /dashboard и /admin/users/{id}.
- *
- * Логика:
- *   1. Пользователь ставит чекбоксы на документах.
- *   2. Появляется плавающая панель «Подписать N выбранных».
- *   3. По клику — модалка прогресса.
- *   4. Для каждого документа скачивается файл и подписывается плагином (один PIN на всё).
- *   5. Список {documentId, signatureBase64} отправляется на /api/sign/accept-batch.
+ * Точка входа: window.BatchSign.signAllInSection(folderId)
+ * Вызывается из inline onclick в шаблоне.
  */
 (function () {
     'use strict';
 
     var API_PREFIX = document.body.dataset.apiPrefix || '';
-    var selected = new Set();
     var isAdmin = (API_PREFIX === '/admin');
+    var selected = new Set();
 
-    function init() {
-        // Никаких чекбоксов и плавающей панели.
-        // Кнопки "Подписать всё" работают через inline onclick,
-        // который вызывает window.BatchSign.signAllInSection(folderId).
-        console.log('[batch-sign] loaded. API_PREFIX=', API_PREFIX, '| isAdmin=', isAdmin);
+    // ═══════════════════════════════════════════════════════
+    //  Подписание всех неподписанных в разделе
+    // ═══════════════════════════════════════════════════════
+    function signAllInSection(folderId) {
+        var card = document.querySelector('.folder-card[data-folder-id="' + folderId + '"]');
+        if (!card) {
+            alert('Раздел не найден на странице');
+            return;
+        }
+        var ids = [];
+        card.querySelectorAll('.doc-card[data-signed="false"], tr[data-signed="false"]').forEach(function (el) {
+            var id = Number(el.dataset.id || el.dataset.docId);
+            if (id) ids.push(id);
+        });
+
+        if (ids.length === 0) {
+            alert('В этом разделе все документы уже подписаны');
+            return;
+        }
+
+        var n = ids.length;
+        if (!confirm('Подписать ' + n + ' неподписанных документа(ов) в разделе?\n'
+                + 'Потребуется один PIN-код для всех.')) {
+            return;
+        }
+
+        console.log('[signAllInSection] folderId=', folderId, 'ids=', ids);
+
+        selected.clear();
+        ids.forEach(function (id) { selected.add(id); });
+        signSelected();
     }
 
-
-
-
-    async function fetchFileBase64(id) {
-        var resp = await fetch(API_PREFIX + '/documents/' + id + '/view', { credentials: 'same-origin' });
-        if (!resp.ok) throw new Error('Файл ' + id + ' не получен: HTTP ' + resp.status);
-        var buf = await resp.arrayBuffer();
-        return arrayBufferToBase64(buf);
+    // ═══════════════════════════════════════════════════════
+    //  Подписание всех неподписанных на странице
+    // ═══════════════════════════════════════════════════════
+    function signAllUnsigned() {
+        var ids = [];
+        document.querySelectorAll('.doc-card[data-signed="false"], tr[data-signed="false"]').forEach(function (el) {
+            var id = Number(el.dataset.id || el.dataset.docId);
+            if (id) ids.push(id);
+        });
+        if (ids.length === 0) {
+            alert('Нет неподписанных документов');
+            return;
+        }
+        if (!confirm('Подписать все ' + ids.length + ' неподписанных документа(ов)?\n'
+                + 'Потребуется один PIN-код для всех.')) {
+            return;
+        }
+        selected.clear();
+        ids.forEach(function (id) { selected.add(id); });
+        signSelected();
     }
 
+    // ═══════════════════════════════════════════════════════
+    //  Основной процесс подписания
+    // ═══════════════════════════════════════════════════════
     async function signSelected() {
-        if (selected.size === 0) return;
+        if (selected.size === 0) {
+            alert('Ничего не выбрано');
+            return;
+        }
 
         var progress = window.SignProgress;
         var total = selected.size;
 
-        // Кастомные шаги для batch
         var steps = [
             { icon: '🔍', title: 'Поиск сертификата', sub: 'Чтение из хранилища «Личные»' },
             { icon: '🖋', title: 'Подписание ' + total + ' документ(ов)', sub: 'Один PIN на все файлы' },
@@ -61,14 +99,22 @@
             var api = await cadesplugin();
             var certs = await api.getCertsList();
             if (!certs || certs.length === 0) throw new Error('В хранилище «Личные» нет сертификатов');
-            var cert = await CertSelector.choose(certs);
-            if (!cert) {
-                if (progress) progress.fail('Подписание отменено');
-                return;
+
+            // CertSelector — если определён
+            var cert;
+            if (window.CertSelector && typeof window.CertSelector.choose === 'function') {
+                cert = await window.CertSelector.choose(certs);
+                if (!cert) {
+                    if (progress) progress.fail('Подписание отменено');
+                    return;
+                }
+            } else {
+                // fallback: первый
+                cert = certs[0];
             }
             if (progress) progress.done(0);
 
-            // Шаг 1: подписываем каждый файл
+            // Шаг 1: подписываем каждый
             if (progress) progress.active(1);
             var ids = Array.from(selected);
             var requests = [];
@@ -86,7 +132,7 @@
             }
             if (progress) progress.done(1);
 
-            // Шаг 2: отправка на сервер
+            // Шаг 2: отправка
             if (progress) progress.active(2);
             var endpoint = isAdmin ? '/api/sign/admin/accept-batch' : '/api/sign/accept-batch';
             var resp = await fetch(endpoint, {
@@ -102,7 +148,14 @@
                 var msg = 'Подписано ' + data.ok + ' из ' + data.total;
                 if (data.fail > 0) msg += ' (ошибок: ' + data.fail + ')';
                 if (progress) progress.success(msg);
-                setTimeout(hardReload, 1500);
+                selected.clear();
+                setTimeout(function () {
+                    if (window.StampEffect) {
+                        StampEffect.play('ПОДПИСАНО', hardReload);
+                    } else {
+                        hardReload();
+                    }
+                }, 1400);
             } else {
                 if (progress) progress.fail('Сервер вернул ошибку: ' + (data.error || resp.statusText));
             }
@@ -110,6 +163,16 @@
             console.error('[batch-sign] error', e);
             if (progress) progress.fail('Ошибка: ' + (e && e.message ? e.message : e));
         }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Хелперы
+    // ═══════════════════════════════════════════════════════
+    async function fetchFileBase64(id) {
+        var resp = await fetch(API_PREFIX + '/documents/' + id + '/view', { credentials: 'same-origin' });
+        if (!resp.ok) throw new Error('Файл ' + id + ' не получен: HTTP ' + resp.status);
+        var buf = await resp.arrayBuffer();
+        return arrayBufferToBase64(buf);
     }
 
     function sanitizeBase64(s) {
@@ -127,86 +190,19 @@
         return btoa(binary);
     }
 
-    /**
-     * Подписать ВСЕ неподписанные документы.
-     * Собирает все .doc-checkbox (они существуют только для неподписанных),
-     * ставит галочки и запускает batch-подписание.
-     */
-    function signAllUnsigned() {
-        var cbs = document.querySelectorAll('.doc-checkbox');
-        if (cbs.length === 0) {
-            alert('Нет неподписанных документов');
-            return;
-        }
-        var n = cbs.length;
-        if (!confirm('Подписать все ' + n + ' неподписанных документа(ов)?\n'
-                + 'Потребуется один PIN-код для всех.')) {
-            return;
-        }
-
-        // Очищаем текущий выбор и заполняем всеми неподписанными
-        selected.clear();
-        cbs.forEach(function (cb) {
-            cb.checked = true;
-            selected.add(Number(cb.dataset.id));
-        });
-
-        // Запускаем подписание (использует существующий flow)
-        signSelected();
-    }
-
-    /**
-     * Подписать все неподписанные документы В КОНКРЕТНОМ РАЗДЕЛЕ.
-     */
-    function signAllInSection(folderId) {
-        var card = document.querySelector('.folder-card[data-folder-id="' + folderId + '"]');
-        if (!card) {
-            alert('Раздел не найден на странице');
-            return;
-        }
-        // Ищем ID неподписанных:
-        //  - .doc-card[data-signed="false"] — клиентский дашборд
-        //  - tr[data-signed="false"] — админская таблица
-        var ids = [];
-        card.querySelectorAll('.doc-card[data-signed="false"], tr[data-signed="false"]').forEach(function (el) {
-            var id = Number(el.dataset.id || el.dataset.docId);
-            if (id) ids.push(id);
-        });
-
-        if (ids.length === 0) {
-            alert('В этом разделе все документы уже подписаны');
-            return;
-        }
-
-        var n = ids.length;
-        if (!confirm('Подписать ' + n + ' неподписанных документа(ов) в разделе?
-'
-                + 'Потребуется один PIN-код для всех.')) {
-            return;
-        }
-
-        console.log('[signAllInSection] folderId=', folderId, 'ids=', ids);
-
-        selected.clear();
-        ids.forEach(function (id) { selected.add(id); });
-        signSelected();
-    }
-
-    /** Hard reload с cache-bust, чтобы точно подхватились новые данные. */
     function hardReload() {
         var url = new URL(location.href);
         url.searchParams.set('_t', Date.now());
         location.href = url.toString();
     }
 
+    // ═══════════════════════════════════════════════════════
+    //  Экспорт
+    // ═══════════════════════════════════════════════════════
     window.BatchSign = {
         signAllUnsigned: signAllUnsigned,
         signAllInSection: signAllInSection
     };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+    console.log('[batch-sign] loaded. API_PREFIX=', API_PREFIX, '| isAdmin=', isAdmin);
 })();
