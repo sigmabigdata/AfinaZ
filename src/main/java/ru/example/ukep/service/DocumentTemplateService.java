@@ -3,6 +3,9 @@ package ru.example.ukep.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Entities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -177,10 +180,17 @@ public class DocumentTemplateService {
     public byte[] renderPdf(DocumentTemplate t, Map<String, String> values) throws IOException {
         String html = substitute(t.getHtmlContent(), values);
         String wrapped = wrapWithHtml(html, t.getName());
+
+        // openhtmltopdf строго требует XHTML. Прогоняем через jsoup для очистки.
+        Document doc = Jsoup.parse(wrapped);
+        doc.outputSettings().syntax(Document.OutputSettings.Syntax.xml);
+        doc.outputSettings().escapeMode(Entities.EscapeMode.xhtml);
+        String xhtml = doc.html();
+
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.useFastMode();
-            builder.withHtmlContent(wrapped, null);
+            builder.withHtmlContent(xhtml, null);
             builder.toStream(out);
             builder.run();
             return out.toByteArray();

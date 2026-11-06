@@ -221,6 +221,13 @@
             <version>2.0.31</version>
         </dependency>
 
+        <!-- ============ HTML5 → XHTML (для openhtmltopdf) ============ -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.17.2</version>
+        </dependency>
+
         <!-- ============ Тесты ============ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
