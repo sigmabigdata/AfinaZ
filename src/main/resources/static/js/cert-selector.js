@@ -71,19 +71,15 @@
         if (!certs || certs.length === 0) {
             return Promise.reject(new Error('Нет доступных сертификатов'));
         }
-        if (certs.length === 1) {
-            return Promise.resolve(certs[0]);
-        }
-        var remembered = getRemembered();
-        if (remembered) {
-            var match = certs.find(function (c) { return c.thumbprint === remembered; });
-            if (match) {
-                var d = daysLeft(match.validPeriod && match.validPeriod.to);
-                if (d === null || d >= 0) {
-                    return Promise.resolve(match);
-                }
-            }
-        }
+        // ВСЕГДА показываем модалку — клиент должен видеть, каким сертификатом подписывает
+        console.log('[cert-selector] found certs:', certs.length);
+        certs.forEach(function (c, i) {
+            console.log('[cert-selector] #' + (i + 1), {
+                thumbprint: c.thumbprint,
+                subject: c.subjectInfo,
+                validTo: c.validPeriod && c.validPeriod.to
+            });
+        });
         return showModal(certs);
     }
 

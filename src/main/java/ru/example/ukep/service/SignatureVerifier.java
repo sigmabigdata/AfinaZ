@@ -106,6 +106,13 @@ public class SignatureVerifier {
     private final Path certsDir;
     private final Path crlsDir;
 
+    private OnlineCrlVerifier onlineCrlVerifier;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setOnlineCrlVerifier(OnlineCrlVerifier v) {
+        this.onlineCrlVerifier = v;
+    }
+
     public SignatureVerifier(
             @Value("${app.certificates-path:/app/certs}") String certsPath,
             @Value("${app.crl-path:/app/crls}") String crlsPath) {
@@ -680,6 +687,19 @@ public class SignatureVerifier {
         }
     }
 
+    /**
+     * Онлайн-проверка отзыва через CDP из сертификатов (как на Госуслугах).
+     * Возвращает отчёт по каждому сертификату цепочки.
+     */
+    public java.util.Map<String, OnlineCrlVerifier.CrlCheckResult> checkRevocationOnline(
+            List<X509Certificate> chain) {
+        if (onlineCrlVerifier == null) {
+            log.warn("OnlineCrlVerifier не внедрён — проверка CRL недоступна");
+            return java.util.Map.of();
+        }
+        return onlineCrlVerifier.checkChain(chain);
+    }
+
     private void checkNotRevoked(List<X509Certificate> chain, Set<X509CRL> crls) {
         for (int i = 0; i < chain.size() - 1; i++) {
             X509Certificate cert = chain.get(i);
@@ -839,22 +859,34 @@ public class SignatureVerifier {
             }
             checks.add(checkItem("Срок действия всей цепочки", allValidDates, datesDetails));
 
-            // ─── 8. Отзыв по CRL ───
+            // ─── 8. Отзыв по CRL (онлайн, из CDP сертификатов) ───
             boolean crlOk = false;
             String crlDetails = "";
-            if (chainOk) {
-                try {
-                    java.util.Set<X509CRL> crls = loadAllCrls();
-                    checkNotRevoked(chain, crls);
-                    crlOk = true;
-                    crlDetails = "Сертификаты не отозваны (проверено по " + crls.size() + " CRL)";
-                } catch (Exception e) {
-                    crlDetails = "Не удалось проверить отзыв: " + e.getMessage();
+            java.util.Map<String, OnlineCrlVerifier.CrlCheckResult> crlReport = new java.util.LinkedHashMap<>();
+            if (chainOk && onlineCrlVerifier != null) {
+                crlReport = onlineCrlVerifier.checkChain(chain);
+                int checked = 0, revoked = 0, failed = 0;
+                for (var entry : crlReport.entrySet()) {
+                    var r = entry.getValue();
+                    if (r.revoked()) revoked++;
+                    else if (r.checked()) checked++;
+                    else failed++;
                 }
+                if (revoked > 0) {
+                    crlDetails = "Отозванных сертификатов: " + revoked;
+                } else if (failed > 0) {
+                    crlDetails = "Не удалось проверить " + failed
+                            + " сертификат(ов) — CDP недоступен";
+                } else {
+                    crlOk = true;
+                    crlDetails = "Проверено онлайн по CDP: " + checked + " сертификат(ов)";
+                }
+            } else if (chainOk) {
+                crlDetails = "Онлайн-проверка CRL недоступна";
             } else {
-                crlDetails = "Пропущено";
+                crlDetails = "Пропущено (цепочка не построена)";
             }
-            checks.add(checkItem("Отзыв сертификатов (CRL)", crlOk, crlDetails));
+            checks.add(checkItem("Отзыв сертификатов (CRL из CDP)", crlOk, crlDetails));
 
             // ─── 9. EKU (назначение ключа) ───
             boolean ekuOk = checkEku(leaf);
@@ -872,6 +904,10 @@ public class SignatureVerifier {
             result.put("signerFullSubject", leaf.getSubjectX500Principal().getName());
             result.put("signerSerial", leaf.getSerialNumber().toString(16).toUpperCase());
             result.put("signerIssuer", extractCn(leaf.getIssuerX500Principal().getName()));
+            result.put("signerIssuerFull", leaf.getIssuerX500Principal().getName());
+            result.put("signerThumbprint", thumbprintSha1(leaf));
+            result.put("signerKeyUsage", keyUsageStr(leaf));
+            result.put("crlReport", crlReport);
             result.put("signerNotBefore", leaf.getNotBefore().toInstant().toString());
             result.put("signerNotAfter", leaf.getNotAfter().toInstant().toString());
 
@@ -916,5 +952,33 @@ public class SignatureVerifier {
         java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter
                 .ofPattern("dd.MM.yyyy").withZone(java.time.ZoneId.systemDefault());
         return f.format(d.toInstant());
+    }
+
+    /** SHA-1 отпечаток сертификата (hex uppercase, без разделителей). */
+    private static String thumbprintSha1(X509Certificate cert) {
+        try {
+            byte[] h = java.security.MessageDigest.getInstance("SHA-1").digest(cert.getEncoded());
+            return java.util.HexFormat.of().withUpperCase().formatHex(h);
+        } catch (Exception e) {
+            return "—";
+        }
+    }
+
+    /** Человекочитаемое keyUsage. */
+    private static String keyUsageStr(X509Certificate cert) {
+        try {
+            boolean[] ku = cert.getKeyUsage();
+            if (ku == null) return "не задан";
+            String[] names = {"digitalSignature", "nonRepudiation", "keyEncipherment",
+                    "dataEncipherment", "keyAgreement", "keyCertSign", "cRLSign",
+                    "encipherOnly", "decipherOnly"};
+            java.util.List<String> out = new java.util.ArrayList<>();
+            for (int i = 0; i < ku.length && i < names.length; i++) {
+                if (ku[i]) out.add(names[i]);
+            }
+            return out.isEmpty() ? "не задан" : String.join(", ", out);
+        } catch (Exception e) {
+            return "—";
+        }
     }
 }
