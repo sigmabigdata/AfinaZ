@@ -45,7 +45,7 @@
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Страница /verify — проверка .sig
+    //  /verify — проверка .sig
     // ═══════════════════════════════════════════════════════
     function initIndexPage() {
         var form = document.getElementById('verify-form');
@@ -79,21 +79,31 @@
             result.innerHTML = '';
 
             try {
+                // ВАЖНО: .sig — бинарный файл, читаем как arrayBuffer (не как text!)
                 var contentBuf = await contentInput.files[0].arrayBuffer();
-                var sigText = await sigInput.files[0].text();
-                // НЕ очищаем на клиенте — сервер tolerant-decoder
-                // (принимает PEM, URL-safe, без padding).
-                var sigB64 = sigText.trim();
+                var sigBuf = await sigInput.files[0].arrayBuffer();
+
+                var contentB64 = arrayBufferToBase64(contentBuf);
+                var sigB64 = arrayBufferToBase64(sigBuf);
+
+                console.log('[verify] content bytes:', contentBuf.byteLength,
+                            '| sig bytes:', sigBuf.byteLength);
 
                 var resp = await fetch('/api/verify/sig', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contentBase64: arrayBufferToBase64(contentBuf),
+                        contentBase64: contentB64,
                         signatureBase64: sigB64
                     })
                 });
-                var data = await resp.json();
+                var data = await resp.json().catch(function () { return {}; });
+
+                if (resp.status === 400) {
+                    renderResult(result, 'err', 'Некорректные данные',
+                        escapeHtml(data.error || 'Проверьте файлы'));
+                    return;
+                }
 
                 if (data.valid) {
                     var info = data.signersInfo
@@ -114,6 +124,7 @@
                         escapeHtml(data.error || 'Не удалось проверить подпись.'));
                 }
             } catch (err) {
+                console.error('[verify] error:', err);
                 renderResult(result, 'err', 'Ошибка проверки',
                     escapeHtml(err.message || String(err)));
             } finally {
@@ -124,7 +135,7 @@
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Страница /verify/{uuid} — инфо о документе
+    //  /verify/{uuid} — инфо о документе
     // ═══════════════════════════════════════════════════════
     async function initDocumentPage(uuid) {
         var loading = document.getElementById('verify-loading');
@@ -182,7 +193,6 @@
                 + '</div>';
             html += '</div>';
 
-            // Метаданные документа
             html += '<div class="verify-card">';
             html += '<h2 style="margin:0 0 16px;font-size:17px;">Информация о документе</h2>';
             html += '<dl class="verify-dl">';
@@ -194,7 +204,6 @@
             html += '</dl>';
             html += '</div>';
 
-            // Список подписей
             if (hasSigs) {
                 html += '<div class="verify-card">';
                 html += '<h2 style="margin:0 0 12px;font-size:17px;">'
