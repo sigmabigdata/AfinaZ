@@ -712,4 +712,209 @@ public class SignatureVerifier {
                 .matcher(x500);
         return m.find() ? m.group(1).replace("\"", "").trim() : x500;
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  Строгая проверка с пошаговым отчётом (как Госуслуги)
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * Полная проверка подписи с возвратом списка проверок.
+     * Проверяет: целостность, криптоподпись, срок leaf, цепочку,
+     * корень в truststore, подписи звеньев, срок всех звеньев,
+     * CRL, EKU.
+     */
+    public java.util.Map<String, Object> verifyDetailed(byte[] data, String signatureBase64) {
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        java.util.List<java.util.Map<String, Object>> checks = new java.util.ArrayList<>();
+
+        try {
+            byte[] sigBytes = decodeBase64Tolerant(signatureBase64);
+            CMSSignedData cms = new CMSSignedData(new CMSProcessableByteArray(data), sigBytes);
+            SignerInformationStore signers = cms.getSignerInfos();
+
+            if (signers.size() == 0) {
+                result.put("valid", false);
+                result.put("error", "В подписи нет подписантов");
+                result.put("checks", java.util.List.of());
+                return result;
+            }
+
+            SignerInformation signer = signers.getSigners().iterator().next();
+            X509Certificate leaf = getSignerCert(signer, cms);
+
+            // ─── 1. Соответствие содержимому ───
+            boolean digestOk = checkSignedDigest(signer, data);
+            checks.add(checkItem("Соответствие содержимому", digestOk,
+                    digestOk ? "Хеш подписанных данных совпадает с файлом"
+                             : "Хеш подписанных данных НЕ совпадает — файл изменён"));
+
+            // ─── 2. Криптографическая подпись ───
+            boolean cryptoOk = false;
+            String cryptoDetails = "";
+            try {
+                cryptoOk = verifySignerCrypto(signer, leaf);
+                cryptoDetails = cryptoOk ? "Подпись проверена криптопровайдером (ГОСТ)"
+                                         : "Подпись не прошла криптопроверку";
+            } catch (Exception e) {
+                cryptoDetails = "Ошибка криптопровайдера: " + e.getMessage();
+            }
+            checks.add(checkItem("Криптографическая подпись", cryptoOk, cryptoDetails));
+
+            // ─── 3. Срок действия leaf ───
+            boolean leafValid = true;
+            try { leaf.checkValidity(); } catch (Exception e) { leafValid = false; }
+            checks.add(checkItem("Срок действия сертификата подписанта", leafValid,
+                    leafValid ? "Действителен до " + fmtDate(leaf.getNotAfter())
+                              : "Срок истёк или не наступил"));
+
+            // ─── 4. Построение цепочки ───
+            java.util.List<X509Certificate> chain = new java.util.ArrayList<>();
+            boolean chainOk = false;
+            String chainDetails = "";
+            java.util.Set<X509Certificate> truststore = loadTrustedCerts();
+            try {
+                chain = buildChain(leaf, cms, truststore);
+                chainOk = !chain.isEmpty();
+                chainDetails = chainOk
+                        ? "Построена цепочка из " + chain.size() + " сертификатов"
+                        : "Цепочка пуста";
+            } catch (Exception e) {
+                chainDetails = "Не удалось построить: " + e.getMessage();
+            }
+            checks.add(checkItem("Цепочка сертификатов", chainOk, chainDetails));
+
+            // ─── 5. Корень в truststore ───
+            boolean rootOk = false;
+            String rootDetails = "";
+            if (chainOk) {
+                X509Certificate root = chain.get(chain.size() - 1);
+                try {
+                    rootOk = isTrustedRoot(root, truststore);
+                    rootDetails = rootOk
+                            ? "Корневой сертификат «"
+                              + extractCn(root.getSubjectX500Principal().getName())
+                              + "» в списке доверенных"
+                            : "Корневой сертификат НЕ в списке доверенных";
+                } catch (Exception e) {
+                    rootDetails = "Ошибка проверки корня: " + e.getMessage();
+                }
+            } else {
+                rootDetails = "Пропущено (цепочка не построена)";
+            }
+            checks.add(checkItem("Корневой сертификат в truststore", rootOk, rootDetails));
+
+            // ─── 6. Подписи звеньев ───
+            boolean chainSigsOk = false;
+            String chainSigsDetails = "";
+            if (chainOk) {
+                try {
+                    verifyChainSignatures(chain);
+                    chainSigsOk = true;
+                    chainSigsDetails = "Все подписи в цепочке валидны";
+                } catch (Exception e) {
+                    chainSigsDetails = "Провал: " + e.getMessage();
+                }
+            } else {
+                chainSigsDetails = "Пропущено";
+            }
+            checks.add(checkItem("Подписи звеньев цепочки", chainSigsOk, chainSigsDetails));
+
+            // ─── 7. Срок всех звеньев ───
+            boolean allValidDates = true;
+            String datesDetails = "";
+            if (chainOk) {
+                for (X509Certificate cc : chain) {
+                    try {
+                        cc.checkValidity();
+                    } catch (Exception e) {
+                        allValidDates = false;
+                        datesDetails = "Истёк/не наступил срок: "
+                                + extractCn(cc.getSubjectX500Principal().getName());
+                        break;
+                    }
+                }
+                if (allValidDates) datesDetails = "Все " + chain.size() + " сертификатов действительны";
+            } else {
+                datesDetails = "Пропущено";
+            }
+            checks.add(checkItem("Срок действия всей цепочки", allValidDates, datesDetails));
+
+            // ─── 8. Отзыв по CRL ───
+            boolean crlOk = false;
+            String crlDetails = "";
+            if (chainOk) {
+                try {
+                    java.util.Set<X509CRL> crls = loadAllCrls();
+                    checkNotRevoked(chain, crls);
+                    crlOk = true;
+                    crlDetails = "Сертификаты не отозваны (проверено по " + crls.size() + " CRL)";
+                } catch (Exception e) {
+                    crlDetails = "Не удалось проверить отзыв: " + e.getMessage();
+                }
+            } else {
+                crlDetails = "Пропущено";
+            }
+            checks.add(checkItem("Отзыв сертификатов (CRL)", crlOk, crlDetails));
+
+            // ─── 9. EKU (назначение ключа) ───
+            boolean ekuOk = checkEku(leaf);
+            checks.add(checkItem("Назначение ключа (EKU)", ekuOk,
+                    ekuOk ? "Ключ предназначен для подписи документов"
+                          : "Ключ НЕ предназначен для подписи документов"));
+
+            // ─── Итог ───
+            boolean allOk = checks.stream()
+                    .allMatch(m -> Boolean.TRUE.equals(m.get("passed")));
+
+            result.put("valid", allOk);
+            result.put("checks", checks);
+            result.put("signerSubject", extractCn(leaf.getSubjectX500Principal().getName()));
+            result.put("signerFullSubject", leaf.getSubjectX500Principal().getName());
+            result.put("signerSerial", leaf.getSerialNumber().toString(16).toUpperCase());
+            result.put("signerIssuer", extractCn(leaf.getIssuerX500Principal().getName()));
+            result.put("signerNotBefore", leaf.getNotBefore().toInstant().toString());
+            result.put("signerNotAfter", leaf.getNotAfter().toInstant().toString());
+
+            java.util.List<String> chainCns = new java.util.ArrayList<>();
+            for (X509Certificate cc : chain) {
+                chainCns.add(extractCn(cc.getSubjectX500Principal().getName()));
+            }
+            result.put("chain", chainCns);
+
+            return result;
+
+        } catch (Exception e) {
+            log.warn("verifyDetailed failed: {}", e.getMessage());
+            result.put("valid", false);
+            result.put("error", "Ошибка: " + e.getMessage());
+            result.put("checks", java.util.List.of());
+            return result;
+        }
+    }
+
+    private static java.util.Map<String, Object> checkItem(String name, boolean passed, String details) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("name", name);
+        m.put("passed", passed);
+        m.put("details", details);
+        return m;
+    }
+
+    /** Проверяет EKU: digitalSignature (0) или nonRepudiation (1). */
+    private boolean checkEku(X509Certificate cert) {
+        try {
+            boolean[] ku = cert.getKeyUsage();
+            if (ku == null) return true; // нет расширения — не блокируем
+            return ku.length > 0 && (ku[0] || (ku.length > 1 && ku[1]));
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    private static String fmtDate(java.util.Date d) {
+        if (d == null) return "—";
+        java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter
+                .ofPattern("dd.MM.yyyy").withZone(java.time.ZoneId.systemDefault());
+        return f.format(d.toInstant());
+    }
 }

@@ -9,6 +9,7 @@ import ru.example.ukep.entity.DocumentSignature;
 import ru.example.ukep.repository.DocumentRepository;
 import ru.example.ukep.service.DocumentService;
 import ru.example.ukep.service.SignatureVerifier;
+import ru.example.ukep.service.VerificationReportPdfService;
 
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -34,13 +35,16 @@ public class PublicVerificationController {
     private final DocumentRepository documentRepository;
     private final DocumentService documentService;
     private final SignatureVerifier signatureVerifier;
+    private final VerificationReportPdfService reportService;
 
     public PublicVerificationController(DocumentRepository documentRepository,
                                         DocumentService documentService,
-                                        SignatureVerifier signatureVerifier) {
+                                        SignatureVerifier signatureVerifier,
+                                        VerificationReportPdfService reportService) {
         this.documentRepository = documentRepository;
         this.documentService = documentService;
         this.signatureVerifier = signatureVerifier;
+        this.reportService = reportService;
     }
 
     /** Публичная информация о документе и его подписях по UUID. */
@@ -97,8 +101,7 @@ public class PublicVerificationController {
 
         try {
             byte[] content = ru.example.ukep.service.SignatureVerifier.decodeBase64Tolerant(contentB64);
-            Map<String, Object> result = signatureVerifier.verifyDetachedBasic(content, sigB64);
-            result.put("valid", true);
+            Map<String, Object> result = signatureVerifier.verifyDetailed(content, sigB64);
             return ResponseEntity.ok(result);
         } catch (SignatureVerifier.SignatureMismatchException e) {
             return ResponseEntity.ok(Map.of("valid", false, "error", e.getMessage()));
@@ -111,5 +114,43 @@ public class PublicVerificationController {
 
     private static String stripWhitespace(String s) {
         return s.replaceAll("\\s+", "");
+    }
+
+    /** PDF-отчёт о проверке подписи (для скачивания пользователем). */
+    @PostMapping("/sig/report")
+    public ResponseEntity<?> report(@RequestBody Map<String, String> body) {
+        String contentB64 = body.get("contentBase64");
+        String sigB64 = body.get("signatureBase64");
+        String fileName = body.getOrDefault("fileName", "document.pdf");
+        if (contentB64 == null || sigB64 == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Нужны contentBase64 и signatureBase64"));
+        }
+        try {
+            byte[] content = SignatureVerifier.decodeBase64Tolerant(contentB64);
+            Map<String, Object> result = signatureVerifier.verifyDetailed(content, sigB64);
+
+            // SHA-256 от содержимого
+            String sha256 = sha256Hex(content);
+
+            byte[] pdf = reportService.generate(fileName, content.length, sha256, result);
+
+            return ResponseEntity.ok()
+                    .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"verification-report.pdf\"")
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("Report generation failed", e);
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private static String sha256Hex(byte[] data) {
+        try {
+            byte[] h = java.security.MessageDigest.getInstance("SHA-256").digest(data);
+            return java.util.HexFormat.of().formatHex(h);
+        } catch (Exception e) {
+            return "—";
+        }
     }
 }

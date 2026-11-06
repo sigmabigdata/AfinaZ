@@ -2,11 +2,11 @@ package ru.example.ukep.controller;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.springframework.http.ResponseEntity;
 import ru.example.ukep.entity.Document;
 import ru.example.ukep.repository.DocumentRepository;
 import ru.example.ukep.service.DocumentService;
 import ru.example.ukep.service.SignatureVerifier;
+import ru.example.ukep.service.VerificationReportPdfService;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -14,18 +14,29 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 class PublicVerificationControllerTest {
 
+    private PublicVerificationController newController(DocumentRepository repo,
+                                                       SignatureVerifier verifier) {
+        return new PublicVerificationController(
+                repo,
+                Mockito.mock(DocumentService.class),
+                verifier,
+                Mockito.mock(VerificationReportPdfService.class));
+    }
+
+    private PublicVerificationController newController() {
+        return newController(Mockito.mock(DocumentRepository.class),
+                Mockito.mock(SignatureVerifier.class));
+    }
+
     @Test
     void verifyByUuid_invalidFormat_returns400() {
-        DocumentRepository repo = Mockito.mock(DocumentRepository.class);
-        PublicVerificationController c = new PublicVerificationController(
-                repo, Mockito.mock(DocumentService.class), Mockito.mock(SignatureVerifier.class));
-
-        var resp = c.verifyByUuid("not-a-uuid");
+        var resp = newController().verifyByUuid("not-a-uuid");
         assertEquals(400, resp.getStatusCode().value());
     }
 
@@ -34,10 +45,8 @@ class PublicVerificationControllerTest {
         DocumentRepository repo = Mockito.mock(DocumentRepository.class);
         when(repo.findByPublicUuid(any())).thenReturn(Optional.empty());
 
-        PublicVerificationController c = new PublicVerificationController(
-                repo, Mockito.mock(DocumentService.class), Mockito.mock(SignatureVerifier.class));
-
-        var resp = c.verifyByUuid(UUID.randomUUID().toString());
+        var resp = newController(repo, Mockito.mock(SignatureVerifier.class))
+                .verifyByUuid(UUID.randomUUID().toString());
         assertEquals(404, resp.getStatusCode().value());
     }
 
@@ -53,10 +62,8 @@ class PublicVerificationControllerTest {
         DocumentRepository repo = Mockito.mock(DocumentRepository.class);
         when(repo.findByPublicUuid(any())).thenReturn(Optional.of(doc));
 
-        PublicVerificationController c = new PublicVerificationController(
-                repo, Mockito.mock(DocumentService.class), Mockito.mock(SignatureVerifier.class));
-
-        var resp = c.verifyByUuid(UUID.randomUUID().toString());
+        var resp = newController(repo, Mockito.mock(SignatureVerifier.class))
+                .verifyByUuid(UUID.randomUUID().toString());
         assertEquals(200, resp.getStatusCode().value());
         assertNotNull(resp.getBody());
         assertEquals(true, resp.getBody().get("valid"));
@@ -65,32 +72,40 @@ class PublicVerificationControllerTest {
 
     @Test
     void verifySig_emptyBody_returns400() {
-        PublicVerificationController c = new PublicVerificationController(
-                Mockito.mock(DocumentRepository.class),
-                Mockito.mock(DocumentService.class),
-                Mockito.mock(SignatureVerifier.class));
-
-        var resp = c.verifySig(Map.of());
+        var resp = newController().verifySig(Map.of());
         assertEquals(400, resp.getStatusCode().value());
     }
 
     @Test
     void verifySig_mismatch_returns200WithValidFalse() {
         SignatureVerifier verifier = Mockito.mock(SignatureVerifier.class);
-        try {
-            when(verifier.verifyDetachedBasic(any(byte[].class), anyString()))
-                    .thenThrow(new SignatureVerifier.SignatureMismatchException("mismatch"));
-        } catch (Exception e) { /* not expected */ }
+        // Новый verifyDetailed — бросает исключение
+        when(verifier.verifyDetailed(any(byte[].class), anyString()))
+                .thenThrow(new RuntimeException("Не удалось проверить"));
 
-        PublicVerificationController c = new PublicVerificationController(
-                Mockito.mock(DocumentRepository.class),
-                Mockito.mock(DocumentService.class),
-                verifier);
-
-        var resp = c.verifySig(Map.of(
-                "contentBase64", "aGVsbG8=",
-                "signatureBase64", "dGVzdA=="));
+        var resp = newController(Mockito.mock(DocumentRepository.class), verifier)
+                .verifySig(Map.of(
+                        "contentBase64", "aGVsbG8=",
+                        "signatureBase64", "dGVzdA=="));
         assertEquals(200, resp.getStatusCode().value());
         assertEquals(false, resp.getBody().get("valid"));
+    }
+
+    @Test
+    void verifySig_validResponse() {
+        SignatureVerifier verifier = Mockito.mock(SignatureVerifier.class);
+        when(verifier.verifyDetailed(any(byte[].class), anyString()))
+                .thenReturn(Map.of(
+                        "valid", true,
+                        "signerSubject", "Иванов И.И.",
+                        "checks", java.util.List.of()
+                ));
+
+        var resp = newController(Mockito.mock(DocumentRepository.class), verifier)
+                .verifySig(Map.of(
+                        "contentBase64", "aGVsbG8=",
+                        "signatureBase64", "dGVzdA=="));
+        assertEquals(200, resp.getStatusCode().value());
+        assertEquals(true, resp.getBody().get("valid"));
     }
 }

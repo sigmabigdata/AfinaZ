@@ -1,6 +1,7 @@
 /**
  * Публичная верификация подписи.
- * Работает на страницах /verify (проверка .sig) и /verify/{uuid} (инфо о документе).
+ * Строгая проверка: целостность, цепочка, truststore, CRL, EKU.
+ * Красивый UI с чек-листом + скачивание PDF-отчёта.
  */
 (function () {
     'use strict';
@@ -10,20 +11,15 @@
         try {
             var d = new Date(iso);
             if (isNaN(d.getTime())) return iso;
-            var pad = function (n) { return String(n).padStart(2, '0'); };
-            return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear()
-                + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            var p = function (n) { return String(n).padStart(2, '0'); };
+            return p(d.getDate()) + '.' + p(d.getMonth() + 1) + '.' + d.getFullYear();
         } catch (e) { return iso; }
     }
 
-    function escapeHtml(s) {
+    function esc(s) {
         if (s == null) return '';
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function arrayBufferToBase64(buf) {
@@ -34,14 +30,6 @@
             binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
         }
         return btoa(binary);
-    }
-
-    function renderResult(container, kind, title, detailsHtml) {
-        container.innerHTML =
-            '<div class="verify-result ' + kind + '">' +
-            '<h2>' + escapeHtml(title) + '</h2>' +
-            '<div>' + detailsHtml + '</div>' +
-            '</div>';
     }
 
     // ═══════════════════════════════════════════════════════
@@ -56,83 +44,178 @@
         var btn = document.getElementById('verify-btn');
         var result = document.getElementById('verify-result');
 
+        var lastState = null;  // для скачивания отчёта
+
         contentInput.addEventListener('change', function () {
             contentName.textContent = contentInput.files.length
-                ? contentInput.files[0].name
-                : 'Файл не выбран';
+                ? contentInput.files[0].name : 'Файл не выбран';
         });
         sigInput.addEventListener('change', function () {
             sigName.textContent = sigInput.files.length
-                ? sigInput.files[0].name
-                : 'Файл не выбран';
+                ? sigInput.files[0].name : 'Файл не выбран';
         });
 
         form.addEventListener('submit', async function (e) {
             e.preventDefault();
             if (!contentInput.files.length || !sigInput.files.length) {
-                renderResult(result, 'err', 'Не выбраны файлы',
-                    'Загрузите документ и файл подписи (.sig).');
+                result.innerHTML = '<div class="verify-alert err">Загрузите документ и .sig</div>';
                 return;
             }
             btn.disabled = true;
             btn.textContent = 'Проверяем…';
-            result.innerHTML = '';
+            result.innerHTML = '<div class="verify-loading"><div class="spinner"></div><div>Проверка подписи…</div></div>';
 
             try {
-                // ВАЖНО: .sig — бинарный файл, читаем как arrayBuffer (не как text!)
                 var contentBuf = await contentInput.files[0].arrayBuffer();
                 var sigBuf = await sigInput.files[0].arrayBuffer();
-
                 var contentB64 = arrayBufferToBase64(contentBuf);
                 var sigB64 = arrayBufferToBase64(sigBuf);
-
-                console.log('[verify] content bytes:', contentBuf.byteLength,
-                            '| sig bytes:', sigBuf.byteLength);
 
                 var resp = await fetch('/api/verify/sig', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contentBase64: contentB64,
-                        signatureBase64: sigB64
-                    })
+                    body: JSON.stringify({ contentBase64: contentB64, signatureBase64: sigB64 })
                 });
-                var data = await resp.json().catch(function () { return {}; });
+                var data = await resp.json();
 
-                if (resp.status === 400) {
-                    renderResult(result, 'err', 'Некорректные данные',
-                        escapeHtml(data.error || 'Проверьте файлы'));
-                    return;
-                }
+                lastState = {
+                    contentB64: contentB64,
+                    sigB64: sigB64,
+                    fileName: contentInput.files[0].name
+                };
 
-                if (data.valid) {
-                    var info = data.signersInfo
-                        ? '<pre style="white-space:pre-wrap;font-size:12px;color:#475569;margin:10px 0 0;">'
-                            + escapeHtml(data.signersInfo) + '</pre>'
-                        : '';
-                    renderResult(result, 'ok', '✓ Подпись действительна',
-                        'Криптографическая подпись сходится с содержимым документа.'
-                        + (data.signerSubject
-                            ? '<br><br><b>Подписант:</b> ' + escapeHtml(data.signerSubject)
-                            : '')
-                        + (data.signerSerial
-                            ? '<br><b>Серийный номер:</b> ' + escapeHtml(data.signerSerial)
-                            : '')
-                        + info);
-                } else {
-                    renderResult(result, 'err', '✗ Подпись недействительна',
-                        escapeHtml(data.error || 'Не удалось проверить подпись.'));
-                }
+                renderResult(result, data, lastState);
             } catch (err) {
-                console.error('[verify] error:', err);
-                renderResult(result, 'err', 'Ошибка проверки',
-                    escapeHtml(err.message || String(err)));
+                result.innerHTML = '<div class="verify-alert err">Ошибка: '
+                    + esc(err.message || String(err)) + '</div>';
             } finally {
                 btn.disabled = false;
                 btn.textContent = '✓ Проверить подпись';
             }
         });
     }
+
+    function renderResult(container, data, state) {
+        var valid = data.valid;
+        var checks = data.checks || [];
+
+        var html = '';
+
+        // ─── Итоговая карточка ───
+        var cls = valid ? 'ok' : 'err';
+        var icon = valid ? '✓' : '✗';
+        var title = valid ? 'Подпись действительна' : 'Подпись недействительна';
+        var sub = valid
+            ? 'Все проверки пройдены успешно'
+            : (data.error || 'Обнаружены проблемы при проверке');
+
+        html += '<div class="verify-summary ' + cls + '">';
+        html += '<div class="verify-summary-icon">' + icon + '</div>';
+        html += '<div class="verify-summary-body">';
+        html += '<h2>' + esc(title) + '</h2>';
+        html += '<p>' + esc(sub) + '</p>';
+        html += '</div>';
+        if (checks.length > 0 && state) {
+            html += '<button type="button" class="verify-download-btn" onclick="__downloadReport()">';
+            html += '📥 Скачать отчёт';
+            html += '</button>';
+        }
+        html += '</div>';
+
+        // ─── Чек-лист ───
+        if (checks.length > 0) {
+            var passedCount = checks.filter(function (c) { return c.passed; }).length;
+            html += '<div class="verify-section">';
+            html += '<h3 class="verify-section-title">Проверки (' + passedCount
+                + ' из ' + checks.length + ')</h3>';
+            html += '<div class="verify-checks">';
+            checks.forEach(function (c) {
+                var ic = c.passed ? '✓' : '✗';
+                var cl = c.passed ? 'passed' : 'failed';
+                html += '<div class="verify-check ' + cl + '">';
+                html += '<div class="verify-check-status">' + ic + '</div>';
+                html += '<div class="verify-check-body">';
+                html += '<div class="verify-check-name">' + esc(c.name) + '</div>';
+                if (c.details) {
+                    html += '<div class="verify-check-details">' + esc(c.details) + '</div>';
+                }
+                html += '</div></div>';
+            });
+            html += '</div></div>';
+        }
+
+        // ─── Подписант ───
+        if (data.signerSubject) {
+            html += '<div class="verify-section">';
+            html += '<h3 class="verify-section-title">Подписант</h3>';
+            html += '<div class="verify-signer">';
+            html += '<div class="verify-signer-avatar">'
+                + esc((data.signerSubject || '?').charAt(0).toUpperCase()) + '</div>';
+            html += '<div class="verify-signer-body">';
+            html += '<div class="verify-signer-name">' + esc(data.signerSubject) + '</div>';
+            if (data.signerIssuer) {
+                html += '<div class="verify-signer-org">УЦ: ' + esc(data.signerIssuer) + '</div>';
+            }
+            html += '<dl class="verify-signer-dl">';
+            if (data.signerSerial) {
+                html += '<dt>Серийный номер</dt><dd><code>' + esc(data.signerSerial) + '</code></dd>';
+            }
+            if (data.signerNotBefore && data.signerNotAfter) {
+                html += '<dt>Действителен</dt><dd>'
+                    + fmtDate(data.signerNotBefore) + ' — ' + fmtDate(data.signerNotAfter)
+                    + '</dd>';
+            }
+            html += '</dl>';
+            html += '</div></div></div>';
+        }
+
+        // ─── Цепочка ───
+        if (data.chain && data.chain.length > 0) {
+            html += '<div class="verify-section">';
+            html += '<h3 class="verify-section-title">Цепочка сертификатов</h3>';
+            html += '<ol class="verify-chain">';
+            data.chain.forEach(function (cn) {
+                html += '<li>' + esc(cn) + '</li>';
+            });
+            html += '</ol></div>';
+        }
+
+        container.innerHTML = html;
+
+        // Сохраняем state для скачивания
+        window.__verifyState = state;
+    }
+
+    window.__downloadReport = async function () {
+        var s = window.__verifyState;
+        if (!s) return;
+        try {
+            var resp = await fetch('/api/verify/sig/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contentBase64: s.contentB64,
+                    signatureBase64: s.sigB64,
+                    fileName: s.fileName
+                })
+            });
+            if (!resp.ok) {
+                alert('Не удалось сгенерировать отчёт (HTTP ' + resp.status + ')');
+                return;
+            }
+            var blob = await resp.blob();
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'verification-report.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            alert('Ошибка: ' + e.message);
+        }
+    };
 
     // ═══════════════════════════════════════════════════════
     //  /verify/{uuid} — инфо о документе
@@ -142,15 +225,12 @@
         var output = document.getElementById('verify-output');
         var timeEl = document.getElementById('verify-time');
 
-        if (timeEl) {
-            timeEl.textContent = new Date().toLocaleString('ru-RU');
-        }
+        if (timeEl) timeEl.textContent = new Date().toLocaleString('ru-RU');
 
         if (!uuid) {
             loading.style.display = 'none';
             output.style.display = 'block';
-            renderResult(output, 'err', 'Неверная ссылка',
-                'UUID документа не указан.');
+            output.innerHTML = '<div class="verify-alert err">UUID документа не указан.</div>';
             return;
         }
 
@@ -160,13 +240,13 @@
             output.style.display = 'block';
 
             if (resp.status === 404) {
-                renderResult(output, 'err', 'Документ не найден',
-                    'Возможно, ссылка устарела или документ был удалён.');
+                output.innerHTML = '<div class="verify-alert err">'
+                    + 'Документ не найден или ссылка устарела.</div>';
                 return;
             }
             if (!resp.ok) {
-                renderResult(output, 'err', 'Ошибка ' + resp.status,
-                    'Не удалось получить информацию о документе.');
+                output.innerHTML = '<div class="verify-alert err">'
+                    + 'Ошибка ' + resp.status + '</div>';
                 return;
             }
 
@@ -175,70 +255,52 @@
             var hasSigs = sigs.length > 0;
             var allValid = data.valid && hasSigs;
 
-            var kind = allValid ? 'ok' : (hasSigs ? 'warn' : 'warn');
+            var cls = allValid ? 'ok' : (hasSigs ? 'warn' : 'warn');
+            var icon = allValid ? '✓' : (hasSigs ? '⚠' : '⚠');
             var title = allValid
-                ? '✓ Подпись действительна'
-                : (hasSigs
-                    ? '⚠ Документ подписан, но есть замечания'
-                    : '⚠ Документ без подписи');
+                ? 'Подпись действительна'
+                : (hasSigs ? 'Документ подписан' : 'Документ без подписи');
 
             var html = '';
+            html += '<div class="verify-summary ' + cls + '">';
+            html += '<div class="verify-summary-icon">' + icon + '</div>';
+            html += '<div class="verify-summary-body">';
+            html += '<h2>' + esc(title) + '</h2>';
+            html += '<p>Документ зарегистрирован в системе ПАО «НБД-Банк»</p>';
+            html += '</div></div>';
 
-            html += '<div class="verify-result ' + kind + '">';
-            html += '<h2>' + escapeHtml(title) + '</h2>';
-            html += '<div>Документ зарегистрирован в системе ПАО «НБД-Банк». '
-                + (hasSigs
-                    ? 'Ниже — все электронные подписи документа.'
-                    : 'На момент проверки документ не подписан.')
-                + '</div>';
-            html += '</div>';
-
-            html += '<div class="verify-card">';
-            html += '<h2 style="margin:0 0 16px;font-size:17px;">Информация о документе</h2>';
-            html += '<dl class="verify-dl">';
-            html += '<dt>Название</dt><dd>' + escapeHtml(data.documentName || '—') + '</dd>';
-            html += '<dt>Идентификатор</dt><dd><code>'
-                + escapeHtml(String(data.documentId)) + '</code></dd>';
+            html += '<div class="verify-section">';
+            html += '<h3 class="verify-section-title">Информация о документе</h3>';
+            html += '<dl class="verify-signer-dl">';
+            html += '<dt>Название</dt><dd>' + esc(data.documentName || '—') + '</dd>';
+            html += '<dt>Идентификатор</dt><dd><code>#' + esc(String(data.documentId)) + '</code></dd>';
             html += '<dt>Загружен</dt><dd>' + fmtDate(data.uploadedAt) + '</dd>';
             html += '<dt>Подписей</dt><dd><b>' + sigs.length + '</b></dd>';
-            html += '</dl>';
-            html += '</div>';
+            html += '</dl></div>';
 
             if (hasSigs) {
-                html += '<div class="verify-card">';
-                html += '<h2 style="margin:0 0 12px;font-size:17px;">'
-                    + 'Электронные подписи</h2>';
-                html += '<div class="verify-sig-list">';
+                html += '<div class="verify-section">';
+                html += '<h3 class="verify-section-title">Подписи</h3>';
+                html += '<div class="verify-checks">';
                 sigs.forEach(function (s, i) {
-                    html += '<div class="verify-sig-item">';
-                    html += '<div class="sig-head">';
-                    html += '<div class="sig-number">' + (i + 1) + '</div>';
-                    html += '<div class="sig-subject">'
-                        + escapeHtml(s.subject || 'Подписант') + '</div>';
-                    html += '</div>';
-                    html += '<dl class="verify-dl">';
-                    html += '<dt>Дата подписания</dt><dd>'
-                        + fmtDate(s.signedAt) + '</dd>';
-                    if (s.serial) {
-                        html += '<dt>Серийный номер</dt><dd><code>'
-                            + escapeHtml(s.serial) + '</code></dd>';
-                    }
-                    if (s.applyPoa) {
-                        html += '<dt>Доверенность</dt><dd>✓ применена</dd>';
-                    }
-                    html += '</dl>';
-                    html += '</div>';
+                    html += '<div class="verify-check passed">';
+                    html += '<div class="verify-check-status">' + (i + 1) + '</div>';
+                    html += '<div class="verify-check-body">';
+                    html += '<div class="verify-check-name">' + esc(s.subject || 'Подписант') + '</div>';
+                    html += '<div class="verify-check-details">'
+                        + fmtDate(s.signedAt)
+                        + (s.serial ? ' · serial=' + esc(s.serial) : '')
+                        + (s.applyPoa ? ' · с доверенностью' : '')
+                        + '</div></div></div>';
                 });
-                html += '</div>';
-                html += '</div>';
+                html += '</div></div>';
             }
 
             output.innerHTML = html;
         } catch (e) {
             loading.style.display = 'none';
             output.style.display = 'block';
-            renderResult(output, 'err', 'Ошибка',
-                escapeHtml(e.message || String(e)));
+            output.innerHTML = '<div class="verify-alert err">Ошибка: ' + esc(e.message) + '</div>';
         }
     }
 
