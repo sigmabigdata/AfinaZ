@@ -96,7 +96,7 @@ public class PublicVerificationController {
         }
 
         try {
-            byte[] content = Base64.getDecoder().decode(stripWhitespace(contentB64));
+            byte[] content = ru.example.ukep.service.SignatureVerifier.decodeBase64Tolerant(contentB64);
             Map<String, Object> result = signatureVerifier.verifyDetachedBasic(content, sigB64);
             result.put("valid", true);
             return ResponseEntity.ok(result);

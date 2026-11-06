@@ -66,6 +66,43 @@ public class SignatureVerifier {
         }
     }
 
+    /**
+     * Толерантное декодирование base64 (принимает PEM, URL-safe, без padding).
+     * Нужно, чтобы не падать на реальных .sig от разных плагинов.
+     */
+    public static byte[] decodeBase64Tolerant(String s) {
+        if (s == null || s.isBlank()) {
+            throw new IllegalArgumentException("empty base64");
+        }
+        // 1. Убрать PEM-обёртку и whitespace
+        String cleaned = s
+                .replaceAll("-----BEGIN[^-]*-----", "")
+                .replaceAll("-----END[^-]*-----", "")
+                .replaceAll("\\s+", "");
+        // 2. URL-safe → стандартный base64
+        cleaned = cleaned.replace('-', '+').replace('_', '/');
+        // 3. Оставить только base64-символы
+        cleaned = cleaned.replaceAll("[^A-Za-z0-9+/=]", "");
+        // 4. Убрать padding из середины (только на конце должен быть)
+        int firstEq = cleaned.indexOf('=');
+        if (firstEq >= 0) {
+            cleaned = cleaned.substring(0, firstEq);
+        }
+        // 5. Добавить padding до кратности 4
+        int rem = cleaned.length() % 4;
+        if (rem == 2) cleaned += "==";
+        else if (rem == 3) cleaned += "=";
+        else if (rem == 1) {
+            throw new IllegalArgumentException("Некорректная длина base64: " + cleaned.length());
+        }
+        // 6. Decode
+        try {
+            return java.util.Base64.getDecoder().decode(cleaned);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Некорректный base64: " + e.getMessage(), e);
+        }
+    }
+
     private final Path certsDir;
     private final Path crlsDir;
 
@@ -85,12 +122,7 @@ public class SignatureVerifier {
 
     public Map<String, Object> verifyDetached(byte[] data, String signatureBase64)
             throws org.bouncycastle.cms.CMSException, java.security.cert.CertificateException {
-        String cleaned = signatureBase64
-                .replaceAll("-----BEGIN[^-]*-----", "")
-                .replaceAll("-----END[^-]*-----", "")
-                .replaceAll("\\s+", "")
-                .replaceAll("[^A-Za-z0-9+/=]", "");
-        byte[] signatureBytes = Base64.decode(cleaned);
+        byte[] signatureBytes = decodeBase64Tolerant(signatureBase64);
 
         CMSSignedData cms = new CMSSignedData(new CMSProcessableByteArray(data), signatureBytes);
         SignerInformationStore signers = cms.getSignerInfos();
@@ -137,12 +169,7 @@ public class SignatureVerifier {
      * с опцией END_ENTITY_ONLY (без промежуточного CA в CMS).</p>
      */
     public Map<String, Object> verifyDetachedBasic(byte[] data, String signatureBase64) throws Exception {
-        String cleaned = signatureBase64
-                .replaceAll("-----BEGIN[^-]*-----", "")
-                .replaceAll("-----END[^-]*-----", "")
-                .replaceAll("\\s+", "")
-                .replaceAll("[^A-Za-z0-9+/=]", "");
-        byte[] signatureBytes = Base64.decode(cleaned);
+        byte[] signatureBytes = decodeBase64Tolerant(signatureBase64);
 
         CMSSignedData cms = new CMSSignedData(new CMSProcessableByteArray(data), signatureBytes);
         SignerInformationStore signers = cms.getSignerInfos();

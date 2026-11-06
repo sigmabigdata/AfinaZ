@@ -14,12 +14,13 @@ import ru.example.ukep.repository.UserRepository;
 import ru.example.ukep.security.PiiEncryptor;
 import ru.example.ukep.service.FolderService;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Клиентский дашборд: плоский список всех документов клиента.
- * Разделы (папки) в клиентском UI больше не показываются —
- * документы грузятся в скрытую папку «Без раздела».
+ * Клиентский дашборд: разделы + документы.
+ * Новые разделы — сверху (сортировка по createdAt DESC).
  */
 @Controller
 public class DashboardController {
@@ -50,7 +51,6 @@ public class DashboardController {
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
         if (isAdmin) return "redirect:/admin";
 
-        // Безопасный поиск: НЕ бросаем NoSuchElementException → не 500
         String username = auth.getName();
         User user = userRepository.findByEmailHash(pii.hash(username)).orElse(null);
         if (user == null) {
@@ -58,24 +58,48 @@ public class DashboardController {
             return "redirect:/login?expired";
         }
 
-        // Дефолтная папка (создаётся автоматически, если нет) — нужна для загрузки
-        DocumentFolder defaultFolder;
+        // Разделы (новые сверху)
+        List<DocumentFolder> folders = folderService.listForOwner(user);
+
+        // Legacy: документы без раздела → в «Без раздела»
         try {
-            defaultFolder = folderService.ensureDefault(user);
+            folderService.migrateUnfiled(user);
+            folders = folderService.listForOwner(user);
         } catch (Exception e) {
-            log.error("Dashboard: ensureDefault failed for user {}", user.getId(), e);
-            return "redirect:/login?error=internal";
+            log.warn("migrateUnfiled failed: {}", e.getMessage());
         }
 
-        // Плоский список всех документов
-        List<Document> documents = documentRepository.findAllByOwnerOrderByUploadedAtDesc(user);
+        // Документы по разделам
+        Map<Long, List<Document>> byFolder = new LinkedHashMap<>();
+        for (DocumentFolder f : folders) {
+            byFolder.put(f.getId(),
+                    documentRepository.findAllByFolderOrderByUploadedAtDesc(f));
+        }
 
-        long totalDocs = documents.size();
-        long signedDocs = documents.stream().filter(Document::isSigned).count();
+        // «Без раздела» — на случай legacy
+        DocumentFolder defaultFolder = folderService.ensureDefault(user);
+        if (!byFolder.containsKey(defaultFolder.getId())) {
+            byFolder.put(defaultFolder.getId(),
+                    documentRepository.findAllByFolderOrderByUploadedAtDesc(defaultFolder));
+        }
+
+        // Простой DTO для JS
+        List<Map<String, Object>> folderOptions = new java.util.ArrayList<>();
+        for (DocumentFolder f : folders) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", f.getId());
+            m.put("name", f.getName());
+            folderOptions.add(m);
+        }
+
+        long totalDocs = documentRepository.countByOwner(user);
+        long signedDocs = documentRepository.countByOwnerAndSignedTrue(user);
 
         model.addAttribute("user", user);
-        model.addAttribute("documents", documents);
+        model.addAttribute("folders", folders);
+        model.addAttribute("documentsByFolder", byFolder);
         model.addAttribute("defaultFolderId", defaultFolder.getId());
+        model.addAttribute("folderOptions", folderOptions);
         model.addAttribute("allDocsCount", totalDocs);
         model.addAttribute("allSignedCount", signedDocs);
 

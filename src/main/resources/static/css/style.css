@@ -353,10 +353,15 @@ table.docs tr:hover td { background: #fafbff; }
 
 .actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
     align-items: center;
     justify-content: flex-end;
+    flex-shrink: 0;
+}
+table.docs td.actions {
+    white-space: nowrap;
+    min-width: 280px;
 }
 .actions form { display: inline-flex; margin: 0; padding: 0; }
 .actions a, .actions button, .actions label {
@@ -632,11 +637,14 @@ table.docs tr:hover td { background: #fafbff; }
 }
 .doc-card:hover { box-shadow: 0 4px 16px rgba(30,40,80,.06); }
 .doc-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
     align-items: center;
     gap: 12px;
     padding: 16px 22px;
+}
+.doc-row .actions-grid {
+    grid-column: 4;
 }
 .doc-name { 
     flex: 1 1 200px;

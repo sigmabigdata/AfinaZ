@@ -29,61 +29,26 @@
 
     <h1>Мои документы</h1>
 
-    <!-- Онбординг: показываем пока не подписано ни одного документа -->
+    <!-- Онбординг -->
     <div th:if="${allSignedCount == 0}"
-         class="onboarding-checklist"
          style="background:linear-gradient(135deg,#faf4ea 0%,#fff8ee 100%);
                 border:1px solid #d4c3a7; border-radius:14px; padding:22px 26px;
                 margin-bottom:24px;">
-        <h2 style="margin:0 0 4px;font-size:18px;">👋 Добро пожаловать в ПАО «НБД-Банк»!</h2>
+        <h2 style="margin:0 0 4px;font-size:18px;">👋 Добро пожаловать!</h2>
         <p style="margin:0 0 16px;font-size:14px;color:#6b5844;">
-            Пройдите 3 шага, чтобы начать работу с электронной подписью.
+            Создайте раздел, загрузите документ и подпишите его УКЭП.
         </p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
-            <div style="background:#fffdf9;border-radius:10px;padding:14px 16px;border:2px solid #e5d9c5;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                    <div style="width:28px;height:28px;border-radius:50%;display:flex;
-                                align-items:center;justify-content:center;font-weight:700;color:#fff;
-                                background:#94a3b8;">1</div>
-                    <b style="font-size:14px;">Загрузите документ</b>
-                </div>
-                <p style="margin:0;color:#8a7259;font-size:13px;">
-                    PDF, DOC или изображение — до 50 МБ.
-                </p>
-            </div>
-            <div style="background:#fffdf9;border-radius:10px;padding:14px 16px;border:2px solid #e5d9c5;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                    <div style="width:28px;height:28px;border-radius:50%;display:flex;
-                                align-items:center;justify-content:center;font-weight:700;color:#fff;
-                                background:#94a3b8;">2</div>
-                    <b style="font-size:14px;">Подпишите УКЭП</b>
-                </div>
-                <p style="margin:0;color:#8a7259;font-size:13px;">
-                    Нажмите ✍ — откроется плагин КриптоПро.
-                </p>
-            </div>
-            <div style="background:#fffdf9;border-radius:10px;padding:14px 16px;border:2px solid #e5d9c5;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                    <div style="width:28px;height:28px;border-radius:50%;display:flex;
-                                align-items:center;justify-content:center;font-weight:700;color:#fff;
-                                background:#94a3b8;">3</div>
-                    <b style="font-size:14px;">Скачайте результат</b>
-                </div>
-                <p style="margin:0;color:#8a7259;font-size:13px;">
-                    PDF со штампом подписи и справку.
-                </p>
-            </div>
-        </div>
     </div>
 
-    <!-- Действия: загрузка + из шаблона -->
+    <!-- Действия -->
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; align-items:stretch;">
-        <form method="post" th:action="@{/documents/upload}"
-              enctype="multipart/form-data"
-              class="upload-form" style="flex:1; min-width:280px; margin:0;">
-            <input type="hidden" name="folderId" th:value="${defaultFolderId}"/>
-            <input type="file" name="file" required/>
-            <button type="submit">📤 Загрузить документ</button>
+        <form method="post" th:action="@{/folders/create}" class="upload-form"
+              style="flex:1; min-width:280px; margin:0;">
+            <input type="text" name="name" required
+                   placeholder="Название нового раздела (например: Учредительные)"
+                   style="flex:1; padding:10px 12px; border:1px solid #d4c3a7;
+                          border-radius:8px; font-size:14px;"/>
+            <button type="submit">+ Создать раздел</button>
         </form>
         <button type="button" id="btn-use-template" class="btn"
                 style="background:linear-gradient(135deg,#c49a6c,#a67c52); border:none;
@@ -92,100 +57,149 @@
         </button>
     </div>
 
-    <!-- Пустое состояние -->
-    <div th:if="${#lists.isEmpty(documents)}" class="empty-state">
+    <div th:if="${#lists.isEmpty(folders)}" class="empty-state">
         <span class="icon">📂</span>
-        <h3>Пока нет ни одного документа</h3>
-        <p>Загрузите PDF/DOC выше, сгенерируйте из шаблона или запросите документ у банка.</p>
+        <h3>Пока нет ни одного раздела</h3>
+        <p>Создайте первый раздел и загрузите в него документ.</p>
     </div>
 
-    <!-- Плоский список документов -->
-    <div th:unless="${#lists.isEmpty(documents)}"
-         th:each="d : ${documents}"
-         class="doc-card"
-         th:attr="data-id=${d.id}"
-         style="margin-bottom:16px;">
-        <div class="doc-row">
-            <input type="checkbox" class="doc-checkbox"
-                   th:if="${not d.signed}"
-                   th:attr="data-id=${d.id}"
-                   title="Выбрать для массового подписания"/>
-            <div class="doc-name" th:text="${d.originalName}"
-                 th:title="${d.originalName}">file.pdf</div>
-            <div class="doc-meta">
-                <span th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</span>
-                <span th:if="${d.signed}" class="badge ok">Подписан</span>
-                <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
+    <!-- Разделы (новые сверху) -->
+    <div th:each="f, folderStat : ${folders}"
+         th:with="docs=${documentsByFolder.get(f.id)},
+                  total=${#lists.size(docs)},
+                  signed=${#lists.size(docs.?[signed])},
+                  unsigned=${total - signed}"
+         class="folder-card">
+
+        <div class="folder-card-header">
+            <div class="folder-card-title-block">
+                <div class="folder-icon">📁</div>
+                <div style="min-width:0;">
+                    <div class="folder-name" th:text="${f.name}">Раздел</div>
+                    <div class="folder-stats">
+                        <span class="folder-stat stat-total">
+                            <b th:text="${total}">0</b> всего
+                        </span>
+                        <span class="folder-stat stat-signed" th:if="${signed > 0}">
+                            ✅ <b th:text="${signed}">0</b>
+                        </span>
+                        <span class="folder-stat stat-unsigned" th:if="${unsigned > 0}">
+                            ⚠️ <b th:text="${unsigned}">0</b>
+                        </span>
+                    </div>
+                </div>
             </div>
-            <div class="actions-grid">
-                <a th:href="@{'/documents/' + ${d.id} + '/view'}"
-                   target="_blank" title="Просмотреть">👁</a>
-                <a th:href="@{'/documents/' + ${d.id} + '/download'}"
-                   title="Скачать">⬇</a>
-                <a th:if="${d.signed}"
-                   th:href="@{'/documents/' + ${d.id} + '/visualization'}"
-                   target="_blank" title="Визуализация подписи (PDF)">📄</a>
-                <span th:unless="${d.signed}" class="spacer"></span>
-                <span th:unless="${d.signed}" class="spacer"></span>
-                <a th:if="${d.signed}"
-                   th:href="@{'/documents/' + ${d.id} + '/signing-certificate'}"
-                   title="Справка о подписании (PDF)">📋</a>
-                <span th:unless="${d.signed}" class="spacer"></span>
-
-                <!-- Загрузить .sig -->
-                <form th:action="@{'/documents/' + ${d.id} + '/upload-signature'}"
-                      method="post" enctype="multipart/form-data"
-                      style="display:inline; margin:0; padding:0;">
-                    <label title="Загрузить .sig из файла">
-                        📎
-                        <input type="file" name="file" accept=".sig,.p7s,.der" required data-no-drop="1"
-                               onchange="this.form.submit()"
-                               style="display:none;"/>
-                    </label>
+            <div class="folder-actions">
+                <form method="post" th:action="@{'/folders/' + ${f.id} + '/delete'}"
+                      onsubmit="return confirm('Удалить раздел и все его документы?');"
+                      style="display:inline">
+                    <button type="submit" class="btn-danger btn-sm">🗑 Удалить</button>
                 </form>
-
-                <button th:if="${not d.hasSignatureByUser(user.id)}" type="button"
-                        class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
-                <span th:if="${d.hasSignatureByUser(user.id)}"
-                      class="badge ok" title="Вы уже подписали этот документ">✓</span>
-
-                <form th:unless="${d.signed}" method="post"
-                      th:action="@{'/documents/' + ${d.id} + '/delete'}"
-                      onsubmit="return confirm('Удалить документ?')" style="display:inline">
-                    <button type="submit" class="danger" title="Удалить">🗑</button>
-                </form>
-                <span th:if="${d.signed}" class="spacer"></span>
             </div>
         </div>
 
-        <!-- Подписи -->
-        <div th:if="${not #lists.isEmpty(d.signatures)}" class="sig-block">
-            <div class="sig-icon">✓</div>
-            <div class="sig-info">
-                <div class="sig-title">
-                    Подписи: <span th:text="${#lists.size(d.signatures)}">0</span>
+        <!-- Загрузка в раздел -->
+        <form method="post" th:action="@{/documents/upload}"
+              enctype="multipart/form-data" class="upload-form">
+            <input type="hidden" name="folderId" th:value="${f.id}"/>
+            <input type="file" name="file" required/>
+            <button type="submit">📤 Загрузить в раздел</button>
+        </form>
+
+        <!-- Пусто -->
+        <div th:if="${#lists.isEmpty(docs)}" class="folder-empty">
+            <span class="folder-empty-icon">📂</span>
+            <strong>Документов пока нет</strong>
+            Загрузите первый файл в этот раздел.
+        </div>
+
+        <!-- Документы -->
+        <div th:each="d : ${docs}" class="doc-card"
+             th:attr="data-id=${d.id}"
+             style="margin:0 22px 16px; border-radius:10px;">
+            <div class="doc-row">
+                <input type="checkbox" class="doc-checkbox"
+                       th:if="${not d.signed}"
+                       th:attr="data-id=${d.id}"
+                       title="Выбрать для массового подписания"/>
+                <div class="doc-name" th:text="${d.originalName}"
+                     th:title="${d.originalName}">file.pdf</div>
+                <div class="doc-meta">
+                    <span th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</span>
+                    <span th:if="${d.signed}" class="badge ok">Подписан</span>
+                    <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
                 </div>
-                <div th:each="sig, st : ${d.signatures}" class="sig-item">
-                    <div class="sig-subject">
-                        <span th:text="${st.index + 1} + '. '">1. </span>
-                        <span th:text="${sig.signerSubject}">ФИО</span>
+                <div class="actions-grid">
+                    <a th:href="@{'/documents/' + ${d.id} + '/view'}"
+                       target="_blank" title="Просмотреть">👁</a>
+                    <a th:href="@{'/documents/' + ${d.id} + '/download'}"
+                       title="Скачать">⬇</a>
+                    <a th:if="${d.signed}"
+                       th:href="@{'/documents/' + ${d.id} + '/visualization'}"
+                       target="_blank" title="Визуализация (PDF)">📄</a>
+                    <span th:unless="${d.signed}" class="spacer"></span>
+                    <a th:if="${d.signed}"
+                       th:href="@{'/documents/' + ${d.id} + '/signing-certificate'}"
+                       title="Справка о подписании (PDF)">📋</a>
+                    <span th:unless="${d.signed}" class="spacer"></span>
+
+                    <!-- Загрузить .sig -->
+                    <form th:action="@{'/documents/' + ${d.id} + '/upload-signature'}"
+                          method="post" enctype="multipart/form-data"
+                          style="display:inline; margin:0; padding:0;">
+                        <label title="Загрузить .sig">
+                            📎
+                            <input type="file" name="file" accept=".sig,.p7s,.der"
+                                   required data-no-drop="1"
+                                   onchange="this.form.submit()"
+                                   style="display:none;"/>
+                        </label>
+                    </form>
+
+                    <button th:if="${not d.hasSignatureByUser(user.id)}" type="button"
+                            class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
+                    <span th:if="${d.hasSignatureByUser(user.id)}"
+                          class="badge ok" title="Вы уже подписали">✓</span>
+
+                    <form th:unless="${d.signed}" method="post"
+                          th:action="@{'/documents/' + ${d.id} + '/delete'}"
+                          onsubmit="return confirm('Удалить документ?')"
+                          style="display:inline">
+                        <button type="submit" class="danger" title="Удалить">🗑</button>
+                    </form>
+                    <span th:if="${d.signed}" class="spacer"></span>
+                </div>
+            </div>
+
+            <!-- Подписи -->
+            <div th:if="${not #lists.isEmpty(d.signatures)}" class="sig-block">
+                <div class="sig-icon">✓</div>
+                <div class="sig-info">
+                    <div class="sig-title">
+                        Подписи: <span th:text="${#lists.size(d.signatures)}">0</span>
                     </div>
-                    <div class="sig-meta">
-                        <span th:text="${#temporals.format(sig.signedAt,'dd.MM.yyyy HH:mm')}">—</span>
-                        <span> · </span>
-                        <span th:text="'serial=' + ${sig.signerSerial}">—</span>
-                    </div>
-                    <div class="sig-actions">
-                        <a th:href="@{'/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/download'}"
-                           class="btn-sig">⬇ .sig</a>
-                        <form method="post"
-                              th:action="@{'/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/apply-poa'}"
-                              style="display:inline; margin:0;">
-                            <input type="hidden" name="apply" th:value="${!sig.applyPoa}"/>
-                            <button type="submit" class="btn-ghost btn-sm"
-                                    th:style="${sig.applyPoa} ? 'background:#e6f7ec; color:#166534; border-color:#c2e7cd;' : ''"
-                                    th:text="${sig.applyPoa ? '✓ Доверенность' : 'Применить доверенность'}"></button>
-                        </form>
+                    <div th:each="sig, st : ${d.signatures}" class="sig-item">
+                        <div class="sig-subject">
+                            <span th:text="${st.index + 1} + '. '">1. </span>
+                            <span th:text="${sig.signerSubject}">ФИО</span>
+                        </div>
+                        <div class="sig-meta">
+                            <span th:text="${#temporals.format(sig.signedAt,'dd.MM.yyyy HH:mm')}">—</span>
+                            <span> · </span>
+                            <span th:text="'serial=' + ${sig.signerSerial}">—</span>
+                        </div>
+                        <div class="sig-actions">
+                            <a th:href="@{'/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/download'}"
+                               class="btn-sig">⬇ .sig</a>
+                            <form method="post"
+                                  th:action="@{'/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/apply-poa'}"
+                                  style="display:inline; margin:0;">
+                                <input type="hidden" name="apply" th:value="${!sig.applyPoa}"/>
+                                <button type="submit" class="btn-ghost btn-sm"
+                                        th:style="${sig.applyPoa} ? 'background:#e6f7ec; color:#166534; border-color:#c2e7cd;' : ''"
+                                        th:text="${sig.applyPoa ? '✓ Доверенность' : 'Применить доверенность'}"></button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -194,7 +208,7 @@
 </main>
 
 <script th:inline="javascript">
-    window.__FOLDERS__ = [{id: /*[[${defaultFolderId}]]*/ 0, name: 'Документы'}];
+    window.__FOLDERS__ = /*[[${folderOptions}]]*/ [];
 </script>
 <script th:src="@{/js/sign-progress.js}"></script>
 <script th:src="@{/js/cert-selector.js}"></script>

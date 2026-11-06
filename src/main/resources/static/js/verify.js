@@ -81,11 +81,9 @@
             try {
                 var contentBuf = await contentInput.files[0].arrayBuffer();
                 var sigText = await sigInput.files[0].text();
-                var sigB64 = sigText
-                    .replace(/-----BEGIN[^-]*-----/g, '')
-                    .replace(/-----END[^-]*-----/g, '')
-                    .replace(/\s+/g, '')
-                    .replace(/[^A-Za-z0-9+/=]/g, '');
+                // НЕ очищаем на клиенте — сервер tolerant-decoder
+                // (принимает PEM, URL-safe, без padding).
+                var sigB64 = sigText.trim();
 
                 var resp = await fetch('/api/verify/sig', {
                     method: 'POST',

@@ -13,6 +13,9 @@ public interface DocumentFolderRepository extends JpaRepository<DocumentFolder, 
 
     List<DocumentFolder> findAllByOwnerOrderByNameAsc(User owner);
 
+    /** Сортировка по дате создания: новые сверху. */
+    List<DocumentFolder> findAllByOwnerOrderByCreatedAtDesc(User owner);
+
     Optional<DocumentFolder> findByIdAndOwner(Long id, User owner);
 
     /** Проверка дубликата имени в рамках клиента (по hash). */

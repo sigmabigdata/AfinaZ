@@ -55,7 +55,8 @@ public class FolderService {
     // ==================== Чтение ====================
 
     public List<DocumentFolder> listForOwner(User owner) {
-        return folderRepository.findAllByOwnerOrderByNameAsc(owner);
+        // Новые разделы — сверху
+        return folderRepository.findAllByOwnerOrderByCreatedAtDesc(owner);
     }
 
     /** Получить раздел, проверив что он принадлежит owner. */
