@@ -840,9 +840,10 @@ public class SignatureVerifier {
             checks.add(checkItem("Подписи звеньев цепочки", chainSigsOk, chainSigsDetails));
 
             // ─── 7. Срок всех звеньев ───
-            boolean allValidDates = true;
-            String datesDetails = "";
+            boolean allValidDates = false;
+            String datesDetails;
             if (chainOk) {
+                allValidDates = true;
                 for (X509Certificate cc : chain) {
                     try {
                         cc.checkValidity();
@@ -854,8 +855,9 @@ public class SignatureVerifier {
                     }
                 }
                 if (allValidDates) datesDetails = "Все " + chain.size() + " сертификатов действительны";
+                else if (datesDetails == null) datesDetails = "Ошибка проверки сроков";
             } else {
-                datesDetails = "Пропущено";
+                datesDetails = "Пропущено (цепочка не построена)";
             }
             checks.add(checkItem("Срок действия всей цепочки", allValidDates, datesDetails));
 
