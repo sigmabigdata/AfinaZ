@@ -64,10 +64,11 @@ services:
       APP_STORAGE_PATH: /app/storage/documents
       ADMINS_FILE: /app/admins.env
       CRL_DIR: /app/crls
+      CRYPTO_PRO_JCP_LICENSE: ${JCP_LICENSE:-}
       LOG_PATH: /var/log/afina/app.log
       FILE_ENCRYPTION_KEY_PATH: /opt/afinaz/secrets/file.key
       TZ: Europe/Moscow
-      JAVA_OPTS: "-Xms256m -Xmx1g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+      JAVA_OPTS: "-Xms512m -Xmx1536m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/afina/heapdump.hprof"
     volumes:
       - ./storage:/app/storage
       - ./logs:/var/log/afina

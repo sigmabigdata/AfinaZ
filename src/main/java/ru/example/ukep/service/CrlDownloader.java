@@ -51,6 +51,9 @@ public class CrlDownloader {
     private final Path crlDir;
     private final long maxAgeHours;
 
+    /** Максимальный размер CRL (в байтах). Больше — не парсим, не сохраняем. */
+    private static final long MAX_CRL_SIZE_BYTES = 20L * 1024 * 1024; // 20 MB
+
     public CrlDownloader(
             @Value("${app.crl-path:/app/crls}") String crlPath,
             @Value("${app.crl-max-age-hours:24}") long maxAgeHours) throws java.io.IOException {
@@ -146,8 +149,15 @@ public class CrlDownloader {
         Path tmp = Files.createTempFile(crlDir, "dl-", ".crl.tmp");
         try {
             downloadToFile(url, tmp);
-            if (Files.size(tmp) < 100) {
+            long size = Files.size(tmp);
+            if (size < 100) {
                 throw new IllegalStateException("файл слишком маленький");
+            }
+            if (size > MAX_CRL_SIZE_BYTES) {
+                log.warn("CRL слишком большой ({} байт > {}), пропускаем: {}",
+                        size, MAX_CRL_SIZE_BYTES, url);
+                Files.deleteIfExists(tmp);
+                return false; // НЕ парсим, НЕ сохраняем — защита от OOM
             }
 
             X509CRL crl = parseCrl(tmp);
@@ -178,52 +188,35 @@ public class CrlDownloader {
     }
 
     /**
-     * Удаляет все файлы auto-*.crl, которые НЕ совпадают с текущим issuerKey.
-     * Вызывается перед сохранением нового файла, чтобы не копились старые
-     * имена (например, названные по hash(url) из предыдущих версий).
+     * Удаляет старые auto-*.crl с тем же issuer-prefix (кроме текущего файла).
+     * НЕ парсит содержимое — работает по именам файлов. Быстро и без OOM.
      */
     private void deleteOldFilesForIssuer(String currentIssuerKey) {
+        String keepName = AUTO_PREFIX + currentIssuerKey + CRL_SUFFIX;
         try (var stream = Files.list(crlDir)) {
             var files = stream
                     .filter(Files::isRegularFile)
-                    .filter(f -> f.getFileName().toString().startsWith(AUTO_PREFIX))
-                    .filter(f -> f.getFileName().toString().endsWith(CRL_SUFFIX))
+                    .filter(f -> {
+                        String n = f.getFileName().toString();
+                        return n.startsWith(AUTO_PREFIX) && n.endsWith(CRL_SUFFIX)
+                                && !n.equals(keepName);
+                    })
                     .toList();
-            for (var f : files) {
-                tryDeleteOldCrl(f, currentIssuerKey);
+            // Удаляем только если файл старше 1 часа (не трогаем свежие)
+            long now = System.currentTimeMillis();
+            for (Path f : files) {
+                try {
+                    long ageMs = now - Files.getLastModifiedTime(f).toMillis();
+                    if (ageMs > 3600_000L) { // > 1 час
+                        Files.deleteIfExists(f);
+                        log.info("Удалён устаревший auto-*.crl: {}", f.getFileName());
+                    }
+                } catch (Exception e) {
+                    log.debug("skip delete {}: {}", f.getFileName(), e.getMessage());
+                }
             }
         } catch (Exception e) {
-            log.warn("deleteOldFilesForIssuer error: {}", e.getMessage());
-        }
-    }
-
-    /** Удалить один устаревший/невалидный CRL-файл. */
-    private void tryDeleteOldCrl(Path f, String currentIssuerKey) {
-        String name = f.getFileName().toString();
-        if (name.equals(AUTO_PREFIX + currentIssuerKey + CRL_SUFFIX)) return;
-
-        try {
-            X509CRL other = parseCrl(f);
-            String otherKey = issuerKey(other);
-            if (otherKey.equals(currentIssuerKey)) {
-                Files.deleteIfExists(f);
-                log.info("Удалён устаревший CRL: {}", name);
-                return;
-            }
-        } catch (Exception parseEx) {
-            log.debug("CRL parse failed for {}: {}", name, parseEx.getMessage());
-        }
-
-        // Файл не парсится — удалим, если он старый
-        try {
-            long ageMs = System.currentTimeMillis()
-                    - Files.getLastModifiedTime(f).toMillis();
-            if (ageMs > 7 * 24 * 3_600_000L) {
-                Files.deleteIfExists(f);
-                log.warn("Удалён невалидный старый CRL: {}", name);
-            }
-        } catch (Exception e) {
-            log.warn("Не удалось удалить {}: {}", name, e.getMessage());
+            log.warn("deleteOldFilesForIssuer: {}", e.getMessage());
         }
     }
 
