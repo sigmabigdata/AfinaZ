@@ -110,12 +110,9 @@ ENV LD_LIBRARY_PATH="/opt/cprocsp/lib/amd64"
 
 RUN rm -f /usr/sbin/policy-rc.d
 
-# Непривилегированный пользователь
-RUN groupadd -r afina 2>/dev/null || true && \
-    useradd -r -u 999 -g afina -m -d /home/afina afina 2>/dev/null || true && \
-    mkdir -p /app/storage/documents /var/log/afina /opt/afinaz/secrets \
+# Непривилегированный пользователь    mkdir -p /app/storage/documents /var/log/afina /opt/afinaz/secrets \
              /var/opt/cprocsp/tmp /var/opt/cprocsp/keys/afina && \
-    chown -R afina:afina /app /var/log/afina /var/opt/cprocsp /opt/afinaz && \
+    chown -R 999:999 /app /var/log/afina /var/opt/cprocsp /opt/afinaz && \
     chmod -R 775 /var/opt/cprocsp && \
     chmod 777 /var/opt/cprocsp/tmp
 
@@ -133,7 +130,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
     CMD curl -fsS http://localhost:8080/actuator/health || exit 1
 
-USER afina
+USER 999:999
 
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dfile.encoding=UTF-8"
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
