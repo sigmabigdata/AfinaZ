@@ -2593,3 +2593,178 @@ table.docs td.actions {
 .info-status.ok {
     color: #10b981;
 }
+
+
+/* ============================================================
+   Mobile adaptation for /info/{uuid}
+   ============================================================ */
+
+@media (max-width: 640px) {
+    /* Контейнер */
+    .info-page {
+        margin: 16px auto;
+        padding: 0 12px 40px;
+    }
+
+    /* Шапка */
+    .info-header {
+        margin-bottom: 20px;
+    }
+    .info-logo {
+        height: 44px;
+        margin-bottom: 8px;
+    }
+    .info-header h1 {
+        font-size: 19px;
+        line-height: 1.3;
+        margin-bottom: 6px;
+    }
+    .info-subtitle {
+        font-size: 13px;
+        padding: 0 4px;
+        line-height: 1.45;
+    }
+
+    /* Карточки */
+    .info-card {
+        padding: 14px 16px;
+        border-radius: 12px;
+        margin-bottom: 12px;
+    }
+    .info-card-title {
+        font-size: 15px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color, #e5d9c5);
+    }
+
+    /* Определения — стекаем в одну колонку */
+    .info-dl,
+    .info-sig .info-dl {
+        display: block;
+        font-size: 14px;
+    }
+    .info-dl dt {
+        margin: 10px 0 2px;
+        font-size: 11.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: var(--text-muted, #6a7285);
+    }
+    .info-dl dt:first-child {
+        margin-top: 0;
+    }
+    .info-dl dd {
+        margin: 0 0 8px;
+        font-size: 14px;
+        line-height: 1.5;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color, #e5d9c5);
+        word-break: break-word;
+    }
+    .info-dl dd:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    .info-dl code {
+        font-size: 11px;
+        padding: 1px 5px;
+        word-break: break-all;
+        line-height: 1.4;
+        display: inline-block;
+        max-width: 100%;
+    }
+
+    /* Подпись */
+    .info-sig {
+        padding: 12px 14px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+    .info-sig-head {
+        gap: 10px;
+        margin-bottom: 6px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color, #e5d9c5);
+    }
+    .info-sig-num {
+        width: 26px;
+        height: 26px;
+        font-size: 12px;
+    }
+    .info-sig-subject {
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.3;
+        word-break: break-word;
+    }
+
+    /* Статусы — крупнее */
+    .info-status {
+        font-size: 14px;
+    }
+    .info-muted {
+        font-size: 12px;
+    }
+
+    /* Футер и дисклеймер */
+    .info-footer {
+        font-size: 12px;
+        margin-top: 20px;
+        line-height: 1.5;
+    }
+    .info-footer a {
+        display: inline-block;
+        margin-top: 4px;
+    }
+    .info-disclaimer {
+        padding: 12px 14px;
+        font-size: 12px;
+        line-height: 1.5;
+        margin-top: 16px;
+    }
+
+    /* Alert / загрузка */
+    .info-alert {
+        padding: 14px 16px;
+        font-size: 13px;
+    }
+    .info-loading {
+        padding: 40px 16px;
+    }
+    .info-spinner {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+/* Очень узкие экраны (iPhone SE 1st gen / Galaxy A0x) */
+@media (max-width: 380px) {
+    .info-page {
+        padding: 0 8px 32px;
+    }
+    .info-card {
+        padding: 12px 12px;
+    }
+    .info-sig {
+        padding: 10px 12px;
+    }
+    .info-dl dd {
+        font-size: 13.5px;
+    }
+    .info-sig-subject {
+        font-size: 14px;
+    }
+    .info-header h1 {
+        font-size: 17px;
+    }
+}
+
+/* iOS Safari — избегаем зума при повороте и авто-скейла шрифтов */
+@supports (-webkit-touch-callout: none) {
+    body {
+        -webkit-text-size-adjust: 100%;
+    }
+}
