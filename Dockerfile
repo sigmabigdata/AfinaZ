@@ -110,7 +110,8 @@ ENV LD_LIBRARY_PATH="/opt/cprocsp/lib/amd64"
 
 RUN rm -f /usr/sbin/policy-rc.d
 
-# Непривилегированный пользователь    mkdir -p /app/storage/documents /var/log/afina /opt/afinaz/secrets \
+# Непривилегированный пользователь
+RUN mkdir -p /app/storage/documents /var/log/afina /opt/afinaz/secrets \
              /var/opt/cprocsp/tmp /var/opt/cprocsp/keys/afina && \
     chown -R 999:999 /app /var/log/afina /var/opt/cprocsp /opt/afinaz && \
     chmod -R 775 /var/opt/cprocsp && \
