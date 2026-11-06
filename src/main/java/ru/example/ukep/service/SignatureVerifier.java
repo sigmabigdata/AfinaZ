@@ -759,7 +759,7 @@ public class SignatureVerifier {
         }
     }
 
-    private String extractCn(String x500) {
+    public String extractCn(String x500) {
         if (x500 == null) return "";
         java.util.regex.Matcher m = java.util.regex.Pattern
                 .compile("CN=([^,]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
@@ -780,4 +780,26 @@ public class SignatureVerifier {
     /** Проверяет EKU: digitalSignature (0) или nonRepudiation (1). */
     /** SHA-1 отпечаток сертификата (hex uppercase, без разделителей). */
     /** Человекочитаемое keyUsage. */
+
+    /**
+     * Извлекает leaf-сертификат подписанта из CAdES-BES подписи.
+     * Возвращает null, если подпись битая/не CMS.
+     */
+    public X509Certificate extractSignerCert(String signatureBase64) {
+        if (signatureBase64 == null || signatureBase64.isBlank()) return null;
+        try {
+            byte[] bytes = decodeBase64Tolerant(signatureBase64);
+            CMSSignedData cms = new CMSSignedData(bytes);
+            SignerInformationStore store = cms.getSignerInfos();
+            if (store.size() == 0) return null;
+            SignerInformation signer = store.getSigners().iterator().next();
+            Collection<X509CertificateHolder> matches = cms.getCertificates().getMatches(signer.getSID());
+            if (matches.isEmpty()) return null;
+            return new JcaX509CertificateConverter().setProvider("BC")
+                    .getCertificate(matches.iterator().next());
+        } catch (Exception e) {
+            log.debug("extractSignerCert failed: {}", e.getMessage());
+            return null;
+        }
+    }
 }

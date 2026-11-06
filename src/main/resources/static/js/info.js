@@ -93,34 +93,81 @@
             html += '<p class="info-muted">На момент проверки документ не подписан.</p>';
         } else {
             sigs.forEach(function (s, i) {
-                var statusCls = s.cryptoOk ? 'ok' : 'err';
-                var statusIcon = s.cryptoOk ? '✓' : '✗';
-                var statusText = s.cryptoOk ? 'Криптоподпись корректна' : 'Криптоподпись не прошла';
-
-                html += '<div class="info-sig">';
-                html += '<div class="info-sig-head">';
-                html += '<div class="info-sig-num">' + (i + 1) + '</div>';
-                html += '<div class="info-sig-subject">' + esc(s.subject || 'Подписант') + '</div>';
-                html += '</div>';
-                html += '<dl class="info-dl">';
-                html += '<dt>Дата</dt><dd>' + fmtDate(s.signedAt) + '</dd>';
-                if (s.serial) {
-                    html += '<dt>Серийный номер</dt><dd><code>' + esc(s.serial) + '</code></dd>';
-                }
-                html += '<dt>Статус</dt>';
-                html += '<dd class="info-status ' + statusCls + '">'
-                    + statusIcon + ' ' + esc(statusText);
-                if (!s.cryptoOk && s.cryptoMessage) {
-                    html += ' <span class="info-muted">(' + esc(s.cryptoMessage) + ')</span>';
-                }
-                html += '</dd>';
-                html += '</dl>';
-                html += '</div>';
+                html += renderSignature(s, i);
             });
         }
         html += '</div>';
 
         container.innerHTML = html;
+    }
+
+    function renderSignature(s, i) {
+        var html = '<div class="info-sig">';
+
+        // Заголовок: номер + ФИО
+        html += '<div class="info-sig-head">';
+        html += '<div class="info-sig-num">' + (i + 1) + '</div>';
+        html += '<div class="info-sig-subject">' + esc(s.subject || 'Подписант') + '</div>';
+        html += '</div>';
+
+        // Реквизиты подписи
+        html += '<dl class="info-dl">';
+
+        html += '<dt>Время подписания</dt><dd>' + fmtDate(s.signedAt) + '</dd>';
+
+        if (s.serial) {
+            html += '<dt>Серийный номер сертификата</dt>'
+                 + '<dd><code>' + esc(s.serial) + '</code></dd>';
+        }
+
+        if (s.certNotBefore && s.certNotAfter) {
+            var validityCls = s.certValidNow ? 'ok' : 'err';
+            var validityIcon = s.certValidNow ? '✓' : '✗';
+            html += '<dt>Срок действия сертификата</dt>';
+            html += '<dd>с ' + fmtDate(s.certNotBefore) + ' по ' + fmtDate(s.certNotAfter);
+            html += ' <span class="info-status ' + validityCls + '">'
+                 + validityIcon + ' ' + (s.certValidNow ? 'действителен' : 'истёк/не вступил')
+                 + '</span></dd>';
+        }
+
+        // Статус криптопроверки
+        var statusCls = s.cryptoOk ? 'ok' : 'err';
+        var statusIcon = s.cryptoOk ? '✓' : '✗';
+        var statusText = s.cryptoOk ? 'Криптоподпись корректна' : 'Криптоподпись не прошла';
+        html += '<dt>Криптоподпись</dt>';
+        html += '<dd class="info-status ' + statusCls + '">'
+             + statusIcon + ' ' + esc(statusText);
+        if (!s.cryptoOk && s.cryptoMessage) {
+            html += ' <span class="info-muted">(' + esc(s.cryptoMessage) + ')</span>';
+        }
+        html += '</dd>';
+
+        // Доверенность
+        if (s.applyPoa) {
+            if (s.poaFound) {
+                html += '<dt>Доверенность</dt>';
+                html += '<dd>';
+                html += '№ <code>' + esc(s.poaStampNumber || '—') + '</code>';
+                if (s.poaValidFrom && s.poaValidUntil) {
+                    html += '<br>с ' + esc(s.poaValidFrom) + ' по ' + esc(s.poaValidUntil);
+                } else if (s.poaValidUntil) {
+                    html += '<br>до ' + esc(s.poaValidUntil);
+                }
+                if (s.poaEffective === false) {
+                    html += ' <span class="info-status err">✗ истекла</span>';
+                } else {
+                    html += ' <span class="info-status ok">✓ действует</span>';
+                }
+                html += '</dd>';
+            } else {
+                html += '<dt>Доверенность</dt>';
+                html += '<dd class="info-status err">не найдена в системе</dd>';
+            }
+        }
+
+        html += '</dl>';
+        html += '</div>';
+        return html;
     }
 
     window.InfoUI = { init: init };

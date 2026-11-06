@@ -2574,3 +2574,22 @@ table.docs td.actions {
 .info-disclaimer b {
     color: var(--text-primary, #1f2430);
 }
+
+
+/* Дополнительные стили для /info — расширенные реквизиты */
+.info-sig .info-dl {
+    grid-template-columns: 200px 1fr;
+    font-size: 13px;
+}
+.info-sig .info-dl dt {
+    font-size: 12.5px;
+}
+.info-sig .info-dl dd {
+    line-height: 1.55;
+}
+.info-status.err {
+    color: #ef4444;
+}
+.info-status.ok {
+    color: #10b981;
+}
