@@ -203,28 +203,30 @@
             alert('Раздел не найден на странице');
             return;
         }
-        var cbs = card.querySelectorAll('.doc-checkbox');
-        if (cbs.length === 0) {
+        // Собираем ID неподписанных документов (data-signed="false")
+        var ids = [];
+        card.querySelectorAll('.doc-card[data-signed="false"]').forEach(function (dc) {
+            var id = Number(dc.dataset.id);
+            if (id) ids.push(id);
+        });
+
+        if (ids.length === 0) {
             alert('В этом разделе все документы уже подписаны');
             return;
         }
-        var n = cbs.length;
+
+        var n = ids.length;
         if (!confirm('Подписать ' + n + ' неподписанных документа(ов) в разделе?
 '
                 + 'Потребуется один PIN-код для всех.')) {
             return;
         }
 
-        console.log('[signAllInSection] folderId=', folderId, 'unsigned=', n);
+        console.log('[signAllInSection] folderId=', folderId, 'ids=', ids);
 
-        // НЕ выставляем cb.checked (не показываем галочки),
-        // НЕ вызываем updateBar() (не показываем плавающую панель).
-        // Просто заполняем selected и сразу запускаем подписание.
         selected.clear();
-        cbs.forEach(function (cb) {
-            selected.add(Number(cb.dataset.id));
-        });
-
+        ids.forEach(function (id) { selected.add(id); });
+        // НЕ вызываем updateBar() — плавающая панель не нужна
         signSelected();
     }
 
