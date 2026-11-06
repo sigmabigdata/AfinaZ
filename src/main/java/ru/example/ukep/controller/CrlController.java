@@ -11,7 +11,6 @@ import org.springframework.web.servlet.view.RedirectView;
 import ru.example.ukep.service.CrlService;
 
 import java.util.List;
-import java.util.Base64;
 
 @Controller
 @RequestMapping("/admin/crl")
@@ -110,107 +109,6 @@ public class CrlController {
             log.error("refresh-all failed", e);
             ra.addFlashAttribute("err", "Ошибка обновления: " + e.getMessage());
         }
-        return new RedirectView(REDIR_CRL);
-    }
-
-    /**
-     * Загрузка .sig файлов → скачивание CRL для сертификатов в них.
-     * Использует BouncyCastle (через CrlOnDemandService), не openssl.
-     */
-    @PostMapping("/upload-sig")
-    public RedirectView uploadSigFiles(@RequestParam("files") MultipartFile[] files,
-                                        java.security.Principal auth,
-                                        RedirectAttributes ra) {
-        if (files == null || files.length == 0) {
-            ra.addFlashAttribute("err", "Не выбрано ни одного файла");
-            return new RedirectView(REDIR_CRL);
-        }
-        String actor = auth != null ? auth.getName() : "admin";
-        int totalCrl = 0, processed = 0, failed = 0;
-        StringBuilder details = new StringBuilder();
-
-        for (MultipartFile file : files) {
-            String name = file.getOriginalFilename();
-            try {
-                if (file.isEmpty()) throw new IllegalArgumentException("пустой файл");
-                byte[] bytes = file.getBytes();
-                String sigBase64 = Base64.getEncoder().encodeToString(bytes);
-                int n = crlOnDemandService.ensureForSignature(sigBase64, null, actor);
-                totalCrl += n;
-                processed++;
-                details.append(name).append(" → ").append(n).append(" CRL; ");
-            } catch (Exception e) {
-                failed++;
-                log.warn("upload-sig: {} failed: {}", name, e.getMessage());
-                details.append(name).append(" → ошибка (").append(e.getMessage()).append("); ");
-            }
-        }
-
-        String msg = String.format(
-                "Обработано .sig: %d (ошибок: %d), скачано CRL: %d. %s",
-                processed, failed, totalCrl, details.toString());
-
-        if (failed > 0 && processed == 0) ra.addFlashAttribute("err", msg);
-        else if (failed > 0) ra.addFlashAttribute("warn", msg);
-        else ra.addFlashAttribute("ok", msg);
-
-        return new RedirectView(REDIR_CRL);
-    }
-
-    /**
-     * Сканирование папки /app/sigs/ — обработка всех .sig/.p7s/.der файлов.
-     * Папка должна быть смонтирована в контейнер (см. docker-compose).
-     */
-    @PostMapping("/scan-sigs")
-    public RedirectView scanSigsDir(java.security.Principal auth, RedirectAttributes ra) {
-        java.nio.file.Path dir = java.nio.file.Paths.get("/app/sigs");
-        if (!java.nio.file.Files.isDirectory(dir)) {
-            ra.addFlashAttribute("err", "Папка /app/sigs не найдена. "
-                    + "Смонтируйте её в docker-compose-prod.yml: "
-                    + "./sigs:/app/sigs:ro");
-            return new RedirectView(REDIR_CRL);
-        }
-
-        String actor = auth != null ? auth.getName() : "admin";
-        int totalCrl = 0, processed = 0, failed = 0;
-        StringBuilder details = new StringBuilder();
-
-        try (var stream = java.nio.file.Files.list(dir)) {
-            var files = stream
-                    .filter(java.nio.file.Files::isRegularFile)
-                    .filter(f -> {
-                        String n = f.getFileName().toString().toLowerCase();
-                        return n.endsWith(".sig") || n.endsWith(".p7s") || n.endsWith(".der");
-                    })
-                    .sorted()
-                    .toList();
-
-            for (java.nio.file.Path f : files) {
-                try {
-                    byte[] bytes = java.nio.file.Files.readAllBytes(f);
-                    String sigBase64 = Base64.getEncoder().encodeToString(bytes);
-                    int n = crlOnDemandService.ensureForSignature(sigBase64, null, actor);
-                    totalCrl += n;
-                    processed++;
-                    details.append(f.getFileName()).append(" → ").append(n).append(" CRL; ");
-                } catch (Exception e) {
-                    failed++;
-                    log.warn("scan-sigs: {} failed: {}", f.getFileName(), e.getMessage());
-                }
-            }
-        } catch (Exception e) {
-            ra.addFlashAttribute("err", "Ошибка сканирования: " + e.getMessage());
-            return new RedirectView(REDIR_CRL);
-        }
-
-        String msg = String.format(
-                "Сканирование /app/sigs: файлов %d, ошибок %d, скачано CRL %d. %s",
-                processed, failed, totalCrl,
-                details.length() > 500 ? details.substring(0, 500) + "..." : details.toString());
-
-        if (failed > 0 && processed == 0) ra.addFlashAttribute("err", msg);
-        else ra.addFlashAttribute("ok", msg);
-
         return new RedirectView(REDIR_CRL);
     }
 }
