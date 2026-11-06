@@ -119,7 +119,7 @@
                 <span th:if="${d.signed}" class="badge ok">Подписан</span>
                 <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
             </div>
-            <div class="actions">
+            <div class="actions-grid">
                 <a th:href="@{'/documents/' + ${d.id} + '/view'}"
                    target="_blank" title="Просмотреть">👁</a>
                 <a th:href="@{'/documents/' + ${d.id} + '/download'}"
@@ -127,22 +127,19 @@
                 <a th:if="${d.signed}"
                    th:href="@{'/documents/' + ${d.id} + '/visualization'}"
                    target="_blank" title="Визуализация подписи (PDF)">📄</a>
+                <span th:unless="${d.signed}" class="spacer"></span>
                 <a th:if="${d.signed}"
                    th:href="@{'/documents/' + ${d.id} + '/signing-certificate'}"
                    title="Справка о подписании (PDF)">📋</a>
+                <span th:unless="${d.signed}" class="spacer"></span>
 
                 <!-- Загрузить .sig -->
                 <form th:action="@{'/documents/' + ${d.id} + '/upload-signature'}"
                       method="post" enctype="multipart/form-data"
                       style="display:inline; margin:0; padding:0;">
-                    <label title="Загрузить .sig из файла"
-                           style="display:inline-flex; align-items:center; justify-content:center;
-                                  width:28px; height:28px; border-radius:6px; cursor:pointer;
-                                  color:#2454ff; font-size:16px;"
-                           onmouseover="this.style.background='#efe4d2'"
-                           onmouseout="this.style.background=''">
+                    <label title="Загрузить .sig из файла">
                         📎
-                        <input type="file" name="file" accept=".sig,.p7s,.der" required
+                        <input type="file" name="file" accept=".sig,.p7s,.der" required data-no-drop="1"
                                onchange="this.form.submit()"
                                style="display:none;"/>
                     </label>
@@ -151,14 +148,14 @@
                 <button th:if="${not d.hasSignatureByUser(user.id)}" type="button"
                         class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
                 <span th:if="${d.hasSignatureByUser(user.id)}"
-                      class="badge ok" title="Вы уже подписали этот документ"
-                      style="padding:4px 8px;">✓ Вы подписали</span>
+                      class="badge ok" title="Вы уже подписали этот документ">✓</span>
 
                 <form th:unless="${d.signed}" method="post"
                       th:action="@{'/documents/' + ${d.id} + '/delete'}"
                       onsubmit="return confirm('Удалить документ?')" style="display:inline">
-                    <button type="submit" class="link danger" title="Удалить">🗑</button>
+                    <button type="submit" class="danger" title="Удалить">🗑</button>
                 </form>
+                <span th:if="${d.signed}" class="spacer"></span>
             </div>
         </div>
 

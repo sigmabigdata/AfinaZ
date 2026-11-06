@@ -55,16 +55,20 @@ public class SearchController {
         int safeLimit = Math.min(Math.max(limit, 1), 30);
 
         User me = userRepository.findByEmailHash(pii.hash(p.getUsername())).orElse(null);
-        if (me == null) return ResponseEntity.status(403).build();
+        if (me == null) {
+            log.warn("Search: user not found for '{}' (hash {})",
+                    p.getUsername(), pii.hash(p.getUsername()));
+            return ResponseEntity.status(403).build();
+        }
         boolean isAdmin = me.getRole() == ru.example.ukep.entity.Role.ROLE_ADMIN;
 
         // Если запрос пустой — возвращаем только статические секции
         if (query.isEmpty()) {
-            return ResponseEntity.ok(Map.of(
-                    "pages", staticPages(isAdmin),
-                    "actions", staticActions(isAdmin),
-                    "users", List.of(),
-                    "documents", List.of()
+            return ResponseEntity.ok(safeMap(
+                    staticPages(isAdmin),
+                    staticActions(isAdmin),
+                    List.of(),
+                    List.of()
             ));
         }
 
@@ -136,12 +140,7 @@ public class SearchController {
             log.debug("search documents failed: {}", e.getMessage());
         }
 
-        return ResponseEntity.ok(Map.of(
-                "pages", pages,
-                "actions", actions,
-                "users", users,
-                "documents", documents
-        ));
+        return ResponseEntity.ok(safeMap(pages, actions, users, documents));
     }
 
     private static boolean matches(String label, String q) {
@@ -200,6 +199,20 @@ public class SearchController {
         m.put("label", label);
         m.put("icon", icon);
         m.put("url", url);
+        return m;
+    }
+
+    /** Безопасный Map, принимает null (в отличие от Map.of). */
+    private static java.util.Map<String, Object> safeMap(
+            java.util.List<?> pages,
+            java.util.List<?> actions,
+            java.util.List<?> users,
+            java.util.List<?> documents) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("pages", pages == null ? List.of() : pages);
+        m.put("actions", actions == null ? List.of() : actions);
+        m.put("users", users == null ? List.of() : users);
+        m.put("documents", documents == null ? List.of() : documents);
         return m;
     }
 }

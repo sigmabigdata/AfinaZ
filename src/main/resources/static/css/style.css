@@ -2455,3 +2455,59 @@ table.docs tr:hover td { background: #fafbff; }
     padding-top: 14px;
     border-top: 1px solid var(--border-color, #eef1f6);
 }
+
+
+/* ============================================================
+   Равномерное распределение значков в карточке документа
+   ============================================================ */
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 32px);
+    gap: 4px;
+    align-items: center;
+    justify-content: end;
+}
+.actions-grid a,
+.actions-grid button,
+.actions-grid label,
+.actions-grid form {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    border-radius: 6px;
+    border: none;
+    background: none;
+    color: #2454ff;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.15s;
+}
+.actions-grid a:hover,
+.actions-grid button:hover,
+.actions-grid label:hover {
+    background: #efe4d2;
+    text-decoration: none;
+}
+.actions-grid .danger { color: #a82323; }
+.actions-grid .danger:hover { background: #fdeaea; }
+.actions-grid .badge {
+    grid-column: span 2;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+.actions-grid .spacer {
+    width: 32px;
+    height: 32px;
+    visibility: hidden;
+    pointer-events: none;
+}
