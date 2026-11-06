@@ -98,21 +98,9 @@
             </div>
             <div class="folder-actions">
                 <button type="button" class="btn-sign-all-section"
-                        th:attr="data-folder-id=${f.id},data-unsigned=${unsigned}"
-                        th:classappend="${unsigned == 0} ? 'btn-sign-all-empty' : ''"
-                        th:disabled="${unsigned == 0}"
-                        th:title="${unsigned > 0}
-                            ? 'Подписать все неподписанные документы в этом разделе'
-                            : 'В этом разделе все документы уже подписаны'"
-                        style="border:none; padding:6px 14px;
-                               border-radius:8px; font-size:13px; white-space:nowrap;
-                               cursor: pointer; color:#fff;"
-                        th:styleappend="${unsigned == 0}
-                            ? 'background: #e5d9c5; color: #8a7259; cursor: default;'
-                            : 'background: linear-gradient(135deg,#2454ff,#7a3fff);'">
-                    <span th:if="${unsigned > 0}">✍ Подписать всё (
-                        <span th:text="${unsigned}">0</span>)</span>
-                    <span th:if="${unsigned == 0}">✓ Всё подписано</span>
+                        th:attr="data-folder-id=${f.id}"
+                        title="Подписать все неподписанные документы в этом разделе">
+                    ✍ Подписать всё
                 </button>
                 <form method="post" th:action="@{'/folders/' + ${f.id} + '/delete'}"
                       onsubmit="return confirm('Удалить раздел и все его документы?');"
@@ -262,15 +250,29 @@
         // Кнопки "Подписать всё" в каждом разделе
         document.querySelectorAll('.btn-sign-all-section').forEach(function (b) {
             b.addEventListener('click', function () {
-                var count = parseInt(b.dataset.unsigned || '0', 10);
-                if (count === 0) return;  // всё подписано — кнопка disabled
                 var folderId = b.dataset.folderId;
+                if (!folderId) {
+                    alert('Раздел не найден');
+                    return;
+                }
+                // Считаем неподписанные документы через DOM внутри этого раздела
+                var card = document.querySelector('.folder-card[data-folder-id="' + folderId + '"]');
+                if (!card) {
+                    alert('Раздел не найден на странице');
+                    return;
+                }
+                var unsignedCount = card.querySelectorAll('.doc-checkbox').length;
+                if (unsignedCount === 0) {
+                    alert('В этом разделе все документы уже подписаны');
+                    return;
+                }
                 if (window.BatchSign && window.BatchSign.signAllInSection) {
                     window.BatchSign.signAllInSection(folderId);
                 } else {
                     alert('Batch-подписание недоступно. Обновите страницу.');
                 }
             });
+        });
         });
     });
 </script>

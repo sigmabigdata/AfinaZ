@@ -2867,3 +2867,35 @@ table.docs td.actions {
 .gos-details > *:not(summary) {
     padding: 16px 18px;
 }
+
+
+/* Кнопка "Подписать всё" в разделе */
+.folder-actions .btn-sign-all-section {
+    background: linear-gradient(135deg, #2454ff, #7a3fff);
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.15s, transform 0.1s;
+    font-family: inherit;
+}
+.folder-actions .btn-sign-all-section:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+.folder-actions .btn-sign-all-section:active {
+    transform: translateY(0);
+}
+.folder-actions .btn-sign-all-section:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #cbd5e1;
+    transform: none;
+}
