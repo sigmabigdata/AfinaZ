@@ -21,9 +21,12 @@ public class CrlController {
     private static final Logger log = LoggerFactory.getLogger(CrlController.class);
 
     private final CrlService crlService;
+    private final ru.example.ukep.service.CrlOnDemandService crlOnDemandService;
 
-    public CrlController(CrlService crlService) {
+    public CrlController(CrlService crlService,
+                         ru.example.ukep.service.CrlOnDemandService crlOnDemandService) {
         this.crlService = crlService;
+        this.crlOnDemandService = crlOnDemandService;
     }
 
     @GetMapping
@@ -84,6 +87,28 @@ public class CrlController {
     public RedirectView deleteAllAuto(RedirectAttributes ra) {
         int n = crlService.deleteAllAuto();
         ra.addFlashAttribute("ok", "Удалено auto-*.crl: " + n);
+        return new RedirectView(REDIR_CRL);
+    }
+
+    /**
+     * Force-refresh: скачать свежие CRL для всех подписей в БД,
+     * удалить осиротевшие auto-*.crl.
+     */
+    @PostMapping("/refresh-all")
+    public RedirectView refreshAll(java.security.Principal auth, RedirectAttributes ra) {
+        try {
+            var result = crlOnDemandService.refreshAll(
+                    auth != null ? auth.getName() : "admin");
+            ra.addFlashAttribute("ok", String.format(
+                    "Обновлено: скачано %d CRL, удалено осиротевших %d. "
+                    + "Сертификатов: %d из %d подписей (ошибок парсинга: %d).",
+                    result.crlDownloaded(), result.crlDeleted(),
+                    result.uniqueCerts(), result.totalSignatures(),
+                    result.parseErrors()));
+        } catch (Exception e) {
+            log.error("refresh-all failed", e);
+            ra.addFlashAttribute("err", "Ошибка обновления: " + e.getMessage());
+        }
         return new RedirectView(REDIR_CRL);
     }
 }

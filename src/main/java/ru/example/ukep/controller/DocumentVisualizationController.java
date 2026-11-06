@@ -35,6 +35,8 @@ public class DocumentVisualizationController {
     private final ru.example.ukep.service.SignatureVerifier signatureVerifier;
     private final ru.example.ukep.service.PowerOfAttorneyService poaService;
     private final ru.example.ukep.repository.DocumentSignatureRepository signatureRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ru.example.ukep.service.CrlOnDemandService crlOnDemandService;
     private final ru.example.ukep.service.SigningCertificateService certificateService;
 
     public DocumentVisualizationController(DocumentRepository documentRepository,
@@ -151,6 +153,18 @@ public class DocumentVisualizationController {
                     principal != null ? principal.getName() : "unknown",
                     "DOCUMENT", String.valueOf(id), subject,
                     "chain-not-verified (END_ENTITY_ONLY .sig)");
+
+            // Скачать CRL для сертификатов этой подписи
+            try {
+                int crlCount = crlOnDemandService.ensureForSignature(
+                        sigBase64, id,
+                        principal != null ? principal.getName() : "admin");
+                if (crlCount > 0) {
+                    log.info("CRL downloaded from admin .sig: {} for doc {}", crlCount, id);
+                }
+            } catch (Exception crlEx) {
+                log.warn("CRL download failed after admin .sig upload: {}", crlEx.getMessage());
+            }
 
             // Пересоздать визуализацию
             try {

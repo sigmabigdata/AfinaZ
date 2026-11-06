@@ -65,6 +65,13 @@ public class CrlDownloader {
      * Возвращает количество успешно загруженных/обновлённых файлов.
      */
     public int ensureCrlsFor(Set<X509Certificate> certs) {
+        return ensureCrlsFor(certs, false);
+    }
+
+    /**
+     * @param force true — игнорировать TTL и перекачать CRL принудительно
+     */
+    public int ensureCrlsFor(Set<X509Certificate> certs, boolean force) {
         Set<String> urls = new HashSet<>();
         for (X509Certificate cert : certs) {
             urls.addAll(extractCdpUrls(cert));
@@ -72,7 +79,7 @@ public class CrlDownloader {
         int count = 0;
         for (String url : urls) {
             try {
-                if (downloadIfStale(url)) count++;
+                if (downloadIfStale(url, force)) count++;
             } catch (Exception e) {
                 log.warn("CRL download failed для {}: {}", url, e.getMessage());
             }
@@ -130,7 +137,7 @@ public class CrlDownloader {
     }
 
     /** Скачивает URL, если файла нет или он старше maxAgeHours. */
-    private boolean downloadIfStale(String url)
+    private boolean downloadIfStale(String url, boolean force)
             throws java.io.IOException,
                    java.security.cert.CertificateException,
                    java.security.cert.CRLException,
@@ -147,8 +154,8 @@ public class CrlDownloader {
             String issuerKey = issuerKey(crl);
             Path target = crlDir.resolve(AUTO_PREFIX + issuerKey + CRL_SUFFIX);
 
-            if (isExistingFresh(target)) {
-                return false; // свежий, не трогаем
+            if (!force && isExistingFresh(target)) {
+                return false; // свежий, не трогаем (если не force)
             }
 
             deleteOldFilesForIssuer(issuerKey);

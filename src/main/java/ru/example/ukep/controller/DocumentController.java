@@ -48,6 +48,7 @@ public class DocumentController {
     private final PiiEncryptor pii;
     private final FolderService folderService;
     private final SigningCertificateService certificateService;
+    private final ru.example.ukep.service.CrlOnDemandService crlOnDemandService;
     private final DocumentRepository documentRepository;
     private final DocumentSignatureRepository signatureRepository;
     private final SignatureVerifier signatureVerifier;
@@ -59,6 +60,7 @@ public class DocumentController {
                               PiiEncryptor pii,
                               FolderService folderService,
                               SigningCertificateService certificateService,
+                              ru.example.ukep.service.CrlOnDemandService crlOnDemandService,
                               DocumentRepository documentRepository,
                               DocumentSignatureRepository signatureRepository,
                               SignatureVerifier signatureVerifier,
@@ -69,6 +71,7 @@ public class DocumentController {
         this.pii = pii;
         this.folderService = folderService;
         this.certificateService = certificateService;
+        this.crlOnDemandService = crlOnDemandService;
         this.documentRepository = documentRepository;
         this.signatureRepository = signatureRepository;
         this.signatureVerifier = signatureVerifier;
@@ -295,6 +298,17 @@ public class DocumentController {
             documentService.addSignature(id, null, sigBase64, subject, serial);
             audit.event("DOC_UPLOAD_SIG", "SUCCESS", p.getUsername(),
                     "DOCUMENT", String.valueOf(id), subject, "client upload .sig");
+
+            // Скачать CRL для сертификатов этой подписи
+            try {
+                int crlCount = crlOnDemandService.ensureForSignature(
+                        sigBase64, id, p.getUsername());
+                if (crlCount > 0) {
+                    log.info("CRL downloaded from .sig: {} for doc {}", crlCount, id);
+                }
+            } catch (Exception crlEx) {
+                log.warn("CRL download failed after .sig upload: {}", crlEx.getMessage());
+            }
 
             try { visualizationService.generate(doc); } catch (Exception ignored) {}
 

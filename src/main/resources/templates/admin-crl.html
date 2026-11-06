@@ -39,10 +39,13 @@
     <div class="alert info">
         <b>Автоматическая загрузка:</b> фоновый сервис каждые 6 часов
         обновляет CRL по CDP-URL из сертификатов подписантов.
+        При загрузке <code>.sig</code> через карточку клиента CRL
+        скачиваются сразу для сертификатов этой подписи.
         Файлы кладутся в <code th:text="${crlsDir}">/app/crls</code>,
         дедуплицируются по издателю (issuer).
-        Файлы <code>auto-*.crl</code> — автоматические,
-        остальные — загружены вручную.
+        Кнопка <b>«Обновить все CRL»</b> принудительно перекачивает
+        все CRL (игнорируя TTL) и <b>удаляет осиротевшие</b> —
+        для которых больше нет подписей.
     </div>
 
     <section class="panel">
@@ -53,8 +56,15 @@
                 · <span th:text="${totalCount}">0</span> файлов
             </div>
             <div style="display:flex; gap:10px;">
+                <form method="post" th:action="@{/admin/crl/refresh-all}" style="display:inline"
+                      onsubmit="return confirm('Скачать свежие CRL для всех подписей и удалить устаревшие? Может занять 1-2 минуты.');">
+                    <button type="submit" class="btn"
+                            style="background:linear-gradient(135deg,#2454ff,#7a3fff); border:none; color:#fff;">
+                        🔄 Обновить все CRL
+                    </button>
+                </form>
                 <form method="post" th:action="@{/admin/crl/delete-all-auto}" style="display:inline"
-                      onsubmit="return confirm('Удалить все auto-*.crl? Они перекачаются автоматически в течение 6 часов.');">
+                      onsubmit="return confirm('Удалить все auto-*.crl? Они перекачаются при следующей загрузке .sig или по кнопке «Обновить все CRL».');">
                     <button type="submit" class="btn-danger">🗑 Удалить все auto-*.crl</button>
                 </form>
             </div>
