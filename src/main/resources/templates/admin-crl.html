@@ -93,6 +93,38 @@
         </p>
     </section>
 
+    <!-- Загрузка .sig файлов для скачивания CRL -->
+    <section class="panel" style="border: 2px solid #2454ff; background: #f8faff;">
+        <h2 style="color: #2454ff;">📥 Загрузить .sig — скачать CRL</h2>
+        <p class="muted small" style="margin-top:0;">
+            Выберите один или несколько файлов <code>.sig</code> / <code>.p7s</code> / <code>.der</code>.
+            Сервер распарсит их через BouncyCastle (поддерживает ГОСТ) и скачает CRL
+            для всех сертификатов, найденных в подписях.
+            <b>Не использует openssl — работает с ГОСТ 2012.</b>
+        </p>
+        <form method="post" th:action="@{/admin/crl/upload-sig}"
+              enctype="multipart/form-data"
+              style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <input type="file" name="files" accept=".sig,.p7s,.der" multiple required
+                   style="padding:8px; border:1px solid #cfd6e4; border-radius:8px;"/>
+            <button type="submit"
+                    style="background:linear-gradient(135deg,#2454ff,#7a3fff); border:none;
+                           color:#fff; padding:10px 20px; border-radius:8px; cursor:pointer;
+                           font-weight:500;">
+                📥 Загрузить и скачать CRL
+            </button>
+        </form>
+
+        <p class="muted small" style="margin-top:12px;">
+            <b>Альтернатива для серверного батча:</b> положите файлы в
+            <code>/opt/afinaz/sigs/</code> на сервере (папка монтируется в контейнер),
+            затем нажмите
+            <form method="post" th:action="@{/admin/crl/scan-sigs}" style="display:inline; margin:0;">
+                <button type="submit" class="btn-ghost btn-sm">🔍 Сканировать /app/sigs</button>
+            </form>
+        </p>
+    </section>
+
     <section class="panel">
         <h2>Загруженные CRL</h2>
 
