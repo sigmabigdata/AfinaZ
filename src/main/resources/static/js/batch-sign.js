@@ -203,10 +203,12 @@
             alert('Раздел не найден на странице');
             return;
         }
-        // Собираем ID неподписанных документов (data-signed="false")
+        // Ищем ID неподписанных:
+        //  - .doc-card[data-signed="false"] — клиентский дашборд
+        //  - tr[data-signed="false"] — админская таблица
         var ids = [];
-        card.querySelectorAll('.doc-card[data-signed="false"]').forEach(function (dc) {
-            var id = Number(dc.dataset.id);
+        card.querySelectorAll('.doc-card[data-signed="false"], tr[data-signed="false"]').forEach(function (el) {
+            var id = Number(el.dataset.id || el.dataset.docId);
             if (id) ids.push(id);
         });
 
@@ -226,7 +228,6 @@
 
         selected.clear();
         ids.forEach(function (id) { selected.add(id); });
-        // НЕ вызываем updateBar() — плавающая панель не нужна
         signSelected();
     }
 
