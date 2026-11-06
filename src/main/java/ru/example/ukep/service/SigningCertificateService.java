@@ -1,16 +1,11 @@
 package ru.example.ukep.service;
 
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.EncodeHintType;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeWriter;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
-import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +15,6 @@ import ru.example.ukep.entity.Document;
 import ru.example.ukep.entity.DocumentSignature;
 import ru.example.ukep.repository.DocumentRepository;
 
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,9 +48,6 @@ public class SigningCertificateService {
     private static final float[] COLOR_BLACK = {0f, 0f, 0f};
 
     private final DocumentRepository documentRepository;
-
-    @Value("${app.base-url}")
-    private String baseUrl;
 
     public SigningCertificateService(DocumentRepository documentRepository) {
         this.documentRepository = documentRepository;
@@ -113,11 +104,7 @@ public class SigningCertificateService {
                     }
                 }
 
-                // ═══ QR-код публичной верификации ═══
-                if (doc.getPublicUuid() != null && baseUrl != null && !baseUrl.isBlank()) {
-                    y = Math.max(y - 30, MARGIN + 150);
-                    drawQrBlock(cs, pdf, font, doc, left, right, y);
-                }
+
 
                 // ═══ Футер ═══
                 drawFooter(cs, font, left, right);
@@ -215,28 +202,6 @@ public class SigningCertificateService {
         return y - 64;
     }
 
-    private void drawQrBlock(PDPageContentStream cs, PDDocument pdf, PDFont font,
-                              Document doc, float left, float right, float y) throws IOException {
-        String url = baseUrl.replaceAll("/+$", "") + "/verify/" + doc.getPublicUuid();
-        BufferedImage qr = generateQr(url, 200);
-        if (qr == null) return;
-
-        PDImageXObject img = LosslessFactory.createFromImage(pdf, qr);
-        float qrSize = 80f;
-        float qrX = right - qrSize;
-
-        cs.drawImage(img, qrX, y - qrSize, qrSize, qrSize);
-
-        // Подпись рядом
-        cs.setNonStrokingColor(COLOR_GRAY[0], COLOR_GRAY[1], COLOR_GRAY[2]);
-        writeText(cs, font, 9, "Проверить подпись онлайн:", left, y - 20);
-        writeText(cs, font, 8, url, left, y - 34);
-        writeText(cs, font, 8, "Наведите камеру телефона на QR-код",
-                left, y - 48);
-
-        cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
-    }
-
     private void drawFooter(PDPageContentStream cs, PDFont font,
                              float left, float right) throws IOException {
         cs.setNonStrokingColor(COLOR_GRAY[0], COLOR_GRAY[1], COLOR_GRAY[2]);
@@ -255,23 +220,6 @@ public class SigningCertificateService {
         cs.newLineAtOffset(x, y);
         cs.showText(text == null ? "" : text);
         cs.endText();
-    }
-
-    private BufferedImage generateQr(String text, int size) {
-        try {
-            Map<EncodeHintType, Object> hints = new HashMap<>();
-            hints.put(EncodeHintType.MARGIN, 0);
-            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-            BitMatrix m = new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints);
-            BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
-            for (int x = 0; x < size; x++)
-                for (int y = 0; y < size; y++)
-                    img.setRGB(x, y, m.get(x, y) ? 0x000000 : 0xFFFFFF);
-            return img;
-        } catch (Exception e) {
-            log.warn("QR generation failed: {}", e.getMessage());
-            return null;
-        }
     }
 
     /** Все известные пути к TTF-шрифтам с поддержкой кириллицы. */

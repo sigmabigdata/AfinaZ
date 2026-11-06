@@ -188,12 +188,10 @@ public class SearchController {
             list.add(action("Создать клиента", "➕", "/admin/users/new"));
             list.add(action("Создать шаблон", "✨", "/admin/templates/new"));
             list.add(action("Создать бэкап", "💾", "/admin/system"));
-            list.add(action("Проверить подпись (.sig)", "🔍", "/verify"));
             list.add(action("Выйти", "🚪", "/admin/logout"));
         } else {
             list.add(action("Создать раздел", "➕", "/dashboard"));
             list.add(action("Документ из шаблона", "✨", "/dashboard"));
-            list.add(action("Проверить подпись (.sig)", "🔍", "/verify"));
             list.add(action("Выйти", "🚪", "/logout"));
         }
         return list;
