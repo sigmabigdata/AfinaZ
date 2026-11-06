@@ -77,31 +77,38 @@ public class AuthController {
                                HttpServletRequest request,
                                HttpServletResponse response,
                                Model model) {
-        log.info("confirmLogin: token received len={}", token == null ? 0 : token.length());
-        User user = userService.consumeLoginToken(token);
-        if (user == null) {
-            log.warn("confirmLogin: token invalid/expired");
-            audit.loginFail("token:" + (token != null && token.length() > 8
-                    ? token.substring(0, 8) + "..." : "?"), "Недействительный/истёкший токен");
-            model.addAttribute("error", "Ссылка недействительна или истекла");
+        try {
+            log.info("confirmLogin: token received len={}", token == null ? 0 : token.length());
+            User user = userService.consumeLoginToken(token);
+            if (user == null) {
+                log.warn("confirmLogin: token invalid/expired");
+                audit.loginFail("token:" + (token != null && token.length() > 8
+                        ? token.substring(0, 8) + "..." : "?"), "Недействительный/истёкший токен");
+                model.addAttribute("error", "Ссылка недействительна или истекла");
+                return "login";
+            }
+            log.info("confirmLogin: user id={} logged in", user.getId());
+
+            var details = org.springframework.security.core.userdetails.User
+                    .withUsername(user.getEmail())
+                    .password("{noop}magic")
+                    .authorities(List.of(new SimpleGrantedAuthority(user.getRole().name())))
+                    .build();
+
+            var auth = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
+            SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+            ctx.setAuthentication(auth);
+            SecurityContextHolder.setContext(ctx);
+            userContextRepository.saveContext(ctx, request, response);
+            audit.loginSuccess(user.getEmail(), user.getRole().name());
+
+            return REDIR_DASHBOARD;
+        } catch (Exception e) {
+            log.error("confirmLogin failed", e);
+            audit.loginFail("token", "Внутренняя ошибка при входе: " + e.getMessage());
+            model.addAttribute("error", "Не удалось войти. Попробуйте запросить новую ссылку.");
             return "login";
         }
-        log.info("confirmLogin: user {} logged in", user.getEmail());
-
-        var details = org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password("{noop}magic")
-                .authorities(List.of(new SimpleGrantedAuthority(user.getRole().name())))
-                .build();
-
-        var auth = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
-        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
-        ctx.setAuthentication(auth);
-        SecurityContextHolder.setContext(ctx);
-        userContextRepository.saveContext(ctx, request, response);
-        audit.loginSuccess(user.getEmail(), user.getRole().name());
-
-        return REDIR_DASHBOARD;
     }
 
     @PostMapping("/logout")

@@ -1,5 +1,7 @@
 package ru.example.ukep.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -12,12 +14,17 @@ import ru.example.ukep.repository.UserRepository;
 import ru.example.ukep.security.PiiEncryptor;
 import ru.example.ukep.service.FolderService;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
+/**
+ * Клиентский дашборд: плоский список всех документов клиента.
+ * Разделы (папки) в клиентском UI больше не показываются —
+ * документы грузятся в скрытую папку «Без раздела».
+ */
 @Controller
 public class DashboardController {
+
+    private static final Logger log = LoggerFactory.getLogger(DashboardController.class);
 
     private final UserRepository userRepository;
     private final PiiEncryptor pii;
@@ -43,35 +50,32 @@ public class DashboardController {
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
         if (isAdmin) return "redirect:/admin";
 
-        User user = userRepository.findByEmailHash(pii.hash(auth.getName())).orElseThrow();
-
-        // Legacy: документы без раздела → перенести в «Без раздела»
-        folderService.migrateUnfiled(user);
-
-        List<DocumentFolder> folders = folderService.listForOwner(user);
-        Map<Long, List<Document>> byFolder = new LinkedHashMap<>();
-        for (DocumentFolder f : folders) {
-            byFolder.put(f.getId(),
-                    documentRepository.findAllByFolderOrderByUploadedAtDesc(f));
+        // Безопасный поиск: НЕ бросаем NoSuchElementException → не 500
+        String username = auth.getName();
+        User user = userRepository.findByEmailHash(pii.hash(username)).orElse(null);
+        if (user == null) {
+            log.warn("Dashboard: user not found for '{}' (hash {})", username, pii.hash(username));
+            return "redirect:/login?expired";
         }
+
+        // Дефолтная папка (создаётся автоматически, если нет) — нужна для загрузки
+        DocumentFolder defaultFolder;
+        try {
+            defaultFolder = folderService.ensureDefault(user);
+        } catch (Exception e) {
+            log.error("Dashboard: ensureDefault failed for user {}", user.getId(), e);
+            return "redirect:/login?error=internal";
+        }
+
+        // Плоский список всех документов
+        List<Document> documents = documentRepository.findAllByOwnerOrderByUploadedAtDesc(user);
+
+        long totalDocs = documents.size();
+        long signedDocs = documents.stream().filter(Document::isSigned).count();
 
         model.addAttribute("user", user);
-        model.addAttribute("folders", folders);
-        model.addAttribute("documentsByFolder", byFolder);
-
-        // Простой DTO для JS (избегаем сериализации JPA-сущностей с lazy-полями)
-        java.util.List<java.util.Map<String, Object>> folderOptions = new java.util.ArrayList<>();
-        for (DocumentFolder f : folders) {
-            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("id", f.getId());
-            m.put("name", f.getName());
-            folderOptions.add(m);
-        }
-        model.addAttribute("folderOptions", folderOptions);
-
-        // Для онбординга
-        long totalDocs = documentRepository.countByOwner(user);
-        long signedDocs = documentRepository.countByOwnerAndSignedTrue(user);
+        model.addAttribute("documents", documents);
+        model.addAttribute("defaultFolderId", defaultFolder.getId());
         model.addAttribute("allDocsCount", totalDocs);
         model.addAttribute("allSignedCount", signedDocs);
 

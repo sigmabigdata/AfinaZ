@@ -87,6 +87,7 @@ public class SignatureVisualizationService {
     private final DocumentVisualizationRepository visRepo;
     private final DocumentService documentService;
     private final PowerOfAttorneyService poaService;
+    private final SignatureVerifier signatureVerifier;
     private final Path storageRoot;
 
     @org.springframework.beans.factory.annotation.Value("${app.base-url}")
@@ -96,11 +97,13 @@ public class SignatureVisualizationService {
                                          DocumentVisualizationRepository visRepo,
                                          DocumentService documentService,
                                          PowerOfAttorneyService poaService,
+                                         SignatureVerifier signatureVerifier,
                                          @Value("${app.storage-path}") String storagePath) throws IOException {
         this.documentRepository = documentRepository;
         this.visRepo = visRepo;
         this.documentService = documentService;
         this.poaService = poaService;
+        this.signatureVerifier = signatureVerifier;
         this.storageRoot = Paths.get(storagePath).toAbsolutePath().normalize();
         Files.createDirectories(storageRoot.resolve("visualizations"));
     }
@@ -185,6 +188,23 @@ public class SignatureVisualizationService {
             return b.getSignedAt().compareTo(a.getSignedAt());
         });
 
+        // QR рисуем ТОЛЬКО если все подписи прошли полную проверку цепочки.
+        // Если хоть одна не прошла (или CRL недоступен) — не ставим QR вообще.
+        boolean allFullyVerified = !sigs.isEmpty();
+        if (allFullyVerified) {
+            for (var sig : sigs) {
+                try {
+                    signatureVerifier.verifyDetached(original, sig.getSignatureBase64());
+                } catch (Exception verifyEx) {
+                    log.warn("QR NOT drawn: signature {} failed full verification: {}",
+                            sig.getId(), verifyEx.getMessage());
+                    allFullyVerified = false;
+                    break;
+                }
+            }
+        }
+        final boolean drawQr = allFullyVerified;
+
         Map<Long, CertInfo> certInfoMap = new HashMap<>();
         Map<Long, PowerOfAttorney> poaMap = new HashMap<>();
         for (var sig : sigs) {
@@ -215,7 +235,8 @@ public class SignatureVisualizationService {
                     drawFooter(cs, font, logo, pageWidth);
 
                     // 1b. QR-КОД со ссылкой на публичную верификацию (top-right, 26x26)
-                    if (document.getPublicUuid() != null) {
+                    //     Только если все подписи прошли полную проверку (цепочка+CRL)
+                    if (drawQr && document.getPublicUuid() != null) {
                         try {
                             drawQr(cs, pdf, font, document, pageWidth, pageHeight);
                         } catch (Exception qrEx) {

@@ -1,5 +1,7 @@
 package ru.example.ukep.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -7,12 +9,20 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import ru.example.ukep.entity.Document;
 import ru.example.ukep.entity.DocumentSignature;
 import ru.example.ukep.entity.User;
+import ru.example.ukep.repository.DocumentRepository;
+import ru.example.ukep.repository.DocumentSignatureRepository;
 import ru.example.ukep.repository.UserRepository;
 import ru.example.ukep.security.PiiEncryptor;
+import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.DocumentService;
+import ru.example.ukep.service.FolderService;
+import ru.example.ukep.service.SignatureVerifier;
+import ru.example.ukep.service.SignatureVisualizationService;
+import ru.example.ukep.service.SigningCertificateService;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -20,6 +30,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -28,29 +39,50 @@ import java.util.zip.ZipOutputStream;
 @RequestMapping("/documents")
 public class DocumentController {
 
+    private static final Logger log = LoggerFactory.getLogger(DocumentController.class);
     private static final String REDIR_DASHBOARD = "redirect:/dashboard";
     private static final String CONTENT_DISP = "attachment; filename*=UTF-8''";
 
     private final DocumentService documentService;
     private final UserRepository userRepository;
     private final PiiEncryptor pii;
-    private final ru.example.ukep.service.FolderService folderService;
-    private final ru.example.ukep.service.SigningCertificateService certificateService;
+    private final FolderService folderService;
+    private final SigningCertificateService certificateService;
+    private final DocumentRepository documentRepository;
+    private final DocumentSignatureRepository signatureRepository;
+    private final SignatureVerifier signatureVerifier;
+    private final SignatureVisualizationService visualizationService;
+    private final AuditService audit;
 
-    public DocumentController(DocumentService documentService, UserRepository userRepository,
+    public DocumentController(DocumentService documentService,
+                              UserRepository userRepository,
                               PiiEncryptor pii,
-                              ru.example.ukep.service.FolderService folderService,
-                              ru.example.ukep.service.SigningCertificateService certificateService) {
+                              FolderService folderService,
+                              SigningCertificateService certificateService,
+                              DocumentRepository documentRepository,
+                              DocumentSignatureRepository signatureRepository,
+                              SignatureVerifier signatureVerifier,
+                              SignatureVisualizationService visualizationService,
+                              AuditService audit) {
         this.documentService = documentService;
         this.userRepository = userRepository;
         this.pii = pii;
         this.folderService = folderService;
         this.certificateService = certificateService;
+        this.documentRepository = documentRepository;
+        this.signatureRepository = signatureRepository;
+        this.signatureVerifier = signatureVerifier;
+        this.visualizationService = visualizationService;
+        this.audit = audit;
     }
 
     private User current(UserDetails p) {
         return userRepository.findByEmailHash(pii.hash(p.getUsername())).orElseThrow();
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  Загрузка / просмотр / скачивание
+    // ═══════════════════════════════════════════════════════
 
     @PostMapping("/upload")
     public String upload(@RequestParam("file") MultipartFile file,
@@ -107,10 +139,6 @@ public class DocumentController {
                 .body(sigBytes);
     }
 
-    /**
-     * Скачать ZIP: документ + подпись.
-     * Имена уникальны на случай, если расширение документа совпадает.
-     */
     @GetMapping("/{id}/download-signed")
     public ResponseEntity<byte[]> downloadSignedZip(@PathVariable Long id,
                                                     @AuthenticationPrincipal UserDetails p) throws IOException {
@@ -154,46 +182,10 @@ public class DocumentController {
         return REDIR_DASHBOARD;
     }
 
-    /** Справка о подписании (PDF). */
-    @GetMapping("/{id}/signing-certificate")
-    public ResponseEntity<byte[]> signingCertificate(@PathVariable Long id,
-                                                     @AuthenticationPrincipal UserDetails p)
-            throws IOException {
-        Document doc = documentService.getOwned(id, current(p));
-        try {
-            byte[] pdf = certificateService.generate(id);
-            String fileName = "СПРАВКА_" + stripExtension(doc.getOriginalName()) + ".pdf";
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_PDF)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
-                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
-                    .body(pdf);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
+    // ═══════════════════════════════════════════════════════
+    //  Подписи — скачивание/удаление
+    // ═══════════════════════════════════════════════════════
 
-    private static String stripExtension(String name) {
-        if (name == null) return "file";
-        int dot = name.lastIndexOf('.');
-        return dot > 0 ? name.substring(0, dot) : name;
-    }
-
-    private static String uniqueEntryName(String desired, Set<String> used) {
-        if (used.add(desired)) return desired;
-        int dot = desired.lastIndexOf('.');
-        String base = dot > 0 ? desired.substring(0, dot) : desired;
-        String ext = dot > 0 ? desired.substring(dot) : "";
-        int i = 1;
-        String candidate;
-        do {
-            candidate = base + "_" + i + ext;
-            i++;
-        } while (!used.add(candidate));
-        return candidate;
-    }
-
-    /** Скачать конкретную подпись. */
     @GetMapping("/{id}/signatures/{sigId}/download")
     public ResponseEntity<byte[]> downloadSignature(@PathVariable Long id,
                                                     @PathVariable Long sigId,
@@ -213,7 +205,6 @@ public class DocumentController {
                 .body(bytes);
     }
 
-    /** Удалить подпись (если она своя). */
     @PostMapping("/{id}/signatures/{sigId}/delete")
     public String deleteSignature(@PathVariable Long id,
                                   @PathVariable Long sigId,
@@ -225,5 +216,173 @@ public class DocumentController {
         }
         documentService.deleteSignature(sigId);
         return REDIR_DASHBOARD;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Клиент: визуализация
+    // ═══════════════════════════════════════════════════════
+
+    /** Скачать PDF-визуализацию подписи (штампы). */
+    @GetMapping("/{id}/visualization")
+    public Object visualization(@PathVariable Long id,
+                                 @RequestParam(defaultValue = "false") boolean regen,
+                                 @AuthenticationPrincipal UserDetails p) {
+        Document doc = documentService.getOwned(id, current(p));
+        try {
+            var vis = visualizationService.findFor(doc);
+            byte[] bytes;
+            if (vis.isPresent() && !regen) {
+                bytes = visualizationService.loadBytes(vis.get());
+            } else {
+                var generated = visualizationService.generate(doc);
+                bytes = visualizationService.loadBytes(generated);
+                audit.event("VISUALIZATION_GENERATE", "SUCCESS",
+                        p.getUsername(), "DOCUMENT", String.valueOf(id), null, "client");
+            }
+            String fileName = "ВИЗУАЛИЗАЦИЯ_"
+                    + stripExtension(doc.getOriginalName()) + ".pdf";
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
+                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                    .body(bytes);
+        } catch (IllegalStateException e) {
+            String msg = e.getMessage() == null ? "Ошибка" : e.getMessage();
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", msg));
+        } catch (Exception e) {
+            log.error("visualization failed for doc {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /** Пересоздать визуализацию. */
+    @PostMapping("/{id}/visualization/regenerate")
+    public String regenerateVisualization(@PathVariable Long id,
+                                           @AuthenticationPrincipal UserDetails p,
+                                           RedirectAttributes ra) {
+        Document doc = documentService.getOwned(id, current(p));
+        try {
+            var vis = visualizationService.generate(doc);
+            ra.addFlashAttribute("ok", "Визуализация обновлена (v" + vis.getVersion() + ")");
+        } catch (Exception e) {
+            ra.addFlashAttribute("err", "Ошибка: " + e.getMessage());
+        }
+        return REDIR_DASHBOARD;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Клиент: загрузка .sig и доверенность
+    // ═══════════════════════════════════════════════════════
+
+    /** Загрузить .sig из файла (клиент). */
+    @PostMapping("/{id}/upload-signature")
+    public String uploadSignature(@PathVariable Long id,
+                                   @RequestParam("file") MultipartFile file,
+                                   @AuthenticationPrincipal UserDetails p,
+                                   RedirectAttributes ra) {
+        Document doc = documentService.getOwned(id, current(p));
+        try {
+            if (file.isEmpty()) throw new IllegalArgumentException("Файл пустой");
+            byte[] sigBytes = file.getBytes();
+            String sigBase64 = Base64.getEncoder().encodeToString(sigBytes);
+
+            var result = signatureVerifier.verifyDetachedBasic(
+                    documentService.getBytes(doc), sigBase64);
+            String subject = String.valueOf(result.getOrDefault("signerSubject", "—"));
+            String serial = String.valueOf(result.getOrDefault("signerSerial", "—"));
+
+            documentService.addSignature(id, null, sigBase64, subject, serial);
+            audit.event("DOC_UPLOAD_SIG", "SUCCESS", p.getUsername(),
+                    "DOCUMENT", String.valueOf(id), subject, "client upload .sig");
+
+            try { visualizationService.generate(doc); } catch (Exception ignored) {}
+
+            ra.addFlashAttribute("ok", "Подпись добавлена. Подписант: " + subject);
+        } catch (IllegalArgumentException e) {
+            ra.addFlashAttribute("err", "Подпись не принята: " + e.getMessage());
+        } catch (Exception e) {
+            log.warn("upload-signature failed for doc {}: {}", id, e.getMessage());
+            ra.addFlashAttribute("err", "Ошибка загрузки .sig: " + e.getMessage());
+        }
+        return REDIR_DASHBOARD;
+    }
+
+    /** Применить/отключить доверенность к конкретной подписи (клиент). */
+    @PostMapping("/{id}/signatures/{sigId}/apply-poa")
+    @org.springframework.transaction.annotation.Transactional
+    public String applyPoaSignature(@PathVariable Long id,
+                                     @PathVariable Long sigId,
+                                     @RequestParam boolean apply,
+                                     @AuthenticationPrincipal UserDetails p,
+                                     RedirectAttributes ra) {
+        Document doc = documentService.getOwned(id, current(p));
+        var sigOpt = doc.getSignatures().stream()
+                .filter(s -> s.getId().equals(sigId)).findFirst();
+        if (sigOpt.isEmpty()) {
+            ra.addFlashAttribute("err", "Подпись не относится к документу");
+            return REDIR_DASHBOARD;
+        }
+        try {
+            signatureRepository.updateApplyPoa(sigId, apply);
+            audit.event("SIG_APPLY_POA", "SUCCESS", p.getUsername(),
+                    "SIGNATURE", String.valueOf(sigId), null,
+                    apply ? "Доверенность применена (client)" : "Доверенность отключена (client)");
+            try {
+                Document fresh = documentRepository.findByIdWithSignatures(id).orElseThrow();
+                visualizationService.generate(fresh);
+            } catch (Exception ignored) {}
+            ra.addFlashAttribute("ok", apply ? "Доверенность применена" : "Доверенность отключена");
+        } catch (Exception e) {
+            ra.addFlashAttribute("err", e.getMessage());
+        }
+        return REDIR_DASHBOARD;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Справка о подписании (PDF)
+    // ═══════════════════════════════════════════════════════
+
+    @GetMapping("/{id}/signing-certificate")
+    public ResponseEntity<byte[]> signingCertificate(@PathVariable Long id,
+                                                     @AuthenticationPrincipal UserDetails p)
+            throws IOException {
+        Document doc = documentService.getOwned(id, current(p));
+        try {
+            byte[] pdf = certificateService.generate(id);
+            String fileName = "СПРАВКА_" + stripExtension(doc.getOriginalName()) + ".pdf";
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISP +
+                            URLEncoder.encode(fileName, StandardCharsets.UTF_8))
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("signing-certificate failed for doc {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  Утилиты
+    // ═══════════════════════════════════════════════════════
+
+    private static String stripExtension(String name) {
+        if (name == null) return "file";
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    private static String uniqueEntryName(String desired, Set<String> used) {
+        if (used.add(desired)) return desired;
+        int dot = desired.lastIndexOf('.');
+        String base = dot > 0 ? desired.substring(0, dot) : desired;
+        String ext = dot > 0 ? desired.substring(dot) : "";
+        int i = 1;
+        String candidate;
+        do {
+            candidate = base + "_" + i + ext;
+            i++;
+        } while (!used.add(candidate));
+        return candidate;
     }
 }
