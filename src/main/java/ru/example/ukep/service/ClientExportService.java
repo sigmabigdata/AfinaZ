@@ -167,8 +167,8 @@ public class ClientExportService {
                   audit.csv             — события аудита (CSV, UTF-8)
                 
                 Все подписи — CAdES-BES (ГОСТ). Проверить можно:
-                  1) На странице https://afinasystems.ru/verify
-                  2) Или через КриптоПро CADESCOM
+                  1) Через КриптоПро CADESCOM
+                  2) Или любым ГОСТ-совместимым криптопровайдером
                 
                 Сгенерировано: %s
                 """.formatted(
