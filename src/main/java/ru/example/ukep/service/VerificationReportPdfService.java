@@ -30,7 +30,7 @@ public class VerificationReportPdfService {
 
     private static final Logger log = LoggerFactory.getLogger(VerificationReportPdfService.class);
     private static final float MARGIN = 40f;
-    private static final float LINE = 14f;
+    private static final float LINE = 18f;
     private static final float[] COLOR_BLUE = {0.0f, 0.20f, 0.60f};
     private static final float[] COLOR_OK = {0.09f, 0.50f, 0.22f};
     private static final float[] COLOR_ERR = {0.66f, 0.14f, 0.14f};
@@ -211,11 +211,54 @@ public class VerificationReportPdfService {
 
     private float kv(PDPageContentStream cs, PDFont font, String key, String value,
                       float left, float right, float y) throws IOException {
+        float fontSize = 9f;
+        String keyText = key + ":";
+        // Измеряем ширину ключа в пикселях
+        float keyWidth = 0f;
+        try {
+            keyWidth = font.getStringWidth(keyText) / 1000f * fontSize;
+        } catch (Exception ignored) {
+            keyWidth = 120f;  // fallback
+        }
+        keyWidth += 10f;  // зазор между ключом и значением
+
+        // Ключ
         cs.setNonStrokingColor(COLOR_GRAY[0], COLOR_GRAY[1], COLOR_GRAY[2]);
-        writeText(cs, font, 9, key + ":", left, y);
+        writeText(cs, font, fontSize, keyText, left, y);
+
+        // Значение — обрезаем по фактической ширине
         cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
-        writeText(cs, font, 9, truncate(value, 95), left + 100, y);
+        float availWidth = right - (left + keyWidth);
+        String safeValue = fitText(font, value == null ? "—" : value, fontSize, availWidth);
+        writeText(cs, font, fontSize, safeValue, left + keyWidth, y);
+
         return y - LINE;
+    }
+
+    /**
+     * Обрезает текст по фактической ширине в пикселях (с многоточием).
+     */
+    private static String fitText(PDFont font, String text, float fontSize, float maxWidth) {
+        if (text == null || text.isEmpty()) return "";
+        try {
+            float fullWidth = font.getStringWidth(text) / 1000f * fontSize;
+            if (fullWidth <= maxWidth) return text;
+
+            String ellipsis = "...";
+            float ellipsisWidth = font.getStringWidth(ellipsis) / 1000f * fontSize;
+
+            String trimmed = text;
+            int safety = 0;
+            while (trimmed.length() > 0 && safety < 1000) {
+                safety++;
+                trimmed = trimmed.substring(0, trimmed.length() - 1);
+                float w = font.getStringWidth(trimmed) / 1000f * fontSize + ellipsisWidth;
+                if (w <= maxWidth) return trimmed + ellipsis;
+            }
+            return ellipsis;
+        } catch (Exception e) {
+            return text.length() > 60 ? text.substring(0, 57) + "..." : text;
+        }
     }
 
     private static void writeText(PDPageContentStream cs, PDFont font, float size,
