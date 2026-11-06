@@ -51,7 +51,6 @@ public class VerificationReportPdfService {
             PDRectangle size = PDRectangle.A4;
             PDPage page = new PDPage(size);
             pdf.addPage(page);
-
             PDFont font = loadFont(pdf);
 
             try (PDPageContentStream cs = new PDPageContentStream(pdf, page)) {
@@ -60,51 +59,95 @@ public class VerificationReportPdfService {
                 float y = size.getHeight() - MARGIN;
 
                 // ─── Заголовок ───
-                cs.setNonStrokingColor(COLOR_BLUE[0], COLOR_BLUE[1], COLOR_BLUE[2]);
-                cs.addRect(left, y - 4, right - left, 2);
-                cs.fill();
-                y -= 22;
-
-                writeText(cs, font, 16, "ОТЧЁТ О ПРОВЕРКЕ ЭЛЕКТРОННОЙ ПОДПИСИ", left, y);
+                writeText(cs, font, 14, "ОТЧЁТ О ПРОВЕРКЕ КВАЛИФИЦИРОВАННОЙ", left, y);
                 y -= 18;
-                cs.setNonStrokingColor(COLOR_GRAY[0], COLOR_GRAY[1], COLOR_GRAY[2]);
-                writeText(cs, font, 9, "ПАО «НБД-Банк» · Сервис проверки УКЭП", left, y);
-                writeText(cs, font, 9,
-                        "Сформирован: " + TS.format(java.time.Instant.now()),
-                        left, y - 12);
-                y -= 30;
+                writeText(cs, font, 14, "ЭЛЕКТРОННОЙ ПОДПИСИ", left, y);
+                y -= 22;
+                cs.setStrokingColor(0.85f, 0.88f, 0.92f);
+                cs.setLineWidth(1f);
+                cs.moveTo(left, y);
+                cs.lineTo(right, y);
+                cs.stroke();
+                y -= 20;
 
-                // ─── Результат ───
+                // ─── Статус ───
                 boolean valid = Boolean.TRUE.equals(result.get("valid"));
                 float[] color = valid ? COLOR_OK : COLOR_ERR;
                 cs.setNonStrokingColor(color[0], color[1], color[2]);
-                cs.addRect(left, y - 44, right - left, 44);
+                cs.addRect(left, y - 56, right - left, 56);
                 cs.fill();
 
                 cs.setNonStrokingColor(1, 1, 1);
-                writeText(cs, font, 13,
-                        valid ? "✓  ПОДПИСЬ ДЕЙСТВИТЕЛЬНА"
-                              : "✗  ПОДПИСЬ НЕДЕЙСТВИТЕЛЬНА",
-                        left + 14, y - 18);
-                writeText(cs, font, 9,
-                        valid ? "Все проверки пройдены успешно"
-                              : "Обнаружены проблемы — см. список ниже",
-                        left + 14, y - 34);
-                y -= 60;
+                writeText(cs, font, 10, "ПОДПИСЬ", left + 14, y - 18);
+                writeText(cs, font, 18,
+                        valid ? "ДЕЙСТВИТЕЛЬНА" : "НЕДЕЙСТВИТЕЛЬНА",
+                        left + 14, y - 40);
+                y -= 72;
                 cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);
 
-                // ─── Документ ───
-                y = section(cs, font, "Документ", left, right, y);
-                y = kv(cs, font, "Название", safe(documentName), left, right, y);
-                y = kv(cs, font, "Размер", formatSize(documentSize), left, right, y);
-                if (documentSha256 != null && !documentSha256.isBlank()) {
-                    y = kv(cs, font, "SHA-256", safe(documentSha256), left, right, y);
-                }
-                y -= 8;
+                // ─── Подпись 1 ───
+                writeText(cs, font, 11, "Подпись 1", left, y);
+                y -= 4;
+                cs.setStrokingColor(0.85f, 0.88f, 0.92f);
+                cs.moveTo(left, y);
+                cs.lineTo(right, y);
+                cs.stroke();
+                y -= 16;
 
-                // ─── Проверки ───
+                // Статус ЭП
+                y = kv(cs, font, "Статус ЭП", valid ? "Электронная подпись верна" : "Неверна", left, right, y);
+
+                // Статус сертификата
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> checks = (List<Map<String, Object>>) result.get("checks");
+                boolean certValid = false;
+                if (checks != null) {
+                    for (Map<String, Object> chk : checks) {
+                        String n = (String) chk.get("name");
+                        if (n != null && n.contains("Срок действия сертификата")) {
+                            certValid = Boolean.TRUE.equals(chk.get("passed"));
+                        }
+                    }
+                }
+                y = kv(cs, font, "Статус сертификата ЭП", certValid ? "ДЕЙСТВИТЕЛЕН" : "НЕДЕЙСТВИТЕЛЕН",
+                        left, right, y);
+
+                // Владелец
+                y = kv(cs, font, "Владелец сертификата",
+                        truncate(safe((String) result.getOrDefault("signerFullSubject", "—")), 90),
+                        left, right, y);
+
+                // Издатель
+                y = kv(cs, font, "Издатель сертификата",
+                        truncate(safe((String) result.getOrDefault("signerIssuerFull", "—")), 90),
+                        left, right, y);
+
+                // Серийный номер
+                y = kv(cs, font, "Серийный номер",
+                        safe((String) result.getOrDefault("signerSerial", "—")), left, right, y);
+
+                // Отпечаток
+                y = kv(cs, font, "Отпечаток",
+                        safe((String) result.getOrDefault("signerThumbprint", "—")), left, right, y);
+
+                // Действует
+                String nb = formatIso((String) result.get("signerNotBefore"));
+                String na = formatIso((String) result.get("signerNotAfter"));
+                y = kv(cs, font, "Действует", "с " + nb + " по " + na, left, right, y);
+
+                // Дата проверки
+                y = kv(cs, font, "Дата проверки",
+                        TS.format(java.time.Instant.now()), left, right, y);
+
+                // SHA-256 документа
+                if (documentSha256 != null && !documentSha256.isBlank()) {
+                    y = kv(cs, font, "SHA-256 содержимого",
+                            truncate(documentSha256, 80), left, right, y);
+                }
+
+                y -= 10;
+
+                // ─── Все проверки ───
                 int total = checks == null ? 0 : checks.size();
                 int passed = 0;
                 if (checks != null) {
@@ -112,13 +155,12 @@ public class VerificationReportPdfService {
                         if (Boolean.TRUE.equals(chk.get("passed"))) passed++;
                     }
                 }
-                y = section(cs, font,
-                        "Проверки (" + passed + " из " + total + " пройдено)",
+                y = section(cs, font, "Проверки (" + passed + " из " + total + ")",
                         left, right, y);
 
                 if (checks != null) {
                     for (Map<String, Object> chk : checks) {
-                        if (y < MARGIN + 100) break; // защита от переполнения
+                        if (y < MARGIN + 60) break;
                         boolean ok = Boolean.TRUE.equals(chk.get("passed"));
                         float[] c2 = ok ? COLOR_OK : COLOR_ERR;
                         cs.setNonStrokingColor(c2[0], c2[1], c2[2]);
@@ -136,16 +178,6 @@ public class VerificationReportPdfService {
                         }
                     }
                 }
-                y -= 6;
-
-                // ─── Подписант ───
-                y = section(cs, font, "Подписант", left, right, y);
-                y = kv(cs, font, "ФИО / CN", safe((String) result.get("signerSubject")), left, right, y);
-                y = kv(cs, font, "Издатель (УЦ)", safe((String) result.get("signerIssuer")), left, right, y);
-                y = kv(cs, font, "Серийный номер", safe((String) result.get("signerSerial")), left, right, y);
-                String nb = formatIso((String) result.get("signerNotBefore"));
-                String na = formatIso((String) result.get("signerNotAfter"));
-                y = kv(cs, font, "Срок действия", nb + " — " + na, left, right, y);
 
                 // ─── Футер ───
                 cs.setNonStrokingColor(COLOR_GRAY[0], COLOR_GRAY[1], COLOR_GRAY[2]);
@@ -153,8 +185,8 @@ public class VerificationReportPdfService {
                         "Отчёт сформирован автоматически сервисом проверки УКЭП ПАО «НБД-Банк».",
                         left, MARGIN + 16);
                 writeText(cs, font, 7,
-                        "Документ не является юридическим заключением — проверка проведена по "
-                        + "техническим критериям (цепочка, truststore, CRL, EKU).",
+                        "Проверка выполнена по техническим критериям: целостность, "
+                        + "криптоподпись, цепочка, truststore, CRL из CDP, EKU.",
                         left, MARGIN + 6);
             }
 

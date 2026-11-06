@@ -2725,3 +2725,140 @@ table.docs td.actions {
     color: #166534;
     border: 1px solid #bbf7d0;
 }
+
+
+/* ============================================================
+   Отчёт в стиле Госуслуг
+   ============================================================ */
+
+.gos-report {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 32px 40px;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+}
+.gos-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1f2430;
+    margin: 0 0 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #e3e7ee;
+}
+.gos-status {
+    padding: 22px 26px;
+    border-radius: 12px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.gos-status.ok {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 2px solid #10b981;
+}
+.gos-status.err {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    border: 2px solid #ef4444;
+}
+.gos-status-label {
+    font-size: 14px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+.gos-status-value {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+.gos-status.ok .gos-status-value { color: #10b981; }
+.gos-status.err .gos-status-value { color: #ef4444; }
+
+.gos-section {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1f2430;
+    margin: 32px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e3e7ee;
+}
+
+.gos-row {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 20px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+    align-items: start;
+}
+.gos-row:last-child { border-bottom: none; }
+.gos-label {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+}
+.gos-value {
+    font-size: 14px;
+    color: #1f2430;
+    word-break: break-word;
+    line-height: 1.5;
+}
+.gos-value.mono {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    background: #f8fafc;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+.gos-value.ok { color: #10b981; font-weight: 600; }
+.gos-value.err { color: #ef4444; font-weight: 600; }
+
+.gos-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #e3e7ee;
+}
+.gos-download {
+    background: #2454ff;
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+.gos-download:hover { background: #1a3fd6; }
+
+.gos-details {
+    margin-top: 24px;
+    border: 1px solid #e3e7ee;
+    border-radius: 10px;
+    padding: 0;
+}
+.gos-details summary {
+    padding: 14px 18px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: #2454ff;
+    background: #f8fafc;
+    border-radius: 10px;
+    user-select: none;
+}
+.gos-details summary:hover { background: #f1f5f9; }
+.gos-details[open] summary {
+    border-bottom: 1px solid #e3e7ee;
+    border-radius: 10px 10px 0 0;
+}
+.gos-details > *:not(summary) {
+    padding: 16px 18px;
+}

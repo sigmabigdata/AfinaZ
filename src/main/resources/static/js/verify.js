@@ -101,34 +101,98 @@
 
         var html = '';
 
-        // ─── Итоговая карточка ───
-        var cls = valid ? 'ok' : 'err';
-        var icon = valid ? '✓' : '✗';
-        var title = valid ? 'Подпись действительна' : 'Подпись недействительна';
-        var sub = valid
-            ? 'Все проверки пройдены успешно'
-            : (data.error || 'Обнаружены проблемы при проверке');
+        // ─── Итог (как на Госуслугах) ───
+        html += '<div class="gos-report">';
 
-        html += '<div class="verify-summary ' + cls + '">';
-        html += '<div class="verify-summary-icon">' + icon + '</div>';
-        html += '<div class="verify-summary-body">';
-        html += '<h2>' + esc(title) + '</h2>';
-        html += '<p>' + esc(sub) + '</p>';
+        html += '<h1 class="gos-title">Отчёт о проверке '
+            + 'квалифицированной электронной подписи</h1>';
+
+        // Главный статус
+        html += '<div class="gos-status ' + (valid ? 'ok' : 'err') + '">';
+        html += '<div class="gos-status-label">Подпись</div>';
+        html += '<div class="gos-status-value">'
+            + (valid ? 'ДЕЙСТВИТЕЛЬНА' : 'НЕДЕЙСТВИТЕЛЬНА') + '</div>';
         html += '</div>';
-        if (checks.length > 0 && state) {
-            html += '<button type="button" class="verify-download-btn" onclick="__downloadReport()">';
-            html += '📥 Скачать отчёт';
-            html += '</button>';
+
+        // ─── Подпись N ───
+        html += '<h2 class="gos-section">Подпись 1</h2>';
+
+        // Статус ЭП
+        html += '<div class="gos-row">';
+        html += '<div class="gos-label">Статус ЭП</div>';
+        html += '<div class="gos-value ' + (valid ? 'ok' : 'err') + '">';
+        html += valid ? 'Электронная подпись верна' : 'Электронная подпись неверна';
+        html += '</div></div>';
+
+        // Статус сертификата
+        var certCheck = checks.find(function (x) { return x.name.indexOf('Срок действия сертификата') >= 0; });
+        html += '<div class="gos-row">';
+        html += '<div class="gos-label">Статус сертификата ЭП</div>';
+        html += '<div class="gos-value ' + (certCheck && certCheck.passed ? 'ok' : 'err') + '">';
+        html += certCheck && certCheck.passed ? 'ДЕЙСТВИТЕЛЕН' : 'НЕДЕЙСТВИТЕЛЕН';
+        html += '</div></div>';
+
+        // Владелец сертификата
+        if (data.signerFullSubject) {
+            html += '<div class="gos-row">';
+            html += '<div class="gos-label">Владелец сертификата</div>';
+            html += '<div class="gos-value mono">' + esc(data.signerFullSubject) + '</div>';
+            html += '</div>';
         }
+
+        // Издатель
+        if (data.signerIssuerFull) {
+            html += '<div class="gos-row">';
+            html += '<div class="gos-label">Издатель сертификата</div>';
+            html += '<div class="gos-value mono">' + esc(data.signerIssuerFull) + '</div>';
+            html += '</div>';
+        }
+
+        // Серийный номер
+        if (data.signerSerial) {
+            html += '<div class="gos-row">';
+            html += '<div class="gos-label">Серийный номер</div>';
+            html += '<div class="gos-value mono">' + esc(data.signerSerial) + '</div>';
+            html += '</div>';
+        }
+
+        // Отпечаток
+        if (data.signerThumbprint) {
+            html += '<div class="gos-row">';
+            html += '<div class="gos-label">Отпечаток</div>';
+            html += '<div class="gos-value mono">' + esc(data.signerThumbprint) + '</div>';
+            html += '</div>';
+        }
+
+        // Действует
+        if (data.signerNotBefore && data.signerNotAfter) {
+            html += '<div class="gos-row">';
+            html += '<div class="gos-label">Действует</div>';
+            html += '<div class="gos-value">с ' + fmtDate(data.signerNotBefore)
+                + ' по ' + fmtDate(data.signerNotAfter) + '</div>';
+            html += '</div>';
+        }
+
+        // Дата проверки
+        html += '<div class="gos-row">';
+        html += '<div class="gos-label">Дата проверки</div>';
+        html += '<div class="gos-value">' + new Date().toLocaleString('ru-RU') + '</div>';
         html += '</div>';
 
-        // ─── Чек-лист ───
+        // Кнопка скачать
+        if (state) {
+            html += '<div class="gos-actions">';
+            html += '<button type="button" class="gos-download" onclick="__downloadReport()">';
+            html += '📥 Скачать отчёт</button>';
+            html += '</div>';
+        }
+
+        // ─── Детальный чек-лист (свернуто) ───
         if (checks.length > 0) {
-            var passedCount = checks.filter(function (c) { return c.passed; }).length;
-            html += '<div class="verify-section">';
-            html += '<h3 class="verify-section-title">Проверки (' + passedCount
-                + ' из ' + checks.length + ')</h3>';
-            html += '<div class="verify-checks">';
+            html += '<details class="gos-details">';
+            html += '<summary>Все проверки (' + checks.filter(function(x){return x.passed;}).length
+                + ' из ' + checks.length + ')</summary>';
+            html += '<div class="verify-checks" style="margin-top:12px;">';
             checks.forEach(function (c) {
                 var ic = c.passed ? '✓' : '✗';
                 var cl = c.passed ? 'passed' : 'failed';
@@ -141,48 +205,23 @@
                 }
                 html += '</div></div>';
             });
-            html += '</div></div>';
-        }
-
-        // ─── Подписант ───
-        if (data.signerSubject) {
-            html += '<div class="verify-section">';
-            html += '<h3 class="verify-section-title">Подписант</h3>';
-            html += '<div class="verify-signer">';
-            html += '<div class="verify-signer-avatar">'
-                + esc((data.signerSubject || '?').charAt(0).toUpperCase()) + '</div>';
-            html += '<div class="verify-signer-body">';
-            html += '<div class="verify-signer-name">' + esc(data.signerSubject) + '</div>';
-            if (data.signerIssuer) {
-                html += '<div class="verify-signer-org">УЦ: ' + esc(data.signerIssuer) + '</div>';
-            }
-            html += '<dl class="verify-signer-dl">';
-            if (data.signerSerial) {
-                html += '<dt>Серийный номер</dt><dd><code>' + esc(data.signerSerial) + '</code></dd>';
-            }
-            if (data.signerNotBefore && data.signerNotAfter) {
-                html += '<dt>Действителен</dt><dd>'
-                    + fmtDate(data.signerNotBefore) + ' — ' + fmtDate(data.signerNotAfter)
-                    + '</dd>';
-            }
-            html += '</dl>';
-            html += '</div></div></div>';
+            html += '</div></details>';
         }
 
         // ─── Цепочка ───
         if (data.chain && data.chain.length > 0) {
-            html += '<div class="verify-section">';
-            html += '<h3 class="verify-section-title">Цепочка сертификатов</h3>';
-            html += '<ol class="verify-chain">';
+            html += '<details class="gos-details">';
+            html += '<summary>Цепочка сертификатов</summary>';
+            html += '<ol class="verify-chain" style="margin-top:12px;">';
             data.chain.forEach(function (cn) {
                 html += '<li>' + esc(cn) + '</li>';
             });
-            html += '</ol></div>';
+            html += '</ol></details>';
         }
 
-        container.innerHTML = html;
+        html += '</div>';  // /gos-report
 
-        // Сохраняем state для скачивания
+        container.innerHTML = html;
         window.__verifyState = state;
     }
 
