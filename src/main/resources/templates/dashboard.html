@@ -7,7 +7,6 @@
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <script src="https://www.cryptopro.ru/sites/default/files/products/cades/cadesplugin_api.js"></script>
-<script th:src="@{/js/theme.js}"></script>
 </head>
 <body>
 <header class="app-header">
@@ -189,8 +188,6 @@
                        title="Выбрать для массового подписания"/>
                 <div class="doc-name" th:text="${d.originalName}">file.pdf</div>
                 <div class="doc-meta">
-                    <span th:text="${#numbers.formatDecimal(d.size/1024.0,1,1)} + ' KB'">0</span>
-                    <span>·</span>
                     <span th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</span>
                     <span th:if="${d.signed}" class="badge ok">Подписан</span>
                     <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
@@ -198,10 +195,6 @@
                 <div class="actions">
                     <a th:href="@{'/documents/' + ${d.id} + '/view'}" target="_blank" title="Просмотреть">👁</a>
                     <a th:href="@{'/documents/' + ${d.id} + '/download'}" title="Скачать">⬇</a>
-                    <button type="button" class="btn-timeline" th:attr="data-id=${d.id}"
-                            title="История документа (кто, когда, что делал)"
-                            style="background:none;border:none;color:#2454ff;cursor:pointer;
-                                   padding:0 4px;font-size:16px;">📜</button>
                     <a th:if="${d.signed}"
                        th:href="@{'/documents/' + ${d.id} + '/signing-certificate'}"
                        title="Справка о подписании (PDF)"
@@ -294,9 +287,8 @@
 <script th:src="@{/js/file-drop.js}"></script>
 <script th:src="@{/js/batch-sign.js}"></script>
 <script th:inline="javascript">
-    window.__FOLDERS__ = /*[[${folders}]]*/ [];
+    window.__FOLDERS__ = /*[[${folderOptions}]]*/ [];
 </script>
-<script th:src="@{/js/timeline.js}"></script>
 <script th:src="@{/js/template-use.js}"></script>
 <script th:src="@{/js/command-palette.js}"></script>
 <script>

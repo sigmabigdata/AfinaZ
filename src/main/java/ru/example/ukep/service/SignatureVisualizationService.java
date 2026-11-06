@@ -206,6 +206,7 @@ public class SignatureVisualizationService {
             for (int pageNum = 0; pageNum < totalPages; pageNum++) {
                 PDPage page = pdf.getPage(pageNum);
                 float pageWidth = page.getMediaBox().getWidth();
+                float pageHeight = page.getMediaBox().getHeight();
 
                 try (PDPageContentStream cs = new PDPageContentStream(
                         pdf, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
@@ -213,10 +214,10 @@ public class SignatureVisualizationService {
                     // 1. ФУТЕР НА КАЖДОЙ СТРАНИЦЕ (лого + текст)
                     drawFooter(cs, font, logo, pageWidth);
 
-                    // 1b. QR-КОД со ссылкой на публичную верификацию
+                    // 1b. QR-КОД со ссылкой на публичную верификацию (top-right, 26x26)
                     if (document.getPublicUuid() != null) {
                         try {
-                            drawQr(cs, pdf, font, document, pageWidth);
+                            drawQr(cs, pdf, font, document, pageWidth, pageHeight);
                         } catch (Exception qrEx) {
                             log.debug("QR generation failed: {}", qrEx.getMessage());
                         }
@@ -672,14 +673,15 @@ public class SignatureVisualizationService {
      * QR ведёт на /verify/{publicUuid}.
      */
     private void drawQr(PDPageContentStream cs, PDDocument pdf, PDFont font,
-                        Document document, float pageWidth) throws IOException {
+                        Document document, float pageWidth, float pageHeight) throws IOException {
         if (baseUrl == null || baseUrl.isBlank()) return;
         String verifyUrl = baseUrl.replaceAll("/+$", "")
                 + "/verify/" + document.getPublicUuid();
 
-        float qrSize = 52f;
+        // QR в 2 раза меньше (52 → 26) и в ПРАВОМ ВЕРХНЕМ углу
+        float qrSize = 26f;
         float qrX = pageWidth - MARGIN - qrSize;
-        float qrY = 30f;  // чуть выше футера (footer at y=15..~30)
+        float qrY = pageHeight - MARGIN - qrSize;
 
         BufferedImage qrImage = generateQrImage(verifyUrl, 240);
         if (qrImage == null) return;
@@ -687,13 +689,13 @@ public class SignatureVisualizationService {
         PDImageXObject qrPdf = LosslessFactory.createFromImage(pdf, qrImage);
         cs.drawImage(qrPdf, qrX, qrY, qrSize, qrSize);
 
-        // Подпись под QR мелким шрифтом
-        cs.setFont(font, 5.5f);
+        // Подпись под QR мелким шрифтом (4.5pt)
+        cs.setFont(font, 4.5f);
         cs.setNonStrokingColor(0.4f, 0.4f, 0.4f);
         String caption = "Проверить подпись";
-        float captionWidth = font.getStringWidth(caption) / 1000f * 5.5f;
+        float captionWidth = font.getStringWidth(caption) / 1000f * 4.5f;
         cs.beginText();
-        cs.newLineAtOffset(qrX + (qrSize - captionWidth) / 2f, qrY - 7f);
+        cs.newLineAtOffset(qrX + (qrSize - captionWidth) / 2f, qrY - 5f);
         cs.showText(caption);
         cs.endText();
         cs.setNonStrokingColor(COLOR_BLACK[0], COLOR_BLACK[1], COLOR_BLACK[2]);

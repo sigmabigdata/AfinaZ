@@ -59,6 +59,16 @@ public class DashboardController {
         model.addAttribute("folders", folders);
         model.addAttribute("documentsByFolder", byFolder);
 
+        // Простой DTO для JS (избегаем сериализации JPA-сущностей с lazy-полями)
+        java.util.List<java.util.Map<String, Object>> folderOptions = new java.util.ArrayList<>();
+        for (DocumentFolder f : folders) {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", f.getId());
+            m.put("name", f.getName());
+            folderOptions.add(m);
+        }
+        model.addAttribute("folderOptions", folderOptions);
+
         // Для онбординга
         long totalDocs = documentRepository.countByOwner(user);
         long signedDocs = documentRepository.countByOwnerAndSignedTrue(user);

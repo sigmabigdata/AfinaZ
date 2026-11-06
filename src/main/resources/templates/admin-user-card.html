@@ -5,7 +5,6 @@
     <title>НБД-Банк · Админ · Карточка клиента</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <script src="https://www.cryptopro.ru/sites/default/files/products/cades/cadesplugin_api.js"></script>
-<script th:src="@{/js/theme.js}"></script>
 </head>
 <body data-api-prefix="/admin">
 <header class="admin-header">
@@ -223,9 +222,12 @@
              style="overflow-x: auto; margin: 0 22px 16px;">
         <table class="docs" style="width: 100%;">
             <thead><tr>
-                <th style="width:40px;"></th>
-                <th>ID</th><th>Документ</th><th>Размер</th><th>Загружен</th>
-                <th>Статус</th><th>Подпись</th><th></th>
+                <th style="width:36px;"></th>
+                <th style="width:200px;">Документ</th>
+                <th style="width:120px;">Загружен</th>
+                <th style="width:110px;">Статус</th>
+                <th>Подпись</th>
+                <th style="width:200px;"></th>
             </tr></thead>
             <tbody>
             <tr th:each="d : ${documentsByFolder.get(f.id)}">
@@ -235,9 +237,9 @@
                            th:attr="data-id=${d.id}"
                            title="Выбрать для массового подписания"/>
                 </td>
-                <td th:text="${d.id}">1</td>
-                <td th:text="${d.originalName}">file.pdf</td>
-                <td th:text="${#numbers.formatDecimal(d.size/1024.0,1,1)} + ' KB'">0</td>
+                <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                    th:text="${d.originalName}"
+                    th:title="${d.originalName}">file.pdf</td>
                 <td th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</td>
                 <td>
                     <span th:if="${d.signed}" class="badge ok">Подписан</span>
@@ -279,10 +281,6 @@
                        target="_blank" title="Визуализация подписи (PDF)">📄</a>
                     <a th:href="@{'/admin/documents/' + ${d.id} + '/download'}"
                        title="Скачать документ">⬇</a>
-                    <button type="button" class="btn-timeline" th:attr="data-id=${d.id}"
-                            title="История документа (кто, когда, что делал)"
-                            style="background:none;border:none;color:#2454ff;cursor:pointer;
-                                   padding:0 4px;font-size:16px;">📜</button>
                     <a th:if="${d.signed}"
                        th:href="@{'/admin/documents/' + ${d.id} + '/signing-certificate'}"
                        title="Справка о подписании (PDF)"
@@ -380,7 +378,6 @@
 <script th:src="@{/js/stamp.js}"></script>
 <script th:src="@{/js/file-drop.js}"></script>
 <script th:src="@{/js/batch-sign.js}"></script>
-<script th:src="@{/js/timeline.js}"></script>
 
 <script>
 async function toggleApplyPoa(cb, docId) {
