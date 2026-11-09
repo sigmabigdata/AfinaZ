@@ -304,11 +304,15 @@ ok "Порт 443 свободен"
 # ─── Шаг 8: Права на папки ───────────────────────────
 hdr "Права доступа"
 UID_TO_USE=999
-chown -R ${UID_TO_USE}:${UID_TO_USE} secrets storage logs backups crls certs angie-certs 2>/dev/null \
-    || warn "UID 999 недоступен в системе, использую текущие права"
+if id -u 999 >/dev/null 2>&1; then
+    chown -R 999:999 secrets storage logs backups crls certs angie-certs 2>/dev/null || true
+else
+    warn "UID 999 не найден, использую root"
+    chown -R root:root secrets storage logs backups crls certs angie-certs 2>/dev/null || true
+fi
 chmod 700 secrets
 chmod 600 secrets/*.key secrets/backup.pass 2>/dev/null || true
-chmod 755 storage logs backups crls certs angie-certs 2>/dev/null || true
+chmod 775 storage logs backups crls certs angie-certs 2>/dev/null || true
 chmod 644 angie-certs/*.pem 2>/dev/null || true
 ok "Права установлены"
 
