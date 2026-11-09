@@ -96,7 +96,11 @@ ok "Файлы проекта найдены"
 
 # ─── Шаг 2: Обязательные файлы ────────────────────────
 hdr "Проверка обязательных файлов"
-[ -f admins.env ]              || die "Нет admins.env"
+if [ ! -f admins.env ]; then
+    echo "Дырул Анатолий Юрьевич|18962570627" > admins.env
+    chmod 644 admins.env
+    ok "Создан admins.env с администратором по умолчанию"
+fi
 [ -f cryptopro-dist/linux-amd64_deb.tgz ] || die "Нет cryptopro-dist/linux-amd64_deb.tgz"
 ls axiom-dist/*.tar.gz >/dev/null 2>&1 || warn "axiom-dist/*.tar.gz не найден (будет системный JDK)"
 [ -d certs ] || mkdir -p certs
