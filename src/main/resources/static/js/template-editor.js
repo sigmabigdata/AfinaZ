@@ -177,8 +177,8 @@
             var row = document.createElement('div');
             row.className = 'tpl-field-row';
             row.innerHTML = `
-                <input type="text" value="${f.key}" placeholder="key" oninput="window.__updateField(${i}, 'key', this.value)">
-                <input type="text" value="${f.label}" placeholder="Название" oninput="window.__updateField(${i}, 'label', this.value)">
+                <input type="text" value="${f.key}" placeholder="ключ (англ)" style="border-color: #cbd5e1;" oninput="window.__updateField(${i}, 'key', this.value)" title="Только английские буквы, цифры и _">
+                <input type="text" value="${f.label}" placeholder="Название (рус)" oninput="window.__updateField(${i}, 'label', this.value)">
                 <select onchange="window.__updateField(${i}, 'type', this.value)">
                     <option value="text" ${f.type==='text'?'selected':''}>text</option>
                     <option value="date" ${f.type==='date'?'selected':''}>date</option>
@@ -194,7 +194,18 @@
     }
 
     window.__updateField = function(idx, prop, val) {
-        fields[idx][prop] = val;
+        if (prop === 'key') {
+            // Автоматически заменяем русские буквы на английские (транслит) и убираем пробелы
+            var map = {'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya','А':'A','Б':'B','В':'V','Г':'G','Д':'D','Е':'E','Ё':'E','Ж':'Zh','З':'Z','И':'I','Й':'Y','К':'K','Л':'L','М':'M','Н':'N','О':'O','П':'P','Р':'R','С':'S','Т':'T','У':'U','Ф':'F','Х':'H','Ц':'Ts','Ч':'Ch','Ш':'Sh','Щ':'Sch','Ъ':'','Ы':'Y','Ь':'','Э':'E','Ю':'Yu','Я':'Ya'};
+            var cleaned = val.split('').map(function(ch) { return map[ch] || ch; }).join('');
+            cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+            fields[idx][prop] = cleaned;
+            // Обновляем поле в интерфейсе
+            var input = document.querySelectorAll('.tpl-field-row')[idx].querySelector('input');
+            if (input) input.value = cleaned;
+        } else {
+            fields[idx][prop] = val;
+        }
         if (prop === 'key') renderChips();
     };
     window.__removeField = function(idx) {
