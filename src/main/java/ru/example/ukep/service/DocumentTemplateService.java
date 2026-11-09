@@ -190,6 +190,11 @@ public class DocumentTemplateService {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.useFastMode();
+            // Подключаем TTF-шрифт для корректного отображения кириллицы
+            java.io.File fontFile = new java.io.File("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+            if (fontFile.exists()) {
+                builder.useFont(fontFile, "DejaVu Sans");
+            }
             builder.withHtmlContent(xhtml, null);
             builder.toStream(out);
             builder.run();
