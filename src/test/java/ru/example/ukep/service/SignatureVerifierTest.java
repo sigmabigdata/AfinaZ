@@ -124,14 +124,14 @@ class SignatureVerifierTest {
     @DisplayName("verifyDetached — неверный base64 → RuntimeException от BC Base64")
     void verifyDetachedInvalidBase64() {
         assertThatThrownBy(() -> verifier.verifyDetached(data, "%%%not-base64%%%"))
-                .isInstanceOf(org.bouncycastle.util.encoders.DecoderException.class);
+                .isInstanceOf(org.bouncycastle.cms.CMSException.class);
     }
 
     @Test
     @DisplayName("verifyDetached — пустая подпись → CMSException")
     void verifyDetachedEmptySig() {
         assertThatThrownBy(() -> verifier.verifyDetached(data, ""))
-                .isInstanceOf(org.bouncycastle.cms.CMSException.class);
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

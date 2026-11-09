@@ -312,12 +312,13 @@ public class SignatureVerifier {
         }
 
         // 3) Ручной fallback: Signature.getInstance по OID / альтернативному имени
-        Boolean manual = tryManualVerify(signer, leaf);
-        if (manual != null) return manual;
+        if (tryManualVerify(signer, leaf)) {
+            return true;
+        }
 
-        // SonarQube: переменные точно не null, так как мы в блоке, где оба метода упали
-        String bcMsg = bcError.getMessage();
-        String jcspMsg = jcspError.getMessage();
+        // Безопасно извлекаем сообщения, чтобы избежать NullPointerException (Sonar bug fix)
+        String bcMsg = bcError != null ? bcError.getMessage() : "none";
+        String jcspMsg = jcspError != null ? jcspError.getMessage() : "none";
         log.warn("verifySignerCrypto: BC: {} | JCSP: {}", bcMsg, jcspMsg);
         throw new CryptoNotSupportedException(
                 "Криптопровайдер не поддерживает алгоритм подписи этого сертификата. " +
@@ -637,24 +638,23 @@ public class SignatureVerifier {
         }
 
         // Попытка 2: явный перебор имён алгоритмов (низкоуровневая)
-        if (tbs != null && sig != null) {
-            for (String alg : algos) {
-                if (alg == null || alg.isBlank()) continue;
-                for (String provider : providers) {
-                    try {
-                        var s = java.security.Signature.getInstance(alg, provider);
-                        s.initVerify(issuer.getPublicKey());
-                        s.update(tbs);
-                        if (s.verify(sig)) {
-                            log.info("verifySignature: OK explicit (alg={}, provider={}): '{}' <- '{}'",
-                                    alg, provider,
-                                    extractCn(cert.getSubjectX500Principal().getName()),
-                                    extractCn(issuer.getSubjectX500Principal().getName()));
-                            return true;
-                        }
-                    } catch (Exception ignored) {
-                        // пробуем дальше
+        // Sonar fix (S2589): убрана избыточная проверка на null, так как ошибки ловит catch
+        for (String alg : algos) {
+            if (alg == null || alg.isBlank()) continue;
+            for (String provider : providers) {
+                try {
+                    var s = java.security.Signature.getInstance(alg, provider);
+                    s.initVerify(issuer.getPublicKey());
+                    s.update(tbs);
+                    if (s.verify(sig)) {
+                        log.info("verifySignature: OK explicit (alg={}, provider={}): '{}' <- '{}'",
+                                alg, provider,
+                                extractCn(cert.getSubjectX500Principal().getName()),
+                                extractCn(issuer.getSubjectX500Principal().getName()));
+                        return true;
                     }
+                } catch (Exception ignored) {
+                    // пробуем дальше
                 }
             }
         }
