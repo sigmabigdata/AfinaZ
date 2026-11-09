@@ -215,8 +215,15 @@ public class AdminTemplateController {
     @ResponseBody
     public ResponseEntity<Map<String, String>> importDocx(@RequestParam("file") MultipartFile file) {
         try {
-            if (file.isEmpty() || file.getOriginalFilename() == null || !file.getOriginalFilename().endsWith(".docx")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Ожидается файл .docx"));
+            String originalName = file.getOriginalFilename();
+            if (file.isEmpty() || originalName == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Файл пустой или не выбран"));
+            }
+            if (originalName.toLowerCase().endsWith(".doc")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Старый формат .doc не поддерживается. Сохраните файл как .docx в Word."));
+            }
+            if (!originalName.toLowerCase().endsWith(".docx")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Ожидается файл формата Word (.docx)"));
             }
             DocumentConverter converter = new DocumentConverter();
             var result = converter.convertToHtml(file.getInputStream());
