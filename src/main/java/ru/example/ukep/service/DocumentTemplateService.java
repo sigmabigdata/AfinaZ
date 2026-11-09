@@ -35,15 +35,21 @@ public class DocumentTemplateService {
 
     private static final String DEFAULT_CSS = """
             @page { size: A4; margin: 20mm 15mm; }
-            body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 12pt;
-                   line-height: 1.5; color: #1f2430; }
-            h1 { font-size: 16pt; text-align: center; margin-bottom: 24pt; }
+            body { font-family: 'Times New Roman', 'Liberation Serif', 'DejaVu Serif', serif; font-size: 12pt; line-height: 1.4; color: #000; }
+            h1 { font-size: 16pt; text-align: center; margin-bottom: 20pt; font-weight: bold; }
+            h2 { font-size: 14pt; margin-top: 16pt; margin-bottom: 10pt; font-weight: bold; }
+            h3 { font-size: 13pt; margin-top: 12pt; margin-bottom: 8pt; font-weight: bold; }
+            p { margin: 0 0 6pt 0; text-align: justify; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 12pt; }
+            th, td { border: 1pt solid #000; padding: 4pt 6pt; font-size: 11pt; vertical-align: top; }
+            th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
+            ul, ol { margin-top: 0; margin-bottom: 6pt; padding-left: 20pt; }
+            li { margin-bottom: 4pt; }
+            img { max-width: 100%; }
             .date { text-align: right; margin-bottom: 24pt; }
-            p { margin: 0 0 12pt 0; text-align: justify; }
-            table.sign { width: 100%; margin-top: 40pt; }
-            table.sign td { padding: 8pt 0; }
+            table.sign { width: 100%; margin-top: 40pt; border: none; }
+            table.sign td { padding: 8pt 0; border: none; }
             table.sign td:last-child { text-align: right; }
-            b { font-weight: bold; }
             """;
 
     private final DocumentTemplateRepository repository;
@@ -197,14 +203,36 @@ public class DocumentTemplateService {
             builder.useFastMode();
             
             // Явно подключаем TTF-шрифты с поддержкой кириллицы
-            java.io.File regularFont = new java.io.File("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
-            java.io.File boldFont = new java.io.File("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf");
-            
-            if (regularFont.exists()) {
-                builder.useFont(regularFont, "DejaVu Sans");
+            String[] regularPaths = {
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+            };
+            String[] boldPaths = {
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+            };
+
+            for (String p : regularPaths) {
+                java.io.File f = new java.io.File(p);
+                if (f.exists()) {
+                    builder.useFont(f, "Times New Roman");
+                    builder.useFont(f, "serif");
+                    builder.useFont(f, "DejaVu Serif");
+                    builder.useFont(f, "Liberation Serif");
+                    break;
+                }
             }
-            if (boldFont.exists()) {
-                builder.useFont(boldFont, "DejaVu Sans");
+            for (String p : boldPaths) {
+                java.io.File f = new java.io.File(p);
+                if (f.exists()) {
+                    builder.useFont(f, "Times New Roman");
+                    builder.useFont(f, "serif");
+                    builder.useFont(f, "DejaVu Serif");
+                    builder.useFont(f, "Liberation Serif");
+                    break;
+                }
             }
             
             builder.withHtmlContent(xhtml, null);
