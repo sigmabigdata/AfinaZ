@@ -185,16 +185,24 @@ public class DocumentTemplateService {
         Document doc = Jsoup.parse(wrapped);
         doc.outputSettings().syntax(Document.OutputSettings.Syntax.xml);
         doc.outputSettings().escapeMode(Entities.EscapeMode.xhtml);
+        doc.outputSettings().charset(java.nio.charset.StandardCharsets.UTF_8);
         String xhtml = doc.html();
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.useFastMode();
-            // Подключаем TTF-шрифт для корректного отображения кириллицы
-            java.io.File fontFile = new java.io.File("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
-            if (fontFile.exists()) {
-                builder.useFont(fontFile, "DejaVu Sans");
+            
+            // Явно подключаем TTF-шрифты с поддержкой кириллицы
+            java.io.File regularFont = new java.io.File("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+            java.io.File boldFont = new java.io.File("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf");
+            
+            if (regularFont.exists()) {
+                builder.useFont(regularFont, "DejaVu Sans");
             }
+            if (boldFont.exists()) {
+                builder.useFont(boldFont, "DejaVu Sans");
+            }
+            
             builder.withHtmlContent(xhtml, null);
             builder.toStream(out);
             builder.run();
