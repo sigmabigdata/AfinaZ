@@ -11,6 +11,8 @@ import ru.example.ukep.entity.DocumentTemplate;
 import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.DocumentTemplateService;
 
+import org.zwobble.mammoth.DocumentConverter;
+import org.springframework.web.multipart.MultipartFile;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -207,4 +209,25 @@ public class AdminTemplateController {
         }
         return values;
     }
+
+    /** Конвертация .docx в HTML для визуального редактора. */
+    @PostMapping("/import-docx")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> importDocx(@RequestParam("file") MultipartFile file) {
+        try {
+            if (file.isEmpty() || file.getOriginalFilename() == null || !file.getOriginalFilename().endsWith(".docx")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Ожидается файл .docx"));
+            }
+            DocumentConverter converter = new DocumentConverter();
+            var result = converter.convertToHtml(file.getInputStream());
+            String html = result.getValue();
+            // Обертываем в div, чтобы стили применялись
+            html = "<div class=\"docx-imported\">" + html + "</div>";
+            return ResponseEntity.ok(Map.of("html", html));
+        } catch (Exception e) {
+            log.error("DOCX import failed", e);
+            return ResponseEntity.status(500).body(Map.of("error", "Ошибка конвертации: " + e.getMessage()));
+        }
+    }
+
 }

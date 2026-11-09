@@ -80,14 +80,20 @@
                 <input type="hidden" name="fieldsJson" id="fields-json"
                        th:value="${mode == 'edit'} ? ${template.fieldsJson} : ''"/>
 
-                <h3 style="margin-top:22px;">HTML-шаблон</h3>
-                <p class="muted small" style="margin: 0 0 8px;">
-                    Используйте <code>{{key}}</code> для подстановки.
-                    Разрешены HTML-теги: <code>h1, p, b, table, br</code>.
-                </p>
-                <textarea name="htmlContent" id="html-content" class="tpl-editor-code"
-                          required placeholder="<h1>ЗАЯВЛЕНИЕ</h1>&#10;<p>Я, {{full_name}}, ...</p>"
-                          th:text="${mode == 'edit'} ? ${template.htmlContent} : ''"></textarea>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:22px; margin-bottom:8px;">
+                    <h3 style="margin:0;">Визуальный редактор</h3>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" id="btn-upload-docx" class="btn-ghost btn-sm" onclick="document.getElementById('docx-file').click()">📄 Загрузить Word (.docx)</button>
+                        <input type="file" id="docx-file" accept=".docx" style="display:none;">
+                        <button type="button" id="btn-insert-field" class="btn btn-sm" title="Выделите текст в редакторе и нажмите, чтобы превратить его в поле">➕ Сделать полем</button>
+                        <button type="button" id="btn-toggle-html" class="btn-ghost btn-sm">👁 HTML код</button>
+                    </div>
+                </div>
+                <div id="visual-editor" contenteditable="true" class="tpl-editor-code" style="background:#fff; overflow-y:auto; height: 460px; border: 1px solid #cfd6e4; border-radius: 8px; padding: 20px; outline: none;">
+                    <!-- Сюда рендерится HTML -->
+                </div>
+                <textarea name="htmlContent" id="html-content" class="tpl-editor-code" style="display:none;"
+                          required th:text="${mode == 'edit'} ? ${template.htmlContent} : ''"></textarea>
 
                 <div class="tpl-placeholder-chips" id="chips">
                     <!-- сюда JS вставит чипы из полей -->

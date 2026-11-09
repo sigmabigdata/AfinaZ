@@ -37,6 +37,103 @@
         renderFields();
         renderChips();
 
+
+        // --- ВИЗУАЛЬНЫЙ РЕДАКТОР ---
+        var visualEditor = document.getElementById('visual-editor');
+        var htmlContent = document.getElementById('html-content');
+        var btnToggleHtml = document.getElementById('btn-toggle-html');
+        var btnInsertField = document.getElementById('btn-insert-field');
+        var docxFile = document.getElementById('docx-file');
+
+        if (visualEditor && htmlContent) {
+            // Инициализация из textarea
+            visualEditor.innerHTML = htmlContent.value || '<p>Загрузите Word или начните печатать...</p>';
+
+            // Синхронизация перед сохранением формы
+            document.getElementById('tpl-form').addEventListener('submit', function () {
+                htmlContent.value = visualEditor.innerHTML;
+            });
+
+            // Переключение HTML / Визуально
+            btnToggleHtml.addEventListener('click', function () {
+                if (htmlContent.style.display === 'none') {
+                    htmlContent.style.display = 'block';
+                    visualEditor.style.display = 'none';
+                    btnToggleHtml.textContent = '👁 Визуально';
+                } else {
+                    htmlContent.style.display = 'none';
+                    visualEditor.style.display = 'block';
+                    btnToggleHtml.textContent = '👁 HTML код';
+                    visualEditor.innerHTML = htmlContent.value;
+                }
+            });
+
+            // Загрузка Word
+            docxFile.addEventListener('change', async function() {
+                if (!docxFile.files.length) return;
+                var file = docxFile.files[0];
+                var formData = new FormData();
+                formData.append('file', file);
+                
+                visualEditor.innerHTML = '<p style="color:#6a7285;">Конвертация Word... ⏳</p>';
+                
+                try {
+                    var resp = await fetch('/admin/templates/import-docx', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    var data = await resp.json();
+                    if (resp.ok && data.html) {
+                        visualEditor.innerHTML = data.html;
+                        htmlContent.value = data.html;
+                    } else {
+                        alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        visualEditor.innerHTML = htmlContent.value;
+                    }
+                } catch (e) {
+                    alert('Ошибка сети: ' + e.message);
+                    visualEditor.innerHTML = htmlContent.value;
+                }
+                docxFile.value = ''; // сброс
+            });
+
+            // Вставка плейсхолдера
+            btnInsertField.addEventListener('click', function() {
+                var sel = window.getSelection();
+                if (!sel.rangeCount || sel.isCollapsed) {
+                    alert('Сначала выделите текст в редакторе, который нужно заменить на поле.');
+                    return;
+                }
+                var range = sel.getRangeAt(0);
+                var selectedText = range.toString();
+                
+                var key = prompt('Введите ключ для этого поля (латиницей, без пробелов, например: fio, date, summa):\n\nВыделенный текст: "' + selectedText + '"', 'field_' + Math.floor(Math.random()*1000));
+                if (!key) return;
+                
+                // Очистка ключа от мусора
+                key = key.trim().replace(/[^a-zA-Z0-9_]/g, '');
+                if (!key) return;
+
+                // Заменяем выделенный текст на {{key}}
+                var span = document.createElement('span');
+                span.className = 'tpl-placeholder-chip'; // подсветим
+                span.style.background = '#e6efff';
+                span.style.color = '#2454ff';
+                span.style.padding = '2px 4px';
+                span.style.borderRadius = '4px';
+                span.textContent = '{{' + key + '}}';
+                
+                range.deleteContents();
+                range.insertNode(span);
+                
+                // Убираем выделение
+                sel.removeAllRanges();
+                
+                // Сразу обновляем textarea
+                htmlContent.value = visualEditor.innerHTML;
+            });
+        }
+
         document.getElementById('add-field').addEventListener('click', addField);
         document.getElementById('btn-preview').addEventListener('click', previewPdf);
         document.getElementById('btn-validate').addEventListener('click', validatePlaceholders);

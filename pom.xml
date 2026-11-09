@@ -228,6 +228,13 @@
             <version>1.17.2</version>
         </dependency>
 
+        <!-- ============ Word -> HTML ============ -->
+        <dependency>
+            <groupId>org.zwobble.mammoth</groupId>
+            <artifactId>mammoth</artifactId>
+            <version>1.7.0</version>
+        </dependency>
+
         <!-- ============ Тесты ============ -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
