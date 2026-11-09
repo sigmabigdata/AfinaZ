@@ -178,7 +178,11 @@ public class DocumentTemplateService {
 
     /** Подставляет значения в HTML и рендерит PDF. */
     public byte[] renderPdf(DocumentTemplate t, Map<String, String> values) throws IOException {
-        String html = substitute(t.getHtmlContent(), values);
+        String rawHtml = t.getHtmlContent();
+        if (rawHtml == null || rawHtml.isBlank()) {
+            rawHtml = "<p style='color:red;'>Ошибка: текст шаблона пуст.</p>";
+        }
+        String html = substitute(rawHtml, values);
         String wrapped = wrapWithHtml(html, t.getName());
 
         // openhtmltopdf строго требует XHTML. Прогоняем через jsoup для очистки.

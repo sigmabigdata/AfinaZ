@@ -266,6 +266,13 @@
         syncFieldsJson();
         var iframe = document.getElementById('pdf-preview');
         var form = new FormData();
+        
+        // ФИКС: Синхронизируем текст из визуального редактора в скрытое поле
+        var vis = document.getElementById('visual-editor');
+        if (vis && htmlContent.style.display === 'none') {
+            htmlContent.value = vis.innerHTML;
+        }
+
         form.append('htmlContent', htmlContent.value);
         form.append('fieldsJson', fieldsJsonEl.value);
 

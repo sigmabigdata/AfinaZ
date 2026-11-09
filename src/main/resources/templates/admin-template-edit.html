@@ -93,7 +93,7 @@
                     <!-- Сюда рендерится HTML -->
                 </div>
                 <textarea name="htmlContent" id="html-content" class="tpl-editor-code" style="display:none;"
-                          required th:text="${mode == 'edit'} ? ${template.htmlContent} : ''"></textarea>
+                          th:text="${mode == 'edit'} ? ${template.htmlContent} : ''"></textarea>
 
                 <div class="tpl-placeholder-chips" id="chips">
                     <!-- сюда JS вставит чипы из полей -->
