@@ -114,11 +114,8 @@
                 Заполняй поля ниже <b>только чтобы переопределить</b> .env.prod.
                 Иначе оставь пустыми.
             </span>
-            <form method="post" th:action="@{/admin/settings/smtp/reset-to-env}"
-                  style="margin:0;"
-                  onsubmit="return confirm('Сбросить SMTP-настройки к .env.prod?');">
-                <button type="submit" class="btn-ghost btn-sm">↻ Сбросить к .env.prod</button>
-            </form>
+            <button type="submit" th:attr="formaction=@{/admin/settings/smtp/reset-to-env}" class="btn-ghost btn-sm"
+                    onclick="return confirm('Сбросить SMTP-настройки к .env.prod?');">↻ Сбросить к .env.prod</button>
         </div>
 
         <div class="form-field">
@@ -174,13 +171,12 @@
                 Сохрани настройки перед отправкой. Письмо уйдёт через активные
                 SMTP-настройки (из БД или .env.prod).
             </p>
-            <form method="post" th:action="@{/admin/settings/test-email}"
-                  style="display:flex; gap:10px; align-items:center;">
+            <div style="display:flex; gap:10px; align-items:center;">
                 <input type="email" name="to" required
                        placeholder="Email получателя тестового письма"
                        style="flex:1; padding:10px 12px; border:1px solid #cfd6e4; border-radius:8px;"/>
-                <button type="submit" class="btn">✉ Отправить тест</button>
-            </form>
+                <button type="submit" th:attr="formaction=@{/admin/settings/test-email}" class="btn">✉ Отправить тест</button>
+            </div>
         </div>
 
         <div class="alert info" style="margin-top:20px">
