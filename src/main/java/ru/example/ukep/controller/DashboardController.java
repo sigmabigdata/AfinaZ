@@ -61,13 +61,6 @@ public class DashboardController {
         // Разделы (новые сверху)
         List<DocumentFolder> folders = folderService.listForOwner(user);
 
-        // Legacy: документы без раздела → в «Без раздела»
-        try {
-            folderService.migrateUnfiled(user);
-            folders = folderService.listForOwner(user);
-        } catch (Exception e) {
-            log.warn("migrateUnfiled failed: {}", e.getMessage());
-        }
 
         // Документы по разделам
         Map<Long, List<Document>> byFolder = new LinkedHashMap<>();
@@ -76,12 +69,6 @@ public class DashboardController {
                     documentRepository.findAllByFolderOrderByUploadedAtDesc(f));
         }
 
-        // «Без раздела» — на случай legacy
-        DocumentFolder defaultFolder = folderService.ensureDefault(user);
-        if (!byFolder.containsKey(defaultFolder.getId())) {
-            byFolder.put(defaultFolder.getId(),
-                    documentRepository.findAllByFolderOrderByUploadedAtDesc(defaultFolder));
-        }
 
         // Простой DTO для JS
         List<Map<String, Object>> folderOptions = new java.util.ArrayList<>();
@@ -98,7 +85,7 @@ public class DashboardController {
         model.addAttribute("user", user);
         model.addAttribute("folders", folders);
         model.addAttribute("documentsByFolder", byFolder);
-        model.addAttribute("defaultFolderId", defaultFolder.getId());
+        model.addAttribute("defaultFolderId", folders.isEmpty() ? 0L : folders.get(0).getId());
         model.addAttribute("folderOptions", folderOptions);
         model.addAttribute("allDocsCount", totalDocs);
         model.addAttribute("allSignedCount", signedDocs);

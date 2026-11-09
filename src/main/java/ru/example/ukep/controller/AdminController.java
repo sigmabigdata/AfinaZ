@@ -128,8 +128,6 @@ public class AdminController {
         User admin = userRepository.findByEmailHash(pii.hash(principal.getName()))
                 .orElse(null);
 
-        // Legacy: документы без раздела → перенести в «Без раздела»
-        folderService.migrateUnfiled(user);
 
         var folders = folderService.listForOwner(user);
         var byFolder = new java.util.LinkedHashMap<Long, java.util.List<Document>>();
