@@ -410,24 +410,26 @@ DB_MIG_PASS=$(grep "^DB_MIGRATOR_PASSWORD=" .env.prod | cut -d'=' -f2)
 DB_APP_PASS=$(grep "^DB_PASSWORD=" .env.prod | cut -d'=' -f2)
 DB_AUD_PASS=$(grep "^DB_AUDITOR_PASSWORD=" .env.prod | cut -d'=' -f2)
 
-docker exec -i afina-postgres psql -U postgres -d postgres >/dev/null 2>&1 <<EOF
-DO \$\$
-BEGIN
-   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'afina_migrator') THEN
-      CREATE ROLE afina_migrator WITH LOGIN PASSWORD '$DB_MIG_PASS';
-   END IF;
-   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'afina_app') THEN
-      CREATE ROLE afina_app WITH LOGIN PASSWORD '$DB_APP_PASS';
-   END IF;
-   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'afina_auditor') THEN
-      CREATE ROLE afina_auditor WITH LOGIN PASSWORD '$DB_AUD_PASS';
-   END IF;
-END
-\$\$;
-GRANT ALL PRIVILEGES ON DATABASE afina_db TO afina_migrator;
-GRANT CONNECT ON DATABASE afina_db TO afina_app;
-GRANT CONNECT ON DATABASE afina_db TO afina_auditor;
-EOF
+# afina_migrator
+if ! docker exec -i afina-postgres psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='afina_migrator'" | grep -q 1; then
+    docker exec -i afina-postgres psql -U postgres -d postgres -c "CREATE ROLE afina_migrator WITH LOGIN PASSWORD '$DB_MIG_PASS';" >/dev/null
+fi
+docker exec -i afina-postgres psql -U postgres -d postgres -c "ALTER USER afina_migrator WITH PASSWORD '$DB_MIG_PASS';" >/dev/null
+
+# afina_app
+if ! docker exec -i afina-postgres psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='afina_app'" | grep -q 1; then
+    docker exec -i afina-postgres psql -U postgres -d postgres -c "CREATE ROLE afina_app WITH LOGIN PASSWORD '$DB_APP_PASS';" >/dev/null
+fi
+docker exec -i afina-postgres psql -U postgres -d postgres -c "ALTER USER afina_app WITH PASSWORD '$DB_APP_PASS';" >/dev/null
+
+# afina_auditor
+if ! docker exec -i afina-postgres psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='afina_auditor'" | grep -q 1; then
+    docker exec -i afina-postgres psql -U postgres -d postgres -c "CREATE ROLE afina_auditor WITH LOGIN PASSWORD '$DB_AUD_PASS';" >/dev/null
+fi
+docker exec -i afina-postgres psql -U postgres -d postgres -c "ALTER USER afina_auditor WITH PASSWORD '$DB_AUD_PASS';" >/dev/null
+
+# Гранты
+docker exec -i afina-postgres psql -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE afina_db TO afina_migrator; GRANT CONNECT ON DATABASE afina_db TO afina_app, afina_auditor;" >/dev/null
 
 docker exec -i afina-postgres psql -U postgres -d afina_db >/dev/null 2>&1 <<EOF
 ALTER SCHEMA public OWNER TO afina_migrator;
