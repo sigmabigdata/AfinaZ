@@ -21,7 +21,11 @@ FILE="$1"
 echo "⚠️  Восстановление из: $FILE"
 echo "    Все данные в afina_db будут заменены."
 read -p "Введи 'RESTORE' для подтверждения: " ans
-[ "$ans" = "RESTORE" ] || { echo "Отменено."; exit 1; }
+# Принимаем restore / RESTORE / Restore (case-insensitive)
+if [ "$(echo "$ans" | tr '[:lower:]' '[:upper:]')" != "RESTORE" ]; then
+    echo "Отменено."
+    exit 1
+fi
 
 echo "▶ Останавливаю app"
 docker compose -f docker-compose-prod.yml --env-file .env.prod stop app

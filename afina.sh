@@ -43,19 +43,19 @@ hdr()  { echo -e "\n${C}${BOLD}▶ $*${N}"; }
 
 # ============================================================
 cmd_restore() {
-    hdr "Восстановление из бэкапа"
+    hdr "Восстановление БД из бэкапа"
 
     if [ ! -d backups ]; then
         err "Каталог backups/ не найден"
         return 1
     fi
 
-    # Показываем доступные бэкапы (только .enc — текущий формат)
+    # Только .sql.gz.enc (дампы БД)
     local files
-    files=$(ls -1t backups/*.enc 2>/dev/null || true)
+    files=$(ls -1t backups/afina_*.sql.gz.enc 2>/dev/null || true)
 
     if [ -z "$files" ]; then
-        err "Нет бэкапов в backups/*.enc"
+        err "Нет бэкапов БД в backups/afina_*.sql.gz.enc"
         echo ""
         echo "  Создайте бэкап:  afina backup"
         return 1
@@ -122,6 +122,87 @@ cmd_restore() {
     return $rc
 }
 
+
+# ============================================================
+cmd_restore_files() {
+    hdr "Восстановление storage из бэкапа"
+
+    if [ ! -d backups ]; then
+        err "Каталог backups/ не найден"
+        return 1
+    fi
+
+    # Только .tar.gz.enc (архивы файлов)
+    local files
+    files=$(ls -1t backups/storage_*.tar.gz.enc 2>/dev/null || true)
+
+    if [ -z "$files" ]; then
+        err "Нет архивов storage в backups/storage_*.tar.gz.enc"
+        echo ""
+        echo "  Создайте бэкап:  afina backup"
+        return 1
+    fi
+
+    echo -e "${BOLD}Доступные архивы storage (свежие сверху):${N}"
+    echo "─────────────────────────────────────────────────────"
+    local i=1
+    local -a names
+    while IFS= read -r f; do
+        local size date
+        size=$(du -h "$f" | cut -f1)
+        date=$(stat -c '%y' "$f" 2>/dev/null | cut -d'.' -f1)
+        printf "  ${C}%2d.${N} %-50s  ${DIM}%s  %s${N}\n" \
+            "$i" "$(basename "$f")" "$size" "$date"
+        names+=("$f")
+        i=$((i+1))
+    done <<< "$files"
+    echo "─────────────────────────────────────────────────────"
+
+    echo ""
+    read -r -p "Номер бэкапа (Enter — отмена): " choice
+    if [ -z "$choice" ]; then
+        echo "Отменено"
+        return 0
+    fi
+
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt "${#names[@]}" ]; then
+        err "Неверный номер: $choice"
+        return 1
+    fi
+
+    local target="${names[$((choice-1))]}"
+    echo ""
+    warn "Файл: $target"
+    warn "Текущие файлы в storage/documents будут заменены содержимым архива."
+    warn "Приложение будет остановлено на 1–2 минуты."
+    echo ""
+    read -r -p "Продолжить? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "Отменено"
+        return 0
+    fi
+
+    if [ ! -x ./restore-storage.sh ]; then
+        err "./restore-storage.sh не найден или не исполняемый"
+        return 1
+    fi
+
+    echo ""
+    ./restore-storage.sh "$target"
+    local rc=$?
+    echo ""
+    if [ "$rc" = "0" ]; then
+        ok "Восстановление storage завершено"
+        echo ""
+        echo "  Проверьте:"
+        echo "    afina status"
+        echo "    afina logs app | tail -30"
+    else
+        err "restore-storage.sh завершился с кодом $rc"
+    fi
+    return $rc
+}
+
 cmd_menu() {
     while true; do
         clear
@@ -138,7 +219,8 @@ cmd_menu() {
         echo -e "${C} 7.${N} 🔧 Doctor (диагностика)"
         echo -e "${C} 8.${N} 💻 Shell в app"
         echo -e "${C} 9.${N} 🗄️  psql"
-        echo -e "${C}10.${N} 📦 Восстановить из бэкапа"
+        echo -e "${C}10.${N} 💾 Восстановить БД из бэкапа (.sql.gz.enc)"
+        echo -e "${C}11.${N} 📁 Восстановить файлы из бэкапа (.tar.gz.enc)"
         echo ""
         echo -e "${C} 0.${N} ❌ Выход"
         echo -e "${C} h.${N} ❓ Справка по командам"
@@ -154,7 +236,8 @@ cmd_menu() {
             7) cmd_doctor ;;
             8) cmd_shell app ;;
             9) docker exec -it afina-postgres psql -U postgres -d afina_db ;;
-            10|restore) cmd_restore ;;
+            10|restore)       cmd_restore ;;
+            11|restore-files) cmd_restore_files ;;
             0) echo "Пока!"; exit 0 ;;
             h|help) cmd_help ;;
             *) echo "Неверный выбор"; sleep 1; continue ;;
@@ -183,7 +266,8 @@ cmd_help() {
     echo ""
     echo -e "${BOLD}Данные:${N}"
     echo "  backup                       Ручной бэкап"
-    echo "  restore                      Восстановить БД из бэкапа (интерактивно)"
+    echo "  restore                      Восстановить БД (.sql.gz.enc)"
+    echo "  restore-files                Восстановить storage (.tar.gz.enc)"
     echo "  key                          Информация о ключах шифрования"
     echo "  audit [N]                    Последние N событий аудита (по умолч. 20)"
     echo "  users [search]               Список клиентов"
@@ -534,6 +618,7 @@ case "${1:-help}" in
     version|v)     cmd_version ;;
     menu|m)        cmd_menu ;;
     restore)       cmd_restore ;;
+    restore-files) cmd_restore_files ;;
     help|-h|--help) cmd_help ;;
     *)             err "Неизвестная команда: $1"; cmd_help; exit 1 ;;
 esac
