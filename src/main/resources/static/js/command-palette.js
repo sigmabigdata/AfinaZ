@@ -54,7 +54,8 @@
 
         input.addEventListener('input', function () {
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(search, 180);
+            var value = input.value;
+            debounceTimer = setTimeout(function () { search(value); }, 180);
         });
 
         input.addEventListener('keydown', onKeyDown);
@@ -161,20 +162,33 @@
     }
 
     async function search(q) {
+        // Лёгкий индикатор «Поиск…», только если это не первый рендер
+        if (q && q.trim() && bodyEl) {
+            bodyEl.innerHTML = '<div class="cmdk-empty">Поиск…</div>';
+        }
         try {
             var params = new URLSearchParams();
             params.set('limit', '10');
             if (q && q.trim()) params.set('q', q.trim());
             var url = '/api/search?' + params.toString();
-            console.log('[cmdk] search:', q, '| URL:', url);
+            if (window.__CMDK_DEBUG__) console.log('[cmdk] search:', q, '| URL:', url);
             var resp = await fetch(url, { credentials: 'same-origin' });
-            if (!resp.ok) {
-                var errText = '';
-                try { errText = await resp.text(); } catch (ex) {}
-                console.error('[cmdk] HTTP', resp.status, errText);
-                bodyEl.innerHTML = '<div class="cmdk-empty">Ошибка: HTTP '
-                    + resp.status + (errText ? ' — ' + escapeHtml(errText.substring(0, 200)) : '')
+
+            // Если сервер редиректит на /login — fetch вернёт HTML,
+            // и resp.json() бросит "Unexpected token '<'". Понятнее:
+            var ct = (resp.headers.get('content-type') || '').toLowerCase();
+            if (ct.indexOf('application/json') < 0) {
+                console.error('[cmdk] Non-JSON response:', resp.status, ct);
+                bodyEl.innerHTML = '<div class="cmdk-empty">'
+                    + (resp.redirected || resp.status === 401 || resp.status === 403
+                        ? 'Сессия истекла. Обновите страницу и войдите заново.'
+                        : 'Ошибка сервера (HTTP ' + resp.status + ')')
                     + '</div>';
+                return;
+            }
+
+            if (!resp.ok) {
+                bodyEl.innerHTML = '<div class="cmdk-empty">Ошибка: HTTP ' + resp.status + '</div>';
                 return;
             }
             var data = await resp.json();
