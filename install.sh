@@ -396,14 +396,13 @@ if [ "$BUILD_MODE" = "2" ]; then
         fi
     done
 
-    # Если angie нет локально — загружаем из архива, иначе тянем из интернета
-    if ! docker image inspect docker.angie.software/angie:1.12.3-alpine >/dev/null 2>&1; then
-        if [ -f images/angie-1.12.3.tar.gz ]; then
-            echo -e "  ${B}▶ Загрузка angie из архива...${N}"
-            gunzip -c images/angie-1.12.3.tar.gz | docker load | tail -1
-        else
-            warn "angie-1.12.3.tar.gz не найден, тянем из интернета"
-        fi
+    # Angie ВСЕГДА тянем с registry (Docker save на Mac часто создает битые архивы)
+    # Это быстро (~10 сек) и гарантирует правильную архитектуру amd64
+    ANGIE_ARCH=$(docker image inspect docker.angie.software/angie:1.12.3-alpine --format '{{.Architecture}}' 2>/dev/null || echo "none")
+    if [ "$ANGIE_ARCH" != "amd64" ]; then
+        warn "angie архитектура '$ANGIE_ARCH' ≠ amd64 — перекачиваем с registry"
+        docker rmi -f docker.angie.software/angie:1.12.3-alpine 2>/dev/null || true
+        docker pull --platform linux/amd64 docker.angie.software/angie:1.12.3-alpine 2>&1 | tail -3
     fi
     ok "Образы загружены"
 else

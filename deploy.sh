@@ -71,16 +71,23 @@ hdr "Проверка локальных файлов"
 [ -d axiom-dist ]              || die "Папка axiom-dist/ не найдена"
 
 # Проверяем образы (find — безопасно для zsh)
-IMG_COUNT=$(find images -maxdepth 1 -type f -name '*.tar.gz' | wc -l | tr -d ' ')
-if [ "$IMG_COUNT" -lt 3 ]; then
-    err "Не найдены все 3 образа в images/ (найдено: $IMG_COUNT)"
-    find images -maxdepth 1 -type f -name '*.tar.gz' 2>/dev/null
-    die "Собери образы: docker save ... | gzip > images/...tar.gz"
-fi
-ok "Образы (${IMG_COUNT} шт):"
-find images -maxdepth 1 -type f -name '*.tar.gz' | while read -r f; do
-    echo "     $f $(du -h "$f" | cut -f1)"
+# Нужно 2 обязательных образа: app + postgres. Angie тянется на сервере
+APP_IMG="images/afinaz-app.tar.gz"
+PG_IMG="images/afinaz-postgres.tar.gz"
+for f in "$APP_IMG" "$PG_IMG"; do
+    if [ ! -f "$f" ]; then
+        die "Образ не найден: $f. Собери: docker save ... | gzip > $f"
+    fi
 done
+ok "Образы (2 шт):"
+echo "     $APP_IMG $(du -h "$APP_IMG" | cut -f1)"
+echo "     $PG_IMG $(du -h "$PG_IMG" | cut -f1)"
+echo "     angie — будет скачан на сервере с registry (правильная архитектура)"
+
+# Предупреждаем если остался битый angie-архив
+if [ -f "images/angie-1.12.3.tar.gz" ]; then
+    warn "images/angie-1.12.3.tar.gz найден — игнорируется (тянем с registry)"
+fi
 
 # Проверяем сертификаты (find — работает и в bash, и в zsh)
 CERT_COUNT=0
@@ -139,7 +146,7 @@ ok "Исходники скопированы"
 hdr "Копируем Docker-образы (1.6 ГБ)"
 for attempt in 1 2 3 4 5; do
     echo -e "  ${B}▶ Попытка $attempt/5${N}"
-    if rsync -avz --partial --partial-dir=.rsync-partial --bwlimit=1500 --info=progress2 \
+    if rsync -avz --partial --progress \
         -e "$RSYNC_SSH" \
         images/ root@$SERVER:/opt/afinaz/images/ 2>&1 | tail -3; then
         # Проверяем, что все три файла на месте на сервере
@@ -163,10 +170,15 @@ hdr "Запуск install.sh на сервере (неинтерактивно)"
 echo "  Ответы: IP=$SERVER, TLS=2 (self-signed), Admin IP=*, Email=log, Images=2 (offline)"
 echo ""
 
-# Передаем ответы через pipe
-PIPE_ANSWERS=$(printf "%s\n2\n*\nlog\n2\n" "$SERVER")
-
-run_ssh "cd /opt/afinaz && chmod +x install.sh && $PIPE_ANSWERS" > /tmp/afina-deploy.log 2>&1 \
+# Передаем ответы через stdin install.sh (НЕ через inline-команды!)
+{
+    printf "%s\n" "$SERVER"       # IP
+    printf "2\n"                  # TLS = custom
+    printf "*\n"                  # ADMIN_IP_WHITELIST
+    printf "log\n"                # MAIL_MODE
+    printf "2\n"                  # BUILD_MODE = offline
+} | eval "$SSH_BASE root@$SERVER 'cd /opt/afinaz && chmod +x install.sh && TERM=xterm-256color ./install.sh'" \
+    > /tmp/afina-deploy.log 2>&1 \
     && ok "install.sh выполнен" \
     || { err "install.sh упал. Последние 30 строк:"; tail -30 /tmp/afina-deploy.log; exit 1; }
 
