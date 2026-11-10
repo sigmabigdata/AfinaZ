@@ -84,6 +84,14 @@ public class DocumentController {
         return userRepository.findByEmailHash(pii.hash(p.getUsername())).orElseThrow();
     }
 
+    /** Куда вернуться после действия с документом: в раздел, если он есть. */
+    private static String backTo(Document doc) {
+        if (doc != null && doc.getFolder() != null && doc.getFolder().getId() != null) {
+            return "redirect:/folders/" + doc.getFolder().getId();
+        }
+        return REDIR_DASHBOARD;
+    }
+
     // ═══════════════════════════════════════════════════════
     //  Загрузка / просмотр / скачивание
     // ═══════════════════════════════════════════════════════
@@ -180,8 +188,11 @@ public class DocumentController {
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable Long id,
                          @AuthenticationPrincipal UserDetails p) throws IOException {
-        documentService.delete(id, current(p));
-        return REDIR_DASHBOARD;
+        User owner = current(p);
+        Document doc = documentService.getOwned(id, owner);
+        String back = backTo(doc);
+        documentService.delete(id, owner);
+        return back;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -215,7 +226,7 @@ public class DocumentController {
             throw new IllegalArgumentException("Подпись не относится к документу");
         }
         documentService.deleteSignature(sigId);
-        return REDIR_DASHBOARD;
+        return backTo(doc);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -267,7 +278,7 @@ public class DocumentController {
         } catch (Exception e) {
             ra.addFlashAttribute("err", "Ошибка: " + e.getMessage());
         }
-        return REDIR_DASHBOARD;
+        return backTo(doc);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -315,7 +326,7 @@ public class DocumentController {
             log.warn("upload-signature failed for doc {}: {}", id, e.getMessage());
             ra.addFlashAttribute("err", "Ошибка загрузки .sig: " + e.getMessage());
         }
-        return REDIR_DASHBOARD;
+        return backTo(doc);
     }
 
     /** Применить/отключить доверенность к конкретной подписи (клиент). */
@@ -346,7 +357,7 @@ public class DocumentController {
         } catch (Exception e) {
             ra.addFlashAttribute("err", e.getMessage());
         }
-        return REDIR_DASHBOARD;
+        return backTo(doc);
     }
 
     // ═══════════════════════════════════════════════════════

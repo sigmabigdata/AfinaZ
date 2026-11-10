@@ -113,8 +113,10 @@
         Загрузите первый файл через форму выше.
     </div>
 
-    <div th:if="${not #lists.isEmpty(documents)}">
-        <table class="docs" style="width:100%;">
+    <div th:if="${not #lists.isEmpty(documents)}"
+         class="folder-card folder-card-flat"
+         th:attr="data-folder-id=${folder.id}">
+        <table class="docs" style="width:100%; margin:0;">
             <thead><tr>
                 <th style="width:36px;"></th>
                 <th style="width:200px;">Документ</th>

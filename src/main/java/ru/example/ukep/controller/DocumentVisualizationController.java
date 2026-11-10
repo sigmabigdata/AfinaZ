@@ -116,7 +116,7 @@ public class DocumentVisualizationController {
             log.error("Regenerate failed for doc {}", id, e);
             ra.addFlashAttribute("err", "Ошибка: " + e.getMessage());
         }
-        return "redirect:/admin/users/" + ownerId;
+        return backToAdmin(doc);
     }
 
     /** Toggle: применить доверенность к визуализации (или нет). */
@@ -194,7 +194,7 @@ public class DocumentVisualizationController {
                 "Не удалось обработать файл подписи. Проверьте, что это корректный .sig, " +
                 "или обратитесь к администратору.");
         }
-        return "redirect:/admin/users/" + ownerId;
+        return backToAdmin(doc);
     }
 
 
@@ -213,7 +213,7 @@ public class DocumentVisualizationController {
         var sigOpt = doc.getSignatures().stream().filter(s -> s.getId().equals(sigId)).findFirst();
         if (sigOpt.isEmpty()) {
             ra.addFlashAttribute("err", "Подпись не относится к документу");
-            return "redirect:/admin/users/" + ownerId;
+            return backToAdmin(doc);
         }
         var sig = sigOpt.get();
 
@@ -253,6 +253,18 @@ public class DocumentVisualizationController {
             ra.addFlashAttribute("warn", "Визуализация не обновилась: " + e.getMessage());
         }
 
+        return backToAdmin(doc);
+    }
+
+    /** Куда вернуться после действия: в раздел клиента, если он есть. */
+    private static String backToAdmin(Document doc) {
+        if (doc == null || doc.getOwner() == null) {
+            return "redirect:/admin/users";
+        }
+        Long ownerId = doc.getOwner().getId();
+        if (doc.getFolder() != null && doc.getFolder().getId() != null) {
+            return "redirect:/admin/users/" + ownerId + "/folders/" + doc.getFolder().getId();
+        }
         return "redirect:/admin/users/" + ownerId;
     }
 

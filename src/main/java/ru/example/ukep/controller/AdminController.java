@@ -437,6 +437,7 @@ public class AdminController {
         Document doc = documentRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(DOC_NOT_FOUND));
         Long ownerId = doc.getOwner().getId();
+        Long folderId = (doc.getFolder() != null) ? doc.getFolder().getId() : null;
         try {
             String name = doc.getOriginalName();
             boolean wasSigned = doc.isSigned();
@@ -447,7 +448,9 @@ public class AdminController {
         } catch (Exception e) {
             ra.addFlashAttribute("err", "Не удалось удалить: " + e.getMessage());
         }
-        return REDIR_USERS + ownerId;
+        return folderId != null
+                ? "redirect:/admin/users/" + ownerId + "/folders/" + folderId
+                : REDIR_USERS + ownerId;
     }
 
     /** Скачать конкретную подпись (админ). */
@@ -481,12 +484,15 @@ public class AdminController {
             return REDIR_USERS + doc.getOwner().getId();
         }
         Long ownerId = doc.getOwner().getId();
+        Long folderId = (doc.getFolder() != null) ? doc.getFolder().getId() : null;
         try {
             documentService.deleteSignature(sigId);
             ra.addFlashAttribute("ok", "Подпись удалена");
         } catch (Exception e) {
             ra.addFlashAttribute("err", "Не удалось удалить: " + e.getMessage());
         }
-        return REDIR_USERS + ownerId;
+        return folderId != null
+                ? "redirect:/admin/users/" + ownerId + "/folders/" + folderId
+                : REDIR_USERS + ownerId;
     }
 }
