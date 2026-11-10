@@ -343,10 +343,21 @@ ok "Права установлены"
 hdr "Подготовка образов"
 if [ "$BUILD_MODE" = "2" ]; then
     [ -d images ] || die "Папка images/ не найдена"
-    for img in images/*.tar; do
-        [ -f "$img" ] || die "Нет образов в images/"
+
+    # Ищем и .tar, и .tar.gz
+    ARCHIVES=$(ls images/*.tar images/*.tar.gz 2>/dev/null || true)
+    if [ -z "$ARCHIVES" ]; then
+        die "Нет образов в images/ (ни .tar, ни .tar.gz)"
+    fi
+
+    for img in $ARCHIVES; do
+        [ -f "$img" ] || continue
         echo -e "  ${B}▶ Загрузка $img...${N}"
-        docker load < "$img" | tail -1
+        if [[ "$img" == *.tar.gz ]]; then
+            gunzip -c "$img" | docker load | tail -1
+        else
+            docker load < "$img" | tail -1
+        fi
     done
     ok "Образы загружены"
 else
