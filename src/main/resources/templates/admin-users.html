@@ -49,78 +49,105 @@
         <a th:href="@{/admin/users}" class="btn-ghost">Сбросить</a>
     </form>
 
-    <div class="users-grid">
-        <div th:each="u : ${users}" class="user-card">
-            <a th:href="@{'/admin/users/' + ${u.id}}" style="text-decoration:none;color:inherit;">
-                <div class="user-card-head">
-                    <div class="user-avatar"
-                         th:classappend="${u.role.name() == 'ROLE_ADMIN'} ? ' gray' : ''"
-                         th:text="${#strings.substring(u.fullName, 0, 1)}">И</div>
-                    <div class="user-card-name-block">
-                        <div class="user-card-name" th:text="${u.fullName}">Иванов Иван</div>
-                        <div class="user-card-email" th:text="${u.email}">a@b.c</div>
-                    </div>
-                </div>
-
-                <!-- Бейдж роли -->
-                <div style="margin-bottom:10px;">
-                    <span th:if="${u.role.name() == 'ROLE_ADMIN'}"
-                          class="badge admin"
-                          style="font-size:12px; padding:4px 12px;">
-                        🛡️ Администратор
-                    </span>
-                    <span th:unless="${u.role.name() == 'ROLE_ADMIN'}"
-                          class="badge"
-                          style="font-size:12px; padding:4px 12px;">
-                        Клиент
-                    </span>
-                </div>
-
-                <div class="user-card-row">
-                    <span class="muted small">Телефон</span>
-                    <span th:text="${u.phone} ?: '—'">—</span>
-                </div>
-                <div class="user-card-row">
-                    <span class="muted small">Статус</span>
-                    <span th:if="${u.enabled}" class="badge ok">Активен</span>
-                    <span th:unless="${u.enabled}" class="badge warn">Заблокирован</span>
-                </div>
-                <div class="user-card-row">
-                    <span class="muted small">Регистрация</span>
-                    <span th:text="${#temporals.format(u.createdAt,'dd.MM.yyyy HH:mm')}">—</span>
-                </div>
-            </a>
-
-            <div class="user-card-actions">
-                <a th:href="@{'/admin/users/' + ${u.id} + '/edit'}"
-                   class="btn-ghost btn-sm" title="Редактировать">✎ Изменить</a>
-
-                <!-- Блокировка только для клиентов -->
-                <form th:if="${u.role.name() != 'ROLE_ADMIN'}"
-                      method="post"
-                      th:action="@{'/admin/users/' + ${u.id} + '/toggle'}"
-                      style="display:inline">
-                    <button type="submit"
-                            th:classappend="${u.enabled} ? 'btn-ghost btn-sm' : 'btn btn-sm'"
-                            th:text="${u.enabled ? '🚫 Заблокировать' : '✓ Разблокировать'}">
-                        Заблокировать
-                    </button>
-                </form>
-
-                <!-- Удаление для всех, включая админов -->
-                <form method="post"
-                      th:action="@{'/admin/users/' + ${u.id} + '/delete'}"
-                      onsubmit="return confirm('Удалить пользователя? Действие необратимо.');"
-                      style="display:inline; margin-left:auto;">
-                    <button type="submit" class="btn-danger btn-sm" title="Удалить">🗑</button>
-                </form>
-            </div>
-        </div>
-
-        <div th:if="${#lists.isEmpty(users)}" class="empty">
-            Нет пользователей по заданным условиям
-        </div>
+    <div th:if="${#lists.isEmpty(users)}" class="empty-state">
+        <span class="icon">👥</span>
+        <h3>Нет пользователей по заданным условиям</h3>
+        <p>Измените фильтр или создайте нового клиента.</p>
     </div>
+
+    <th:block th:if="${not #lists.isEmpty(users)}">
+        <th:block th:with="admins=${users.?[role.name() == 'ROLE_ADMIN']},
+                         clients=${users.?[role.name() != 'ROLE_ADMIN']}">
+
+            <section th:if="${not #lists.isEmpty(admins)}" class="user-section">
+                <h2 class="user-section-title">
+                    <span class="user-section-icon">🛡️</span>
+                    Администраторы
+                    <span class="user-section-count" th:text="${#lists.size(admins)}">0</span>
+                </h2>
+                <div class="user-list">
+                    <a th:each="u : ${admins}"
+                       th:href="@{'/admin/users/' + ${u.id}}"
+                       class="user-row user-row-admin">
+                        <div class="user-avatar-sm user-avatar-admin"
+                             th:text="${#strings.substring(u.fullName, 0, 1)}">И</div>
+                        <div class="user-row-main">
+                            <div class="user-row-name" th:text="${u.fullName}">Иванов Иван Иванович</div>
+                            <div class="user-row-sub" th:text="${u.email}">a@b.c</div>
+                        </div>
+                        <div class="user-row-cell user-row-phone">
+                            <span th:text="${u.phone} ?: '—'">—</span>
+                        </div>
+                        <div class="user-row-cell user-row-date">
+                            <span th:text="${#temporals.format(u.createdAt,'dd.MM.yyyy')}">—</span>
+                        </div>
+                        <div class="user-row-cell user-row-status">
+                            <span th:if="${u.enabled}" class="badge ok">Активен</span>
+                            <span th:unless="${u.enabled}" class="badge warn">Заблокирован</span>
+                        </div>
+                        <div class="user-row-actions" onclick="event.stopPropagation(); event.preventDefault();">
+                            <a th:href="@{'/admin/users/' + ${u.id} + '/edit'}"
+                               class="action-icon" title="Редактировать">✎</a>
+                            <form method="post"
+                                  th:action="@{'/admin/users/' + ${u.id} + '/delete'}"
+                                  onsubmit="return confirm('Удалить пользователя?');"
+                                  style="display:inline; margin:0;">
+                                <button type="submit" class="action-icon action-danger" title="Удалить">🗑</button>
+                            </form>
+                        </div>
+                    </a>
+                </div>
+            </section>
+
+            <section th:if="${not #lists.isEmpty(clients)}" class="user-section">
+                <h2 class="user-section-title">
+                    <span class="user-section-icon">👤</span>
+                    Клиенты
+                    <span class="user-section-count" th:text="${#lists.size(clients)}">0</span>
+                </h2>
+                <div class="user-list">
+                    <a th:each="u : ${clients}"
+                       th:href="@{'/admin/users/' + ${u.id}}"
+                       class="user-row">
+                        <div class="user-avatar-sm"
+                             th:text="${#strings.substring(u.fullName, 0, 1)}">И</div>
+                        <div class="user-row-main">
+                            <div class="user-row-name" th:text="${u.fullName}">Иванов Иван Иванович</div>
+                            <div class="user-row-sub" th:text="${u.email}">a@b.c</div>
+                        </div>
+                        <div class="user-row-cell user-row-phone">
+                            <span th:text="${u.phone} ?: '—'">—</span>
+                        </div>
+                        <div class="user-row-cell user-row-date">
+                            <span th:text="${#temporals.format(u.createdAt,'dd.MM.yyyy')}">—</span>
+                        </div>
+                        <div class="user-row-cell user-row-status">
+                            <span th:if="${u.enabled}" class="badge ok">Активен</span>
+                            <span th:unless="${u.enabled}" class="badge warn">Заблокирован</span>
+                        </div>
+                        <div class="user-row-actions" onclick="event.stopPropagation(); event.preventDefault();">
+                            <a th:href="@{'/admin/users/' + ${u.id} + '/edit'}"
+                               class="action-icon" title="Редактировать">✎</a>
+                            <form method="post"
+                                  th:action="@{'/admin/users/' + ${u.id} + '/toggle'}"
+                                  style="display:inline; margin:0;">
+                                <button type="submit"
+                                        class="action-icon"
+                                        th:title="${u.enabled} ? 'Заблокировать' : 'Разблокировать'"
+                                        th:text="${u.enabled} ? '🚫' : '✓'">🚫</button>
+                            </form>
+                            <form method="post"
+                                  th:action="@{'/admin/users/' + ${u.id} + '/delete'}"
+                                  onsubmit="return confirm('Удалить клиента и все его документы?');"
+                                  style="display:inline; margin:0;">
+                                <button type="submit" class="action-icon action-danger" title="Удалить">🗑</button>
+                            </form>
+                        </div>
+                    </a>
+                </div>
+            </section>
+        </th:block>
+    </th:block>
 </main>
 <script th:src="@{/js/command-palette.js}"></script>
 <script th:src="@{/js/skeleton.js}"></script>

@@ -2768,3 +2768,166 @@ table.docs td.actions {
         -webkit-text-size-adjust: 100%;
     }
 }
+
+/* ============================================================
+   Список клиентов — красивый перечень (строки, не карточки)
+   ============================================================ */
+
+.user-section {
+    margin-bottom: 32px;
+}
+
+.user-section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #5a6478;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.user-section-icon { font-size: 16px; }
+
+.user-section-count {
+    background: #e6efff;
+    color: #2454ff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 1px 9px;
+    border-radius: 999px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.user-list {
+    background: #fff;
+    border: 1px solid #e3e7ee;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.user-row {
+    display: grid;
+    grid-template-columns: 44px 1fr 160px 110px 130px 130px;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 20px;
+    text-decoration: none;
+    color: inherit;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.12s ease;
+    cursor: pointer;
+}
+
+.user-row:last-child { border-bottom: none; }
+.user-row:hover { background: #f8faff; text-decoration: none; }
+
+.user-row-admin {
+    background: linear-gradient(90deg, #fafbff 0%, #ffffff 60%);
+}
+.user-row-admin:hover {
+    background: linear-gradient(90deg, #f0f4ff 0%, #f8faff 60%);
+}
+
+.user-avatar-sm {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2454ff, #7a3fff);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    font-weight: 700;
+    text-transform: uppercase;
+    box-shadow: 0 2px 6px rgba(36,84,255,0.18);
+}
+
+.user-avatar-admin {
+    background: linear-gradient(135deg, #6b7280, #3a4255);
+    box-shadow: 0 2px 6px rgba(58,66,85,0.25);
+}
+
+.user-row-main { min-width: 0; }
+
+.user-row-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2430;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-row-sub {
+    font-size: 12.5px;
+    color: #6a7285;
+    line-height: 1.3;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-row-cell {
+    font-size: 13px;
+    color: #5a6478;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-row-phone { font-variant-numeric: tabular-nums; }
+.user-row-date  { font-variant-numeric: tabular-nums; }
+
+.user-row-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #5a6478;
+    font-size: 15px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
+    padding: 0;
+    font-family: inherit;
+}
+
+.action-icon:hover {
+    background: #e6efff;
+    color: #2454ff;
+    text-decoration: none;
+}
+
+.action-icon.action-danger:hover {
+    background: #fdeaea;
+    color: #a82323;
+}
+
+@media (max-width: 900px) {
+    .user-row {
+        grid-template-columns: 40px 1fr 130px;
+        gap: 10px;
+        padding: 12px 14px;
+    }
+    .user-row-phone, .user-row-date { display: none; }
+    .user-row-actions { grid-column: 3; }
+}
