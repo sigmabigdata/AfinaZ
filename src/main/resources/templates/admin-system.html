@@ -118,14 +118,16 @@
 
         <div class="alert info" style="margin-bottom:10px;">
             <b>🔒 Бэкапы зашифрованы AES-256</b>.
-            Скачать и удалить можно из UI. <b>Восстановление</b> — только через CLI на сервере
+            Скачать и удалить можно из UI. <b>Восстановление</b> — только через CLI
+            на сервере, где развёрнут сервис
             (пароль бэкапа <code>secrets/backup.pass</code> не покидает сервер):
             <br>
             <code>afina restore</code> — восстановить БД (покажет список бэкапов)
             <br>
             <code>afina restore-files</code> — восстановить файлы storage
             <br>
-            <span class="muted small">Резервный вариант без CLI-меню: <code>cd /opt/afinaz &amp;&amp; ./restore-prod.sh backups/afina_*.sql.gz.enc</code></span>
+            <span class="muted small">Резервный вариант без CLI-меню: в каталоге сервиса
+            <code>./restore-prod.sh backups/afina_*.sql.gz.enc</code></span>
         </div>
 
         <table class="docs">
@@ -320,7 +322,7 @@
         </p>
 
         <p style="margin:16px 0 8px; font-weight:600;">
-            Выполни на сервере <span class="muted small">(если не там — сначала <code>ssh root@195.206.252.79</code>)</span>:
+            Выполни на сервере, где развёрнут сервис:
         </p>
         <pre id="cli-restore-cmd" style="background:#0f172a; color:#e2e8f0;
              padding:14px 16px; border-radius:8px; font-size:12px;
@@ -451,16 +453,15 @@
     var closeBtn = document.getElementById('cli-restore-close');
 
     function buildCommand(fileName) {
+        // Сервис может быть развёрнут в любом каталоге — не хардкодим путь.
+        // Пользователь сам перейдёт в каталог сервиса.
         // Для .sql.gz.enc — восстановление БД
         // Для .tar.gz.enc — восстановление storage
         var isStorage = /\.tar\.gz\.enc$/.test(fileName);
         var direct = isStorage
             ? './restore-storage.sh backups/' + fileName
             : './restore-prod.sh backups/' + fileName;
-        return [
-            'cd /opt/afinaz',
-            direct
-        ].join('\n');
+        return direct;
     }
 
     document.querySelectorAll('.btn-cli-restore').forEach(function (btn) {
