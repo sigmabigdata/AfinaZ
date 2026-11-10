@@ -80,6 +80,7 @@ services:
       - ./secrets:/opt/afinaz/secrets:ro
       # Только для /admin/system/cleanup. --volumes НИКОГДА не передаётся.
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./angie-certs:/opt/afinaz/angie-certs
     logging:
       driver: json-file
       options:

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>НБД-Банк · SSL-сертификат</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<header class="admin-header">
+    <a th:href="@{/admin}" class="brand">
+        <img src="/img/logo.png" alt="НБД-Банк" class="brand-logo">
+    </a>
+    <nav class="admin-nav">
+        <a th:href="@{/admin}">Дашборд</a>
+        <a th:href="@{/admin/users}">Клиенты</a>
+        <a th:href="@{/admin/templates}">Шаблоны</a>
+        <a th:href="@{/admin/system}">Система</a>
+        <a th:href="@{/admin/monitor}">Мониторинг</a>
+        <a th:href="@{/admin/crl}">CRL</a>
+        <a th:href="@{/admin/audit}">Аудит</a>
+        <a th:href="@{/admin/keys}">Ключи</a>
+        <a th:href="@{/admin/settings}">Настройки</a>
+        <a th:href="@{/admin/ssl}" class="active">SSL</a>
+        <a th:href="@{/admin/poa}">Доверенности</a>
+    </nav>
+</header>
+<main>
+    <h1>SSL-сертификат</h1>
+
+    <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
+    <div th:if="${err}" class="alert err" th:text="${err}"></div>
+    <div th:if="${warn}" class="alert warn" th:text="${warn}"></div>
+
+    <div th:if="${hasCert}" class="alert info">
+        ✅ Загружен пользовательский сертификат (Angie использует его).
+    </div>
+    <div th:unless="${hasCert}" class="alert info">
+        🔒 Используется self-signed сертификат (по умолчанию).
+    </div>
+
+    <section class="panel">
+        <h2>Загрузить сертификат</h2>
+        <p class="muted">Файлы в формате PEM (fullchain.pem + privkey.pem). Ключ должен соответствовать сертификату.</p>
+        <form method="post" th:action="@{/admin/ssl/upload}" enctype="multipart/form-data">
+            <div class="form-field">
+                <label>Файл сертификата (fullchain.pem)</label>
+                <input type="file" name="certFile" accept=".pem,.crt,.cer" required>
+            </div>
+            <div class="form-field">
+                <label>Файл приватного ключа (privkey.pem)</label>
+                <input type="file" name="keyFile" accept=".pem,.key" required>
+            </div>
+            <button type="submit">Загрузить и применить</button>
+        </form>
+    </section>
+
+    <section class="panel">
+        <h2>Удалить сертификат</h2>
+        <p>Вернуть self-signed сертификат.</p>
+        <form method="post" th:action="@{/admin/ssl/delete}" onsubmit="return confirm('Удалить текущий SSL-сертификат?');">
+            <button type="submit" class="btn-danger">Удалить</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>
