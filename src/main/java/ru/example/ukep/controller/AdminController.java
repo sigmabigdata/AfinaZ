@@ -306,7 +306,7 @@ public class AdminController {
                 List<DocumentSignature> sigs = documentService.listSignatures(d.getId());
                 if (sigs.isEmpty()) continue;
 
-                String base = stripExtension(d.getOriginalName());
+                String base = FileNames.sanitizeZipEntry(stripExtension(d.getOriginalName()));
                 for (int i = 0; i < sigs.size(); i++) {
                     DocumentSignature sig = sigs.get(i);
                     byte[] bytes = Base64.getDecoder().decode(sig.getSignatureBase64().replaceAll("\s+", ""));

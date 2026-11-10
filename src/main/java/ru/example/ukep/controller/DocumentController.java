@@ -162,12 +162,13 @@ public class DocumentController {
         byte[] sigBytes = Base64.getDecoder().decode(
                 doc.getSignatureBase64().replaceAll("\\s+", ""));
 
-        String base = stripExtension(doc.getOriginalName());
+        String safeName = FileNames.sanitizeZipEntry(doc.getOriginalName());
+        String base = stripExtension(safeName);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         Set<String> usedNames = new HashSet<>();
         try (ZipOutputStream zip = new ZipOutputStream(baos)) {
-            String docEntry = uniqueEntryName(doc.getOriginalName(), usedNames);
+            String docEntry = uniqueEntryName(safeName, usedNames);
             zip.putNextEntry(new ZipEntry(docEntry));
             zip.write(docBytes);
             zip.closeEntry();

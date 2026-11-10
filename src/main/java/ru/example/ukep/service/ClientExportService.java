@@ -261,8 +261,7 @@ public class ClientExportService {
     }
 
     private static String sanitize(String s) {
-        if (s == null) return "file";
-        return s.replaceAll("[^a-zA-Z0-9._-]", "_");
+        return ru.example.ukep.util.FileNames.sanitizeZipEntry(s);
     }
 
     private static String stripExtension(String name) {
