@@ -134,38 +134,82 @@ public class EmailService {
         }
     }
 
-    /** Возвращает JavaMailSender: из БД (если настроен) или spring-boot fallback. */
+    /**
+     * Возвращает JavaMailSender.
+     * <p>Приоритет: <b>.env.prod (spring.mail.*)</b> → app_settings.smtp.* → null.
+     * <p>Раньше было наоборот: если админ открывал /admin/settings и сохранял
+     * что-то в форме SMTP, в БД появлялся smtp.host и приложение начинало
+     * игнорировать .env.prod. Плюс в buildFromSettings() был жёстко зашит
+     * {@code mail.smtp.auth=true} — при пустом пароле это давало 535.
+     */
     private JavaMailSender resolveSender(boolean force) {
+        JavaMailSender envSender = mailSenderProvider.getIfAvailable();
+
+        // 1) Основной путь — spring.mail.* из .env.prod.
+        //    Считаем «настроенным», если host задан и это не localhost-заглушка.
+        if (isEnvConfigured(envSender)) {
+            return envSender;
+        }
+
+        // 2) Fallback — настройки из БД (legacy/override, только если .env пуст).
         if (settings.isSmtpConfigured()) {
             return buildFromSettings();
         }
-        // Fallback на spring.mail.* из env
+
+        // 3) Нет SMTP вообще.
         if (!force && !"smtp".equalsIgnoreCase(mode)) {
             return null;
         }
-        return mailSenderProvider.getIfAvailable();
+        return envSender;
+    }
+
+    /** true, если spring.mail.* из .env.prod задан осмысленно (не localhost). */
+    private static boolean isEnvConfigured(JavaMailSender sender) {
+        if (!(sender instanceof JavaMailSenderImpl impl)) {
+            return false;
+        }
+        String host = impl.getHost();
+        return host != null
+                && !host.isBlank()
+                && !"localhost".equalsIgnoreCase(host)
+                && !"127.0.0.1".equals(host);
     }
 
     private JavaMailSenderImpl buildFromSettings() {
         JavaMailSenderImpl impl = new JavaMailSenderImpl();
         impl.setHost(settings.getOrDefault("smtp.host", ""));
-        impl.setPort(settings.getIntOrDefault("smtp.port", 465));
-        impl.setUsername(settings.getOrDefault("smtp.username", ""));
+        impl.setPort(settings.getIntOrDefault("smtp.port", 25));
+
+        String username = settings.getOrDefault("smtp.username", "");
         String pwd = settings.getSmtpPasswordDecrypted(pii);
-        impl.setPassword(pwd);
+
+        // auth=true только если задан username (иначе Postfix на 25 без auth).
+        boolean needAuth = !username.isBlank();
+        if (needAuth) {
+            impl.setUsername(username);
+            impl.setPassword(pwd);
+        }
         impl.setDefaultEncoding("UTF-8");
 
-        boolean ssl = settings.getBoolOrDefault("smtp.ssl", true);
+        // ssl=true → implicit SSL (465); ssl=false → STARTTLS или plain (25/587)
+        boolean ssl = settings.getBoolOrDefault("smtp.ssl", false);
         Properties props = impl.getJavaMailProperties();
         props.put("mail.transport.protocol", "smtp");
-        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.auth", String.valueOf(needAuth));
         props.put("mail.smtp.connectiontimeout", "5000");
         props.put("mail.smtp.timeout", "10000");
         props.put("mail.smtp.writetimeout", "10000");
         if (ssl) {
             props.put("mail.smtp.ssl.enable", "true");
-        } else {
+            props.put("mail.smtp.starttls.enable", "false");
+        } else if (needAuth) {
+            // 587 + auth → STARTTLS обязателен
             props.put("mail.smtp.starttls.enable", "true");
+            props.put("mail.smtp.ssl.enable", "false");
+        } else {
+            // 25 plain без auth (relay по mynetworks)
+            props.put("mail.smtp.ssl.enable", "false");
+            props.put("mail.smtp.starttls.enable", "false");
         }
         return impl;
     }

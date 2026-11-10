@@ -98,6 +98,17 @@
 
         <h2>SMTP (отправка email)</h2>
 
+        <div class="alert warn" style="margin-bottom:16px">
+            <b>⚠️ Не заполняйте поля ниже без необходимости.</b><br>
+            По умолчанию письма идут через SMTP из <code>.env.prod</code>
+            (для локального Postfix — порт 25, без пароля). Заполненные
+            поля ниже <b>переопределяют</b> <code>.env.prod</code>.
+            Если сомневаетесь — нажмите «↻ Сбросить к .env.prod».
+            <br><br>
+            <b>Правило:</b> локальный Postfix → порт 25, без пароля.
+            Внешний SMTP (Yandex/Mailgun) → порт 587 + логин + пароль.
+        </div>
+
         <div class="alert info" style="margin-bottom:16px">
             <b>Если поля пусты</b> — используются настройки из <code>.env.prod</code>:
             <table class="kv-table" style="margin:10px 0 0;">

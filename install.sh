@@ -420,6 +420,43 @@ else
     ok "Образы готовы"
 fi
 
+# ─── Шаг 9.5: Postfix mynetworks (для локальной почты) ───
+hdr "Postfix (локальная доставка почты)"
+
+if command -v postconf &>/dev/null; then
+    # Бэкап
+    cp /etc/postfix/main.cf /etc/postfix/main.cf.bak.$(date +%s) 2>/dev/null || true
+
+    CURRENT_NET=$(postconf -h mynetworks 2>/dev/null || echo "127.0.0.0/8")
+    log "Текущий mynetworks: $CURRENT_NET"
+
+    NEED_UPDATE=0
+    NEW_NET="$CURRENT_NET"
+    for net in "172.17.0.0/16" "172.18.0.0/16"; do
+        if ! echo "$CURRENT_NET" | grep -qw "$net"; then
+            NEW_NET="$NEW_NET $net"
+            NEED_UPDATE=1
+        fi
+    done
+
+    if [ "$NEED_UPDATE" = "1" ]; then
+        postconf -e "mynetworks = $NEW_NET" 2>/dev/null
+        systemctl reload postfix 2>/dev/null || postfix reload 2>/dev/null || true
+        sleep 1
+        ok "Postfix mynetworks: $NEW_NET"
+    else
+        ok "Postfix mynetworks уже включает Docker-сети"
+    fi
+
+    # Проверка: пускает ли Postfix relay из Docker-сети
+    # (проверяем ПОСЛЕ запуска app, см. ниже — на этом шаге app ещё не поднят)
+else
+    warn "Postfix не установлен на хосте"
+    warn "  Настройте SMTP в .env.prod вручную:"
+    warn "  локальный Postfix: MAIL_HOST=<домен>, MAIL_PORT=25, без пароля"
+    warn "  внешний SMTP: MAIL_PORT=587, MAIL_USERNAME, MAIL_PASSWORD, STARTTLS=true"
+fi
+
 # ─── Шаг 10: Запуск ──────────────────────────────────
 hdr "Запуск стека (поэтапно)"
 
@@ -497,6 +534,29 @@ echo -e "  ${DIM}▶ angie...${N}"
 $COMPOSE_CMD -f docker-compose-prod.yml --env-file .env.prod up -d angie 2>&1 | tail -2
 sleep 5
 ok "Angie запущен"
+
+# 10.5. Проверка SMTP-relay из контейнера app
+echo -e "  ${DIM}▶ SMTP relay...${N}"
+if docker exec afina-app sh -c 'command -v python3 >/dev/null 2>&1' 2>/dev/null; then
+    RELAY_RESULT=$(docker exec afina-app python3 -c '
+import smtplib, os
+try:
+    s = smtplib.SMTP(os.environ.get("MAIL_HOST","localhost"),
+                     int(os.environ.get("MAIL_PORT","25")), timeout=5)
+    s.ehlo(); s.quit()
+    print("OK")
+except Exception as e:
+    print("FAIL:" + str(e))
+' 2>/dev/null || echo "FAIL:no-python")
+
+    case "$RELAY_RESULT" in
+        OK) ok "SMTP relay: подключение к Postfix работает" ;;
+        FAIL:no-python) warn "SMTP: python3 нет в контейнере — пропускаю проверку" ;;
+        *) warn "SMTP relay: $RELAY_RESULT" ;;
+    esac
+else
+    warn "SMTP: пропускаю проверку (нет python3 в контейнере)"
+fi
 
 
 # ─── Шаг 11: Тесты ───────────────────────────────────
