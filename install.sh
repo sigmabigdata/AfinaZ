@@ -187,11 +187,25 @@ fi
 hdr "Конфигурация .env.prod"
 [ -f .env.prod ] && cp .env.prod ".env.prod.bak.$(date +%s)"
 
-DB_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
-DB_MIG_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
-DB_AUD_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
-DB_SUPER_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+if [ -f .env.prod ] && [ "$KEEP_ENV" != "0" ]; then
+    # .env.prod уже есть — берем пароли из него, не перегенерируем
+    warn ".env.prod уже существует — пароли БД берутся из него"
+    DB_PASS=$(grep '^DB_PASSWORD=' .env.prod | cut -d'=' -f2)
+    DB_MIG_PASS=$(grep '^DB_MIGRATOR_PASSWORD=' .env.prod | cut -d'=' -f2)
+    DB_AUD_PASS=$(grep '^DB_AUDITOR_PASSWORD=' .env.prod | cut -d'=' -f2)
+    DB_SUPER_PASS=$(grep '^DB_SUPERUSER_PASSWORD=' .env.prod | cut -d'=' -f2)
+    SKIP_ENV_WRITE=1
+else
+    DB_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+    DB_MIG_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+    DB_AUD_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+    DB_SUPER_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+    SKIP_ENV_WRITE=0
+fi
 
+if [ "$SKIP_ENV_WRITE" = "1" ]; then
+    ok ".env.prod сохранён без изменений"
+else
 cat > .env.prod << EOF
 APP_DOMAIN=${APP_DOMAIN}
 APP_BASE_URL=${APP_BASE_URL}
@@ -224,6 +238,7 @@ CRYPTO_PRO_ENABLED=true
 EOF
 chmod 600 .env.prod
 ok ".env.prod создан"
+fi
 
 CREDS_FILE="install-credentials-$(date +%Y%m%d_%H%M%S).txt"
 cat > "$CREDS_FILE" << EOF
