@@ -30,11 +30,16 @@
 </header>
 
 <main>
-    <p><a th:href="@{/admin/users}" class="btn-ghost">← Ко всем клиентам</a></p>
+    <div class="breadcrumb">
+        <a th:href="@{/admin/users}">Клиенты</a>
+        <span class="sep">›</span>
+        <span th:text="${user.fullName}">ФИО</span>
+    </div>
 
     <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
     <div th:if="${err}" class="alert err" th:text="${err}"></div>
 
+    <!-- ═══ Шапка клиента ═══ -->
     <div class="client-card">
         <div>
             <div class="user-avatar big"
@@ -43,9 +48,9 @@
         </div>
         <div>
             <h1 class="client-name" th:text="${user.fullName}">Иванов Иван Иванович</h1>
-            <div style="margin-bottom:18px; display:flex; gap:8px; align-items:center;">
-                <span th:if="${user.role.name() == ROLE_ADMIN}" class="badge admin" style="font-size:13px; padding:5px 14px;">🛡️ Администратор</span>
-                <span th:unless="${user.role.name() == ROLE_ADMIN}" class="badge" style="font-size:13px; padding:5px 14px;">Клиент</span>
+            <div style="margin-bottom:14px; display:flex; gap:8px; align-items:center;">
+                <span th:if="${user.role.name() == 'ROLE_ADMIN'}" class="badge admin" style="font-size:13px; padding:5px 14px;">🛡️ Администратор</span>
+                <span th:unless="${user.role.name() == 'ROLE_ADMIN'}" class="badge" style="font-size:13px; padding:5px 14px;">Клиент</span>
             </div>
             <div class="client-name-sub" th:text="${user.email}">client@example.com</div>
 
@@ -53,11 +58,6 @@
                 <div>
                     <span class="muted">Телефон:</span>
                     <b th:text="${user.phone} ?: '—'">—</b>
-                </div>
-                <div>
-                    <span class="muted">Роль:</span>
-                    <span th:if="${user.role.name() == 'ROLE_ADMIN'}" class="badge admin">Админ</span>
-                    <span th:unless="${user.role.name() == 'ROLE_ADMIN'}" class="badge">Клиент</span>
                 </div>
                 <div>
                     <span class="muted">Статус:</span>
@@ -88,6 +88,10 @@
                          th:text="${docsTotal - docsSigned}">0</div>
                     <div class="stat-mini-label">Без подписи</div>
                 </div>
+                <div>
+                    <div class="stat-mini-value" th:text="${#lists.size(folders)}">0</div>
+                    <div class="stat-mini-label">Разделов</div>
+                </div>
             </div>
 
             <div class="client-actions">
@@ -110,13 +114,6 @@
                    class="btn-ghost" style="background:#f0f4ff; color:#2454ff; border-color:#c7d2fe;">
                     📦 Скачать всё (ZIP)
                 </a>
-
-                <button type="button" id="btn-sign-all" class="btn"
-                        style="background:linear-gradient(135deg,#2454ff,#7a3fff); border:none;
-                               color:#fff; white-space:nowrap;"
-                        title="Подписать все неподписанные документы клиента">
-                    ✍ Подписать всё
-                </button>
 
                 <form th:if="${user.role.name() != 'ROLE_ADMIN'}"
                       method="post"
@@ -141,16 +138,15 @@
         </div>
     </div>
 
-    <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
-    <div th:if="${err}" class="alert err" th:text="${err}"></div>
+    <!-- ═══ Разделы ═══ -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:24px 0 16px;">
+        <h2 style="margin:0;">Разделы клиента</h2>
+    </div>
 
-    <h2>Разделы и документы клиента</h2>
-
-    <!-- Создать раздел клиенту -->
     <form method="post" th:action="@{'/admin/users/' + ${user.id} + '/folders/create'}"
-          class="upload-form" style="margin-bottom:24px;">
+          class="upload-form" style="margin-bottom:20px;">
         <input type="text" name="name" required
-               placeholder="Название нового раздела для клиента"
+               placeholder="Название нового раздела (например: Учредительные документы)"
                style="flex:1; padding:10px 12px; border:1px solid #cfd6e4; border-radius:8px; font-size:14px;"/>
         <button type="submit">+ Создать раздел</button>
     </form>
@@ -158,288 +154,36 @@
     <div th:if="${#lists.isEmpty(folders)}" class="empty-state">
         <span class="icon">📂</span>
         <h3>У клиента нет разделов</h3>
-        <p>Создайте раздел выше, чтобы загрузить документы от имени клиента,
-           или отправьте клиенту ссылку для самостоятельной загрузки.</p>
-        <div class="empty-actions">
-            <form th:if="${user.enabled}" method="post"
-                  th:action="@{'/admin/users/' + ${user.id} + '/send-login-link'}"
-                  style="margin:0;">
-                <button type="submit" class="btn">✉ Отправить клиенту ссылку</button>
-            </form>
-        </div>
+        <p>Создайте первый раздел выше, чтобы загружать в него документы от имени клиента.</p>
     </div>
 
-    <!-- Плитки разделов -->
-    <div th:each="f, folderStat : ${folders}"
-         th:with="docs=${documentsByFolder.get(f.id)},
-                  total=${#lists.size(docs)},
-                  signed=${#lists.size(docs.?[signed])},
-                  unsigned=${total - signed}"
-         th:classappend="'folder-color-' + ${folderStat.index % 6}"
-         class="folder-card" th:attr="data-folder-id=${f.id}">
-
-        <div class="folder-card-header">
-            <div class="folder-card-title-block">
-                <div class="folder-icon">📁</div>
-                <div style="min-width:0;">
-                    <div class="folder-name" th:text="${f.name}">Раздел</div>
-                    <div class="folder-stats">
-                        <span class="folder-stat stat-total">
-                            <b th:text="${total}">0</b> всего
-                        </span>
-                        <span class="folder-stat stat-signed" th:if="${signed > 0}">
-                            ✅ <b th:text="${signed}">0</b>
-                        </span>
-                        <span class="folder-stat stat-unsigned" th:if="${unsigned > 0}">
-                            ⚠️ <b th:text="${unsigned}">0</b>
-                        </span>
-                    </div>
+    <div th:if="${not #lists.isEmpty(folders)}" class="folder-tile-grid">
+        <a th:each="f, folderStat : ${folders}"
+           th:href="@{'/admin/users/' + ${user.id} + '/folders/' + ${f.id}}"
+           th:with="docs=${documentsByFolder.get(f.id)},
+                    total=${#lists.size(docs)},
+                    signed=${#lists.size(docs.?[signed])},
+                    unsigned=${total - signed}"
+           th:classappend="'folder-color-' + ${folderStat.index % 6}"
+           class="folder-tile">
+            <div class="folder-tile-icon">📁</div>
+            <div class="folder-tile-body">
+                <div class="folder-tile-name" th:text="${f.name}">Раздел</div>
+                <div class="folder-tile-stats">
+                    <span th:text="${total} + ' док.'">0 док.</span>
+                    <span th:if="${signed > 0}" class="folder-tile-stat-ok">
+                        ✅ <span th:text="${signed}">0</span>
+                    </span>
+                    <span th:if="${unsigned > 0}" class="folder-tile-stat-warn">
+                        ⚠️ <span th:text="${unsigned}">0</span>
+                    </span>
                 </div>
             </div>
-            <div class="folder-actions">
-                <button type="button"
-                        th:attr="data-folder-id=${f.id}"
-                        onclick="if(window.BatchSign &amp;&amp; window.BatchSign.signAllInSection){window.BatchSign.signAllInSection(this.getAttribute('data-folder-id'))}else{alert('Batch недоступен. Обновите страницу (Ctrl+Shift+R)')}"
-                        title="Подписать все неподписанные в разделе"
-                        style="background: linear-gradient(135deg,#2454ff,#7a3fff); color: #ffffff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; line-height: 1.2;">
-                    ✍ Подписать всё
-                </button>
-                
-                <button type="button" class="btn-ghost btn-rename-folder"
-                        th:attr="data-folder-id=${f.id}, data-folder-name=${f.name}">✎ Переименовать</button>
-                <form method="post"
-                      th:action="@{'/admin/users/' + ${user.id} + '/folders/' + ${f.id} + '/delete'}"
-                      onsubmit="return confirm('ВНИМАНИЕ! Удалить раздел со всеми документами и подписями?');"
-                      style="display:inline">
-                    <button type="submit" class="btn-danger">🗑 Удалить</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Форма загрузки -->
-        <form method="post"
-              th:action="@{'/admin/users/' + ${user.id} + '/documents/upload'}"
-              enctype="multipart/form-data"
-              class="upload-form">
-            <input type="hidden" name="folderId" th:value="${f.id}"/>
-            <input type="file" name="file" required/>
-            <button type="submit">Загрузить за клиента</button>
-        </form>
-
-        <!-- Пустое состояние -->
-        <div th:if="${#lists.isEmpty(documentsByFolder.get(f.id))}" class="folder-empty">
-            <span class="folder-empty-icon">📂</span>
-            <strong>Документов пока нет</strong>
-            Загрузите первый файл в этот раздел от имени клиента.
-        </div>
-
-        <div th:if="${not #lists.isEmpty(documentsByFolder.get(f.id))}"
-             style="overflow-x: auto; margin: 0 22px 16px;">
-        <table class="docs" style="width: 100%;">
-            <thead><tr>
-                <th style="width:36px;"></th>
-                <th style="width:200px;">Документ</th>
-                <th style="width:120px;">Загружен</th>
-                <th style="width:110px;">Статус</th>
-                <th>Подпись</th>
-                <th style="width:200px;"></th>
-            </tr></thead>
-            <tbody>
-            <tr th:each="d : ${documentsByFolder.get(f.id)}" th:attr="data-doc-id=${d.id},data-signed=${d.signed}">
-                <td>
-                    <input type="checkbox" class="doc-checkbox"
-                           th:if="${not d.signed}"
-                           th:attr="data-id=${d.id}"
-                           title="Выбрать для массового подписания"/>
-                </td>
-                <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                    th:text="${d.originalName}"
-                    th:title="${d.originalName}">file.pdf</td>
-                <td th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</td>
-                <td>
-                    <span th:if="${d.signed}" class="badge ok">Подписан</span>
-                    <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
-                </td>
-                <td>
-                    <div th:if="${not #lists.isEmpty(d.signatures)}">
-                        <div th:each="sig, st : ${d.signatures}" class="sig-item small">
-                            <div>
-                                <b th:text="${st.index + 1} + '. '">1. </b>
-                                <span th:text="${sig.signerSubject}">ФИО</span>
-                            </div>
-                            <div class="muted small"
-                                 th:text="${#temporals.format(sig.signedAt,'dd.MM.yyyy HH:mm')}">—</div>
-                            <div style="margin-top:4px; display:flex; gap:4px; flex-wrap:wrap; align-items:center;">
-                                <a th:href="@{'/admin/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/download'}"
-                                   class="btn-sig btn-sm" title="Скачать подпись">⬇ .sig</a>
-                                <form method="post"
-                                      th:action="@{'/admin/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/apply-poa'}"
-                                      style="display:inline; margin:0;">
-                                    <input type="hidden" name="apply" th:value="${!sig.applyPoa}"/>
-                                    <button type="submit"
-                                            class="btn-ghost btn-sm"
-                                            th:style="${sig.applyPoa} ? 'background:#e6f7ec; color:#166534; border-color:#c2e7cd;' : ''"
-                                            th:text="${sig.applyPoa ? '✓ Доверенность' : 'Применить доверенность'}"
-                                            title="Применить/отключить доверенность для этой подписи">
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                    <span th:if="${#lists.isEmpty(d.signatures)}" class="muted small">—</span>
-                </td>
-                <td class="actions">
-                    <a th:href="@{'/admin/documents/' + ${d.id} + '/view'}"
-                       target="_blank" title="Просмотреть">👁</a>
-                    <a th:if="${d.signed}"
-                       th:href="@{'/admin/documents/' + ${d.id} + '/visualization'}"
-                       target="_blank" title="Визуализация подписи (PDF)">📄</a>
-                    <a th:href="@{'/admin/documents/' + ${d.id} + '/download'}"
-                       title="Скачать документ">⬇</a>
-                    <a th:if="${d.signed}"
-                       th:href="@{'/admin/documents/' + ${d.id} + '/signing-certificate'}"
-                       title="Справка о подписании (PDF)"
-                       style="color:#2454ff;padding:0 4px;font-size:16px;">📋</a>
-
-                    <!-- Загрузить .sig — доступно всегда, документ станет подписанным -->
-                    <form th:action="@{'/admin/documents/' + ${d.id} + '/upload-signature'}"
-                          method="post" enctype="multipart/form-data"
-                          style="display:inline; margin:0; padding:0;"
-                          onsubmit="return confirm('Загрузить .sig и добавить подпись к документу?');">
-                        <label title="Загрузить .sig из файла (документ станет подписанным)"
-                               style="display:inline-flex; align-items:center; justify-content:center;
-                                      width:32px; height:32px; border-radius:6px; cursor:pointer;
-                                      color:#2454ff; font-size:16px;"
-                               onmouseover="this.style.background='#e6efff'"
-                               onmouseout="this.style.background=''">
-                            📎
-                            <input type="file" name="file" accept=".sig,.p7s,.der" required data-no-drop="1"
-                                   onchange="this.form.submit()"
-                                   style="display:none;"/>
-                        </label>
-                    </form>
-                    <button th:if="${not d.hasSignatureByUser(currentAdminId)}" type="button"
-                            class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
-                    <span th:if="${d.hasSignatureByUser(currentAdminId)}"
-                          class="badge ok" title="Вы уже подписали этот документ"
-                          style="padding:4px 8px;">✓ Вы подписали</span>
-
-                    <form method="post"
-                          th:action="@{'/admin/documents/' + ${d.id} + '/delete'}"
-                          th:onsubmit="${d.signed}
-                              ? 'return confirm(\'ВНИМАНИЕ! Документ подписан. Удаление приведёт к потере всех подписей. Продолжить?\');'
-                              : 'return confirm(\'Удалить документ?\');'"
-                          style="display:inline">
-                        <button type="submit" class="link danger"
-                                th:title="${d.signed} ? 'Удалить подписанный документ (аудит)' : 'Удалить'"
-                                th:text="${d.signed} ? '🗑⚠' : '🗑'">🗑</button>
-                    </form>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        </div>
-    </div>
-
-    <!-- Модалка переименования раздела -->
-    <div id="modal-rename-folder" class="modal" style="display:none">
-        <div class="modal-card">
-            <h2>Переименовать раздел</h2>
-            <form method="post" id="rename-folder-form" style="margin-top:16px;">
-                <input type="text" name="name" id="rename-folder-name" required
-                       style="width:100%; padding:10px 12px; border:1px solid #cbd5e1;
-                              border-radius:8px; font-size:14px; margin-bottom:16px;"/>
-                <div class="modal-actions">
-                    <button type="button" class="btn-ghost" id="rename-folder-cancel">Отмена</button>
-                    <button type="submit" class="btn">Сохранить</button>
-                </div>
-            </form>
-        </div>
+            <div class="folder-tile-arrow">→</div>
+        </a>
     </div>
 </main>
 
-<script>
-(function () {
-    var modal = document.getElementById('modal-rename-folder');
-    var form = document.getElementById('rename-folder-form');
-    var input = document.getElementById('rename-folder-name');
-    var cancel = document.getElementById('rename-folder-cancel');
-
-    document.querySelectorAll('.btn-rename-folder').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var id = btn.dataset.folderId;
-            var name = btn.dataset.folderName;
-            form.action = '/admin/users/' + USER_ID + '/folders/' + id + '/rename';
-            input.value = name || '';
-            modal.style.display = 'flex';
-            setTimeout(function () { input.focus(); input.select(); }, 30);
-        });
-    });
-
-    cancel.addEventListener('click', function () { modal.style.display = 'none'; });
-    modal.addEventListener('click', function (e) {
-        if (e.target === modal) modal.style.display = 'none';
-    });
-})();
-</script>
-
-<script th:inline="javascript">
-    const USER_ID = /*[[${user.id}]]*/ 0;
-</script>
-
-<script type="module" th:src="@{/js/sign.js}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var signAllBtn = document.getElementById('btn-sign-all');
-        if (signAllBtn) {
-            signAllBtn.addEventListener('click', function () {
-                if (window.BatchSign && window.BatchSign.signAllUnsigned) {
-                    window.BatchSign.signAllUnsigned();
-                } else {
-                    alert('Batch-подписание недоступно. Обновите страницу.');
-                }
-            });
-        }
-    });
-</script>
-<script th:src="@{/js/cert-selector.js}"></script>
-<script th:src="@{/js/sign-progress.js}"></script>
-<script th:src="@{/js/stamp.js}"></script>
-<script th:src="@{/js/file-drop.js}"></script>
-<script th:src="@{/js/batch-sign.js}"></script>
-
-<script>
-async function toggleApplyPoa(cb, docId) {
-    const apply = cb.checked;
-    try {
-        const r = await fetch('/admin/documents/' + docId + '/apply-poa?apply=' + apply, {
-            method: 'POST',
-            credentials: 'same-origin'
-        });
-        if (!r.ok) {
-            cb.checked = !apply;
-            alert('Не удалось переключить: HTTP ' + r.status);
-            return;
-        }
-        const data = await r.json();
-        if (apply && data.poaFound === false) {
-            alert('⚠️ Доверенность НЕ найдена.\n\n'
-                + 'ФИО из сертификата: ' + (data.certFio || '—') + '\n\n'
-                + (data.message || 'Проверьте таблицу доверенностей.'));
-        } else if (apply && data.poaFound === true) {
-            alert('✅ Доверенность применена.\n'
-                + '№ ' + data.poaNumber + '\n'
-                + 'Действует до ' + data.poaValidUntil);
-        }
-        if (data.regenError) {
-            console.warn('Regenerate error:', data.regenError);
-        }
-    } catch (e) {
-        cb.checked = !apply;
-        alert('Ошибка: ' + e.message);
-    }
-}
-</script>
 <script th:src="@{/js/command-palette.js}"></script>
 <script th:src="@{/js/skeleton.js}"></script>
 </body>

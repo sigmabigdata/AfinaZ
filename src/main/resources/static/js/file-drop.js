@@ -38,16 +38,20 @@
         var icon = zone.querySelector('.icon');
 
         function updateLabel() {
-            if (input.files && input.files.length) {
-                var name = input.files[0].name;
-                label.textContent = name;
-                zone.classList.add('has-file');
-                icon.textContent = '📄';
-            } else {
+            if (!input.files || !input.files.length) {
                 label.textContent = 'Перетащите файл сюда или кликните';
                 zone.classList.remove('has-file');
                 icon.textContent = '📎';
+                return;
             }
+            var n = input.files.length;
+            if (n === 1) {
+                label.textContent = input.files[0].name;
+            } else {
+                label.textContent = n + ' файлов — начнём с ' + input.files[0].name;
+            }
+            zone.classList.add('has-file');
+            icon.textContent = '📄';
         }
 
         function handleFiles(files) {

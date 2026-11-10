@@ -128,7 +128,6 @@ public class AdminController {
         User admin = userRepository.findByEmailHash(pii.hash(principal.getName()))
                 .orElse(null);
 
-
         var folders = folderService.listForOwner(user);
         var byFolder = new java.util.LinkedHashMap<Long, java.util.List<Document>>();
         for (var f : folders) {
@@ -140,8 +139,6 @@ public class AdminController {
         model.addAttribute("currentAdminId", admin != null ? admin.getId() : null);
         model.addAttribute("folders", folders);
         model.addAttribute("documentsByFolder", byFolder);
-        model.addAttribute("documents",
-                documentRepository.findAllByOwnerOrderByUploadedAtDesc(user));
         model.addAttribute("docsTotal", documentRepository.countByOwner(user));
         model.addAttribute("docsSigned", documentRepository.countByOwnerAndSignedTrue(user));
         return "admin-user-card";
@@ -353,25 +350,83 @@ public class AdminController {
 
     // ==================== ДОКУМЕНТЫ (загрузка/удаление админом) ====================
 
-    /** Загрузить документ в карточку клиента. */
-    @PostMapping("/users/{userId}/documents/upload")
+    /** Страница раздела клиента — документы этого раздела. */
+    @GetMapping("/users/{userId}/folders/{folderId}")
+    public String userFolder(@PathVariable Long userId,
+                             @PathVariable Long folderId,
+                             java.security.Principal principal,
+                             Model model) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
+        var folder = folderService.getById(folderId);
+        if (!folder.getOwner().getId().equals(userId)) {
+            throw new IllegalArgumentException("Раздел не принадлежит этому клиенту");
+        }
+        User admin = userRepository.findByEmailHash(pii.hash(principal.getName()))
+                .orElse(null);
+
+        List<Document> docs = documentRepository.findAllByFolderOrderByUploadedAtDesc(folder);
+        long signed = docs.stream().filter(Document::isSigned).count();
+
+        model.addAttribute("user", user);
+        model.addAttribute("folder", folder);
+        model.addAttribute("documents", docs);
+        model.addAttribute("total", docs.size());
+        model.addAttribute("signed", signed);
+        model.addAttribute("unsigned", docs.size() - signed);
+        model.addAttribute("currentAdminId", admin != null ? admin.getId() : null);
+        return "admin-user-folder";
+    }
+
+    /** Загрузить НЕСКОЛЬКО документов в раздел клиента за один раз. */
+    @PostMapping("/users/{userId}/folders/{folderId}/upload")
     public String uploadForUser(@PathVariable Long userId,
-                                @RequestParam("file") MultipartFile file,
-                                @RequestParam("folderId") Long folderId,
+                                @PathVariable Long folderId,
+                                @RequestParam("files") List<MultipartFile> files,
                                 java.security.Principal principal,
                                 RedirectAttributes ra) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
-        try {
-            var folder = folderService.getOwned(folderId, user);
-            Document doc = documentService.upload(file, user, folder);
-            audit.documentUpload(principal != null ? principal.getName() : UNKNOWN,
-                    doc.getId(), doc.getOriginalName());
-            ra.addFlashAttribute("ok", "Документ загружен: " + doc.getOriginalName());
-        } catch (Exception e) {
-            ra.addFlashAttribute("err", "Не удалось загрузить: " + e.getMessage());
+        var folder = folderService.getOwned(folderId, user);
+        String who = principal != null ? principal.getName() : UNKNOWN;
+
+        int okCount = 0;
+        int failCount = 0;
+        StringBuilder errs = new StringBuilder();
+        List<String> okNames = new java.util.ArrayList<>();
+
+        if (files != null) {
+            for (MultipartFile f : files) {
+                if (f == null || f.isEmpty()) continue;
+                try {
+                    Document doc = documentService.upload(f, user, folder);
+                    audit.documentUpload(who, doc.getId(), doc.getOriginalName());
+                    okCount++;
+                    okNames.add(doc.getOriginalName());
+                } catch (Exception e) {
+                    failCount++;
+                    String n = f.getOriginalFilename() != null ? f.getOriginalFilename() : "?";
+                    errs.append(n).append(": ").append(e.getMessage()).append("; ");
+                }
+            }
         }
-        return REDIR_USERS + userId;
+
+        if (okCount > 0) {
+            String msg = "Загружено файлов: " + okCount;
+            if (okNames.size() <= 3) {
+                msg += " — " + String.join(", ", okNames);
+            }
+            if (failCount > 0) msg += " (ошибок: " + failCount + ")";
+            ra.addFlashAttribute("ok", msg);
+        }
+        if (failCount > 0) {
+            ra.addFlashAttribute("err", "Не удалось загрузить: " + errs);
+        }
+        if (okCount == 0 && failCount == 0) {
+            ra.addFlashAttribute("err", "Не выбрано ни одного файла");
+        }
+
+        return "redirect:/admin/users/" + userId + "/folders/" + folderId;
     }
 
     /** Удалить документ клиента. */
