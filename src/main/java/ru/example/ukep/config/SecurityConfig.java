@@ -98,7 +98,7 @@ public class SecurityConfig {
                     return;
                 }
                 String ip = clientIp((HttpServletRequest) req);
-                if (!allowed.contains(ip)) {
+                if (!isAllowedIp(ip, allowed)) {
                     log.warn("Blocked admin access from IP: {}", ip);
                     ((HttpServletResponse) res).sendError(HttpServletResponse.SC_FORBIDDEN,
                             "Admin area available only from server");
@@ -107,6 +107,49 @@ public class SecurityConfig {
                 chain.doFilter(req, res);
             }
         };
+    }
+
+    /** Проверка IP по whitelist: exact match для одиночных, CIDR для «x.x.x.x/n». */
+    private static boolean isAllowedIp(String ip, List<String> allowed) {
+        if (ip == null || ip.isBlank()) return false;
+        for (String pattern : allowed) {
+            if (pattern.equals(ip)) return true;
+            if (pattern.indexOf('/') > 0 && isInCidr(ip, pattern)) return true;
+        }
+        return false;
+    }
+
+    /** Проверка: попадает ли IP в CIDR-подсеть (IPv4). IPv6 — только exact. */
+    private static boolean isInCidr(String ip, String cidr) {
+        try {
+            String[] parts = cidr.split("/", 2);
+            if (parts.length != 2) return false;
+
+            java.net.InetAddress network = java.net.InetAddress.getByName(parts[0]);
+            java.net.InetAddress address = java.net.InetAddress.getByName(ip);
+
+            byte[] networkBytes = network.getAddress();
+            byte[] addressBytes = address.getAddress();
+            if (networkBytes.length != addressBytes.length) return false;
+            if (networkBytes.length != 4) return false;  // CIDR только IPv4
+
+            int prefixLen = Integer.parseInt(parts[1]);
+            if (prefixLen < 0 || prefixLen > 32) return false;
+
+            int fullBytes = prefixLen / 8;
+            int remainingBits = prefixLen % 8;
+
+            for (int i = 0; i < fullBytes; i++) {
+                if (networkBytes[i] != addressBytes[i]) return false;
+            }
+            if (remainingBits > 0) {
+                int mask = (0xFF << (8 - remainingBits)) & 0xFF;
+                if ((networkBytes[fullBytes] & mask) != (addressBytes[fullBytes] & mask)) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /** AJAX/JSON-запрос? Тогда при отсутствии сессии возвращаем 401, а не редирект. */
