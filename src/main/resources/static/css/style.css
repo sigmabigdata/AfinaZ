@@ -364,13 +364,34 @@ table.docs td.actions {
     min-width: 280px;
 }
 .actions form { display: inline-flex; margin: 0; padding: 0; }
-.actions a, .actions button, .actions label {
+/* Иконочные кнопки в .actions (без класса .btn*, а также .btn-sign) — 28x28 */
+.actions > a:not([class]),
+.actions > button:not([class]),
+.actions > .btn-sign,
+.actions > form > button:not([class]),
+.actions > form > label:not([class]) {
     display: inline-flex; align-items: center; justify-content: center;
     width: 28px; height: 28px; padding: 0; margin: 0;
     background: none; color: #2454ff;
     border: none; border-radius: 6px; cursor: pointer;
     font-size: 16px;
     transition: background .15s;
+}
+
+/* Кнопки с классом .btn* в .actions — сохраняют обычный размер */
+.actions > a[class*="btn"]:not(.btn-sign),
+.actions > button[class*="btn"]:not(.btn-sign),
+.actions > form > button[class*="btn"]:not(.btn-sign) {
+    width: auto;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin: 0 2px;
+    white-space: nowrap;
 }
 .actions a:hover, .actions button:hover {
     background: #e6efff; text-decoration: none;
@@ -1097,7 +1118,7 @@ table.docs td.actions {
     padding: 6px 12px;
     border-radius: 8px;
     text-decoration: none;
-    font-size: 12px;
+    font-size: 14px;
     display: inline-block;
     margin-right: 4px;
 }

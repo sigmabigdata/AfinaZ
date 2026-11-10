@@ -38,6 +38,48 @@ err()  { echo -e "${R}✗${N} $*"; }
 hdr()  { echo -e "\n${C}${BOLD}▶ $*${N}"; }
 
 # ============================================================
+
+# ============================================================
+cmd_menu() {
+    while true; do
+        clear
+        echo -e "${BOLD}══════════════════════════════════════════════════${N}"
+        echo -e "${BOLD}      ПАО "НБД-Банк" · Панель управления       ${N}"
+        echo -e "${BOLD}══════════════════════════════════════════════════${N}"
+        echo ""
+        echo -e "${C} 1.${N} 📊 Статус (контейнеры, health, ключи)"
+        echo -e "${C} 2.${N} 🔄 Перезапустить app"
+        echo -e "${C} 3.${N} 🩺 Health check"
+        echo -e "${C} 4.${N} 📜 Логи (50 строк)"
+        echo -e "${C} 5.${N} 💾 Создать бэкап"
+        echo -e "${C} 6.${N} 🚀 Deploy (pull + build + restart)"
+        echo -e "${C} 7.${N} 🔧 Doctor (диагностика)"
+        echo -e "${C} 8.${N} 💻 Shell в app"
+        echo -e "${C} 9.${N} 🗄️  psql"
+        echo ""
+        echo -e "${C} 0.${N} ❌ Выход"
+        echo -e "${C} h.${N} ❓ Справка по командам"
+        echo -e "${BOLD}══════════════════════════════════════════════════${N}"
+        read -r -p "Выберите: " choice
+        case "$choice" in
+            1) cmd_status ;;
+            2) cmd_restart ;;
+            3) cmd_health ;;
+            4) cmd_logs app ;;
+            5) cmd_backup ;;
+            6) cmd_deploy ;;
+            7) cmd_doctor ;;
+            8) cmd_shell app ;;
+            9) docker exec -it afina-postgres psql -U postgres -d afina_db ;;
+            0) echo "Пока!"; exit 0 ;;
+            h|help) cmd_help ;;
+            *) echo "Неверный выбор"; sleep 1; continue ;;
+        esac
+        echo ""
+        read -r -p "Enter для продолжения..." _
+    done
+}
+
 cmd_help() {
     echo -e "${BOLD}Афина · CLI${N}"
     echo ""
@@ -380,6 +422,12 @@ cmd_doctor() {
 
 # ============================================================
 # Main
+# Если аргументов нет и мы в терминале — показать интерактивное меню
+if [ -z "${1:-}" ] && [ -t 1 ]; then
+    cmd_menu
+    exit 0
+fi
+
 case "${1:-help}" in
     status|st)     cmd_status ;;
     up)            cmd_up ;;
@@ -399,6 +447,7 @@ case "${1:-help}" in
     cron)          cmd_cron ;;
     doctor|doc)    cmd_doctor ;;
     version|v)     cmd_version ;;
+    menu|m)        cmd_menu ;;
     help|-h|--help) cmd_help ;;
     *)             err "Неизвестная команда: $1"; cmd_help; exit 1 ;;
 esac

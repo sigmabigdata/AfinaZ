@@ -29,7 +29,7 @@
 </header>
 
 <main>
-    <h1>Доверенности (ЭМЧД)</h1>
+    <h1>Доверенности (МЧД)</h1>
 
     <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
     <div th:if="${err}" class="alert err" th:text="${err}"></div>
@@ -57,7 +57,7 @@
               enctype="multipart/form-data"
               style="display:flex; gap:10px; align-items:center;">
             <input type="file" name="file" accept=".xml" required/>
-            <button type="submit">Загрузить ЭМЧД (.xml)</button>
+            <button type="submit">Загрузить МЧД (.xml)</button>
         </form>
         <p class="muted small" style="margin-top:8px;">
             XML-файл доверенности из ЕИС (нотариальной или УЦ). Формат: urn://x-artefacts/EMCHD_1.
@@ -125,7 +125,7 @@
             </tr>
             <tr th:if="${#lists.isEmpty(poas)}">
                 <td colspan="6" class="muted center">
-                    Доверенностей нет. Загрузите ЭМЧД (.xml) выше.
+                    Доверенностей нет. Загрузите МЧД (.xml) выше.
                 </td>
             </tr>
             </tbody>

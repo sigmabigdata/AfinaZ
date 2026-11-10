@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 
 /**
- * Парсер ЭМЧД XML (формат ФНС, urn://x-artefacts/EMCHD_1).
+ * Парсер МЧД XML (формат ФНС, urn://x-artefacts/EMCHD_1).
  * Извлекает: ФИО представителя, SNILS, INN, организацию, номер/дату/срок доверенности.
  * Без XXE (защита от XML-инъекций).
  */

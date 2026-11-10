@@ -49,8 +49,8 @@
         <div>
             <h1 class="client-name" th:text="${user.fullName}">Иванов Иван Иванович</h1>
             <div style="margin-bottom:14px; display:flex; gap:8px; align-items:center;">
-                <span th:if="${user.role.name() == 'ROLE_ADMIN'}" class="badge admin" style="font-size:13px; padding:5px 14px;">🛡️ Администратор</span>
-                <span th:unless="${user.role.name() == 'ROLE_ADMIN'}" class="badge" style="font-size:13px; padding:5px 14px;">Клиент</span>
+                <span th:if="${user.role.name() == 'ROLE_ADMIN'}" class="badge admin" style="padding:5px 14px;">🛡️ Администратор</span>
+                <span th:unless="${user.role.name() == 'ROLE_ADMIN'}" class="badge" style="padding:5px 14px;">Клиент</span>
             </div>
             <div class="client-name-sub" th:text="${user.email}">client@example.com</div>
 

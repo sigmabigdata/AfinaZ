@@ -45,7 +45,7 @@ public class PowerOfAttorneyController {
         }
         String name = file.getOriginalFilename();
         if (name == null || !name.toLowerCase().endsWith(".xml")) {
-            ra.addFlashAttribute("err", "Ожидается .xml файл ЭМЧД");
+            ra.addFlashAttribute("err", "Ожидается .xml файл МЧД");
             return REDIR;
         }
         try {
