@@ -118,7 +118,6 @@
          th:attr="data-folder-id=${folder.id}">
         <table class="docs" style="width:100%; margin:0;">
             <thead><tr>
-                <th style="width:36px;"></th>
                 <th style="width:200px;">Документ</th>
                 <th style="width:120px;">Загружен</th>
                 <th style="width:110px;">Статус</th>
@@ -128,12 +127,6 @@
             <tbody>
             <tr th:each="d : ${documents}"
                 th:attr="data-doc-id=${d.id},data-signed=${d.signed}">
-                <td>
-                    <input type="checkbox" class="doc-checkbox"
-                           th:if="${not d.signed}"
-                           th:attr="data-id=${d.id}"
-                           title="Выбрать для массового подписания"/>
-                </td>
                 <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
                     th:text="${d.originalName}"
                     th:title="${d.originalName}">file.pdf</td>

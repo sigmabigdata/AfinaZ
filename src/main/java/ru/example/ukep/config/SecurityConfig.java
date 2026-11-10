@@ -15,6 +15,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.DelegatingSecurityContextRepository;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
 import java.io.IOException;
@@ -45,6 +46,18 @@ public class SecurityConfig {
         HttpSessionSecurityContextRepository repo = new HttpSessionSecurityContextRepository();
         repo.setSpringSecurityContextKey(USER_CTX_KEY);
         return repo;
+    }
+
+    /**
+     * Пробует оба контекста: сначала ADMIN, потом USER.
+     * Нужен для /api/search и других «общих» API — админ должен
+     * видеть результаты поиска, хотя его auth лежит в ADMIN-контексте.
+     */
+    @Bean(name = "delegatingContextRepository")
+    public DelegatingSecurityContextRepository delegatingContextRepository(
+            @Qualifier("adminContextRepository") HttpSessionSecurityContextRepository admin,
+            @Qualifier("userContextRepository") HttpSessionSecurityContextRepository user) {
+        return new DelegatingSecurityContextRepository(admin, user);
     }
 
     /**
@@ -161,11 +174,11 @@ public class SecurityConfig {
     public SecurityFilterChain userChain(
             HttpSecurity http,
             UserDetailsService uds,
-            @Qualifier("userContextRepository") HttpSessionSecurityContextRepository userRepo) throws Exception {
+            @Qualifier("delegatingContextRepository") DelegatingSecurityContextRepository ctxRepo) throws Exception {
 
         http
             .userDetailsService(uds)
-            .securityContext(sc -> sc.securityContextRepository(userRepo))
+            .securityContext(sc -> sc.securityContextRepository(ctxRepo))
             .sessionManagement(s -> s.sessionFixation().changeSessionId())
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/", "/login", "/login/confirm", "/error",

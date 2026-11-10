@@ -40,6 +40,7 @@
             +     '<span class="hotkey"><span class="key">↵</span> выбрать</span>'
             +     '<span class="hotkey"><span class="key">g</span>+<span class="key">d</span> дашборд</span>'
             +     '<span class="hotkey"><span class="key">g</span>+<span class="key">u</span> клиенты</span>'
+            +     '<span class="hotkey"><span class="key">g</span>+<span class="key">r</span> карточка</span>'
             +   '</div>'
             + '</div>';
         document.body.appendChild(overlay);
@@ -99,12 +100,20 @@
                 'm': '/admin/monitor'
             };
             var isAdmin = location.pathname.startsWith('/admin');
-            var dest = map[e.key.toLowerCase()];
+            var key = e.key.toLowerCase();
+            var dest = map[key];
+
+            // g+r — вернуться в карточку текущего клиента (если открыт /admin/users/{id}/...)
+            if (key === 'r' && isAdmin) {
+                var m = location.pathname.match(/^\/admin\/users\/(\d+)/);
+                dest = m ? '/admin/users/' + m[1] : '/admin/users';
+            }
+
             gPressed = false;
             clearTimeout(gTimer);
             if (dest) {
                 // Для клиента "g d" ведёт на /dashboard
-                if (!isAdmin && e.key.toLowerCase() === 'd') dest = '/dashboard';
+                if (!isAdmin && key === 'd') dest = '/dashboard';
                 e.preventDefault();
                 location.href = dest;
             }

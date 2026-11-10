@@ -65,7 +65,11 @@ public class SearchController {
     }
 
     private ResponseEntity<Map<String, Object>> doSearch(String q, int limit, UserDetails p) {
-        if (p == null) return ResponseEntity.status(401).build();
+        if (p == null) {
+            return ResponseEntity.status(401).body(safeMap(
+                    java.util.List.of(), java.util.List.of(),
+                    java.util.List.of(), java.util.List.of()));
+        }
 
         String query = q == null ? "" : q.trim().toLowerCase();
         int safeLimit = Math.min(Math.max(limit, 1), 30);
@@ -74,7 +78,9 @@ public class SearchController {
         if (me == null) {
             log.warn("Search: user not found for '{}' (hash {})",
                     p.getUsername(), pii.hash(p.getUsername()));
-            return ResponseEntity.status(403).build();
+            return ResponseEntity.status(403).body(safeMap(
+                    java.util.List.of(), java.util.List.of(),
+                    java.util.List.of(), java.util.List.of()));
         }
         boolean isAdmin = me.getRole() == ru.example.ukep.entity.Role.ROLE_ADMIN;
 
