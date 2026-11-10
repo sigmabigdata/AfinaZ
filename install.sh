@@ -120,8 +120,17 @@ TLS_CHOICE=$(ask "Выберите [1]" "1")
 
 if [ "$TLS_CHOICE" = "2" ]; then
     TLS_MODE="custom"
+fi
+
+# Let's Encrypt не выдаёт сертификаты на IP — принудительно переключаемся на custom
+if [ "$TLS_MODE" = "letsencrypt" ] && [[ "$APP_DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    warn "Let's Encrypt не поддерживает IP-адреса. Генерирую self-signed."
+    TLS_MODE="custom"
+fi
+
+if [ "$TLS_MODE" = "custom" ]; then
     if [ ! -f angie-certs/fullchain.pem ] || [ ! -f angie-certs/privkey.pem ]; then
-        warn "Сертификаты не найдены. Генерирую самоподписанный для ${APP_DOMAIN}..."
+        warn "Сертификаты не найдены. Генерирую self-signed для ${APP_DOMAIN}..."
         mkdir -p angie-certs
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
           -keyout angie-certs/privkey.pem \
@@ -131,9 +140,8 @@ if [ "$TLS_CHOICE" = "2" ]; then
         chmod 644 angie-certs/fullchain.pem
         ok "Самоподписанный сертификат создан"
     fi
-    ok "TLS: custom"
+    ok "TLS: custom (self-signed)"
 else
-    TLS_MODE="letsencrypt"
     ok "TLS: Let's Encrypt"
 fi
 
@@ -155,6 +163,10 @@ fi
 
 echo ""
 BUILD_MODE=$(ask "Установка образов (1=online, 2=offline)" "1")
+if [ "$BUILD_MODE" = "1" ]; then
+    [ -f cryptopro-dist/linux-amd64_deb.tgz ] || die "Для online-сборки нужен cryptopro-dist/linux-amd64_deb.tgz"
+    ls axiom-dist/*.tar.gz >/dev/null 2>&1 || warn "axiom-dist/*.tar.gz не найден, будет использован системный JDK"
+fi
 
 # ─── Шаг 4: Секреты ──────────────────────────────────
 hdr "Секреты"
@@ -342,11 +354,62 @@ else
 fi
 
 # ─── Шаг 10: Запуск ──────────────────────────────────
-hdr "Запуск стека"
-$COMPOSE_CMD -f docker-compose-prod.yml --env-file .env.prod up -d 2>&1 | tee -a "$LOG" | tail -5
-ok "Стек запущен"
+hdr "Запуск стека (поэтапно)"
 
-echo -e "  ${DIM}Ожидание готовности (макс 180 с)...${N}"
+# 10.1. Postgres
+echo -e "  ${DIM}▶ postgres...${N}"
+$COMPOSE_CMD -f docker-compose-prod.yml --env-file .env.prod up -d postgres 2>&1 | tail -2
+WAIT=0
+while [ $WAIT -lt 90 ]; do
+    if docker exec afina-postgres pg_isready -U postgres >/dev/null 2>&1; then break; fi
+    sleep 2; WAIT=$((WAIT+2))
+done
+[ $WAIT -lt 90 ] || die "Postgres не запустился за 90 с"
+ok "Postgres готов (~${WAIT}с)"
+
+# 10.2. Создаём роли БД (idempotent)
+echo -e "  ${DIM}▶ роли БД...${N}"
+DB_MIG_PASS=$(grep "^DB_MIGRATOR_PASSWORD=" .env.prod | cut -d'=' -f2)
+DB_APP_PASS=$(grep "^DB_PASSWORD=" .env.prod | cut -d'=' -f2)
+DB_AUD_PASS=$(grep "^DB_AUDITOR_PASSWORD=" .env.prod | cut -d'=' -f2)
+
+docker exec -i afina-postgres psql -U postgres -d postgres >/dev/null 2>&1 <<EOF
+DO \$\$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'afina_migrator') THEN
+      CREATE ROLE afina_migrator WITH LOGIN PASSWORD '$DB_MIG_PASS';
+   END IF;
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'afina_app') THEN
+      CREATE ROLE afina_app WITH LOGIN PASSWORD '$DB_APP_PASS';
+   END IF;
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'afina_auditor') THEN
+      CREATE ROLE afina_auditor WITH LOGIN PASSWORD '$DB_AUD_PASS';
+   END IF;
+END
+\$\$;
+GRANT ALL PRIVILEGES ON DATABASE afina_db TO afina_migrator;
+GRANT CONNECT ON DATABASE afina_db TO afina_app;
+GRANT CONNECT ON DATABASE afina_db TO afina_auditor;
+EOF
+
+docker exec -i afina-postgres psql -U postgres -d afina_db >/dev/null 2>&1 <<EOF
+ALTER SCHEMA public OWNER TO afina_migrator;
+GRANT USAGE, CREATE ON SCHEMA public TO afina_migrator;
+GRANT USAGE ON SCHEMA public TO afina_app, afina_auditor;
+ALTER DEFAULT PRIVILEGES FOR ROLE afina_migrator IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO afina_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE afina_migrator IN SCHEMA public
+  GRANT SELECT ON TABLES TO afina_auditor;
+ALTER DEFAULT PRIVILEGES FOR ROLE afina_migrator IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO afina_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE afina_migrator IN SCHEMA public
+  GRANT SELECT ON SEQUENCES TO afina_auditor;
+EOF
+ok "Роли БД созданы/проверены"
+
+# 10.3. App
+echo -e "  ${DIM}▶ app...${N}"
+$COMPOSE_CMD -f docker-compose-prod.yml --env-file .env.prod up -d app 2>&1 | tail -2
 WAIT=0; HEALTH_OK=0
 while [ $WAIT -lt 180 ]; do
     if docker exec afina-app curl -sf http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
@@ -354,8 +417,18 @@ while [ $WAIT -lt 180 ]; do
     fi
     sleep 3; WAIT=$((WAIT+3))
 done
-[ $HEALTH_OK -eq 1 ] || { docker logs afina-app --tail 50; die "App не поднялось за 180 с"; }
-ok "Приложение запущено за ~${WAIT}с"
+if [ $HEALTH_OK -ne 1 ]; then
+    docker logs afina-app --tail 50
+    die "App не поднялось за 180 с"
+fi
+ok "App готов (~${WAIT}с)"
+
+# 10.4. Angie (после app, чтобы DNS резолвился)
+echo -e "  ${DIM}▶ angie...${N}"
+$COMPOSE_CMD -f docker-compose-prod.yml --env-file .env.prod up -d angie 2>&1 | tail -2
+sleep 5
+ok "Angie запущен"
+
 
 # ─── Шаг 11: Тесты ───────────────────────────────────
 hdr "Проверки"

@@ -3,55 +3,70 @@
 ## 1. Требования к серверу
 - **ОС:** Astra Linux SE 1.8 или Ubuntu 22.04/24.04
 - **Архитектура:** x86_64
-- **RAM�* 4 ГБ минимум
+- **RAM:** 4 ГБ
 - **Диск:** 50 ГБ SSD
-- **Порты:** 80 и 443 свободны
+- **Порты:** 80 и 443
 - **ПО:** Docker и Docker Compose
 
-## 2. Онлайн-развертывание
-1. Скопируйте проект: `rsync -avz ./ root@IP:/opt/afinaz/`
-2. Запустите генератор конфига с профилем prod: `docker compose -f docker-compose-prod.yml --env-file .env.prod up -d
-`
+## 2. Что в дистрибутиве (всё ставится автоматически)
+- `certs/` — сертификаты Минцифры / СКБ Контур / Russian Trusted
+- `admins.env` — админ по умолчанию (Дырул Анатолий Юрьевич)
+- `secrets/` — ключи file.key, pii.key, backup.pass
+- `.env.prod` — конфигурация + пароли БД
+- Роли БД: afina_migrator, afina_app, afina_auditor
+- SSL: для IP — self-signed, для домена — Let's Encrypt
 
-## 3. Офлайн-развертывание
-1. На Mac соберите образ и сохраните в archiv в папку `imȰайз�/:
+## 3. Онлайн-развертывание
 ```bash
+# На Mac:
+rsync -avz ./ root@IP:/opt/afinaz/
+
+# На сервере:
+cd /opt/afinaz && chmod +x install.sh && ./install.sh
+```
+Ответы: IP, TLS=2, Admin IP=*, Email=log, Images=**1**.
+
+## 4. Офлайн-развертывание
+```bash
+# На Mac:
 docker build -t afinaz-app:latest .
 docker build -f Dockerfile-postgres -t afinaz-postgres:15-astra .
-mkdir -p mages
+mkdir -p images
 docker save afinaz-app:latest | gzip > images/afinaz-app.tar.gz
 docker save afinaz-postgres:15-astra | gzip > images/afinaz-postgres.tar.gz
-```
-2. На сервере отправьте файлы и загрузите образы:
-```bash
-rsync -avz ./ root@IP:/opt/afinaz/
-```
-3. Отключите build в docker-compose-prod.yml для service app и postgres, иначе он будет пытаться собрать снова.
-4. Запустите `docker compose -f docker-compose-prod.yml --env-file .env.prod up -d`
+rsync -avz --exclude .git ./ root@IP:/opt/afinaz/
+rsync -avz --progress images/ root@IP:/opt/afinaz/images/
 
-## 4. Права доступа
-- При ошибке `AccessDeniedException` на папку storage, выполните:
+# На сервере:
+cd /opt/afinaz
+docker load < images/afinaz-app.tar.gz
+docker load < images/afinaz-postgres.tar.gz
+chmod +x install.sh && ./install.sh
+```
+Ответы: IP, TLS=2, Admin IP=*, Email=log, Images=**2**.
+
+## 5. Права доступа
+Скрипт сам выдаёт:
 ```bash
 chown -R 999:999 storage logs backups crls certs angie-certs secrets
 chmod -R 775 storage logs backups crls certs angie-certs
 chmod 700 secrets && chmod 600 secrets/*.key secrets/backup.pass
+```
+
+Если приложение упало с `AccessDeniedException`:
+```bash
+chown -R 999:999 storage certs secrets
 docker restart afina-app
 ```
-- Файл `secrets/backup.pass` используется для шифрования бекапов.
-- Файл `secrets/file.key` и `secrets/pii.key` используются для шифрования файлов и PII
 
-## 5. Управление сервисом
-Меню `afina`:
-- 1 - Деплой
-(- 2 - Перезапуск
-- 3 - Health checkо
-- 4 - Логи
-- 5 - Бэкап
-= 6 - Восстановление
+## 6. Управление — утилита `afina`
+1 — Деплой, 2 — Перезапуск, 3 — Health, 4 — Логи, 5 — Бэкап, 6 — Восстановление, 7 — Очистка, 8 — Shell, 9 — psql.
 
-
-## 6. Решение проблем
-- **502 Bad Gateway** - `docker logs afina-app --tail 50`
-- **AccessDeniedException** - команды: `chown -R 999:999 storage secrets`
-- **Maven UnresolvableModelException** - используйте офлайн-развертывание (`save` image на Mac и `load` на сервере)
-- **Angie cannot load certificate** - comройте семоподписанный сертификат через openssl
+## 7. Решение проблем
+- **502 Bad Gateway** — `docker logs afina-app --tail 50`
+- **AccessDeniedException** — `chown -R 999:999 storage certs secrets && docker restart afina-app`
+- **password authentication failed** — `docker compose down && docker volume rm afinaz_pgdata && ./install.sh`
+- **Angie: cannot load certificate** — `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout angie-certs/privkey.pem -out angie-certs/fullchain.pem -subj "/CN=IP" && docker restart afina-angie`
+- **Angie: host not found in upstream "app:8080"** — подожди 30 сек, потом `docker restart afina-angie`
+- **Maven UnresolvableModelException** — используй офлайн-развертывание (раздел 4)
+- **Нет CRL для CN=...** — это норма (soft-fail). При загрузке .sig CRL скачаются, или через /admin/crl → Обновить все
