@@ -308,6 +308,17 @@ ok "Compose: $COMPOSE_CMD ($($COMPOSE_CMD version --short 2>/dev/null | head -1)
 
 # ─── Шаг 7: Порты ────────────────────────────────────
 hdr "Освобождение портов 80/443"
+
+# Сначала останавливаем старые контейнеры проекта (если запущены)
+if [ -f docker-compose-prod.yml ]; then
+    echo -e "  ${DIM}▶ Останавливаем старые контейнеры проекта...${N}"
+    $COMPOSE_CMD -f docker-compose-prod.yml --env-file .env.prod down 2>/dev/null || true
+    # Также удаляем по имени, если остались "висящие"
+    docker rm -f afina-app afina-postgres afina-angie 2>/dev/null || true
+    sleep 2
+fi
+
+# Теперь освобождаем порты от системных сервисов (nginx, apache)
 free_port 80  || die "Не удалось освободить порт 80"
 ok "Порт 80 свободен"
 free_port 443 || die "Не удалось освободить порт 443"
