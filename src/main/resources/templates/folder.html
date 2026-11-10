@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="'НБД-Банк · ' + ${folder.name}">Раздел</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://www.cryptopro.ru/sites/default/files/products/cades/cadesplugin_api.js"></script>
+</head>
+<body>
+<header class="app-header">
+    <a th:href="@{/dashboard}" class="brand">
+        <img src="/img/logo.png" alt="НБД-Банк" class="brand-logo">
+    </a>
+    <div class="header-user">
+        <button type="button" class="cmdk-trigger" title="Поиск (⌘K)">
+            🔍 <span style="opacity:0.6;">⌘K</span>
+        </button>
+        <span th:text="${user.fullName}">Пользователь</span>
+        <form method="post" th:action="@{/logout}" style="display:inline">
+            <button class="btn-ghost btn-sm" type="submit">Выйти</button>
+        </form>
+    </div>
+</header>
+
+<main>
+    <div class="breadcrumb">
+        <a th:href="@{/dashboard}">Мои разделы</a>
+        <span class="sep">›</span>
+        <span th:text="${folder.name}">Раздел</span>
+    </div>
+
+    <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
+    <div th:if="${err}" class="alert err" th:text="${err}"></div>
+
+    <div class="folder-page-head">
+        <div class="folder-page-title">
+            <div class="folder-icon-big">📁</div>
+            <div>
+                <h1 th:text="${folder.name}" style="margin:0;">Раздел</h1>
+                <div class="folder-page-stats">
+                    <span><b th:text="${total}">0</b> всего</span>
+                    <span class="folder-tile-stat-ok" th:if="${signed > 0}">
+                        ✅ <b th:text="${signed}">0</b> подписано
+                    </span>
+                    <span class="folder-tile-stat-warn" th:if="${unsigned > 0}">
+                        ⚠️ <b th:text="${unsigned}">0</b> без подписи
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="folder-page-actions">
+            <button type="button"
+                    th:if="${unsigned > 0}"
+                    th:attr="data-folder-id=${folder.id}"
+                    onclick="if(window.BatchSign &amp;&amp; window.BatchSign.signAllInSection){window.BatchSign.signAllInSection(this.getAttribute('data-folder-id'))}else{alert('Batch недоступен. Обновите страницу (Ctrl+Shift+R)')}"
+                    class="btn"
+                    style="background:linear-gradient(135deg,#2454ff,#7a3fff); border:none; color:#fff;">
+                ✍ Подписать всё
+            </button>
+            <button type="button"
+                    class="btn-ghost btn-rename-folder"
+                    th:attr="data-folder-id=${folder.id}, data-folder-name=${folder.name}">
+                ✎ Переименовать
+            </button>
+            <form method="post"
+                  th:action="@{'/folders/' + ${folder.id} + '/delete'}"
+                  onsubmit="return confirm('Удалить раздел и все его документы?');"
+                  style="display:inline">
+                <button type="submit" class="btn-danger">🗑 Удалить</button>
+            </form>
+        </div>
+    </div>
+
+    <section class="panel" style="background:linear-gradient(180deg,#fbfcff,#ffffff);">
+        <h2 style="margin:0 0 6px; font-size:16px;">📤 Загрузить документы</h2>
+        <p class="muted small" style="margin:0 0 12px;">
+            Можно выбрать <b>несколько файлов сразу</b> — перетащите мышью или кликните.
+            Лимит: до 50 МБ на файл, до 300 МБ на весь пакет.
+        </p>
+        <form method="post"
+              th:action="@{'/folders/' + ${folder.id} + '/documents/upload'}"
+              enctype="multipart/form-data"
+              class="upload-form-multi"
+              id="multi-upload-form">
+            <input type="file" name="files" multiple required/>
+            <button type="submit" id="multi-upload-btn">📤 Загрузить</button>
+        </form>
+    </section>
+
+    <h2 style="margin:24px 0 14px;">
+        Документы
+        <span class="muted" style="font-weight:400; font-size:14px;">
+            (<span th:text="${total}">0</span>)
+        </span>
+    </h2>
+
+    <div th:if="${#lists.isEmpty(documents)}" class="folder-empty" style="margin:0;">
+        <span class="folder-empty-icon">📂</span>
+        <strong>В этом разделе пока нет документов</strong>
+        Загрузите первый файл через форму выше.
+    </div>
+
+    <div th:if="${not #lists.isEmpty(documents)}"
+         class="folder-card folder-card-flat"
+         th:attr="data-folder-id=${folder.id}">
+
+        <div th:each="d : ${documents}" class="doc-card"
+             th:attr="data-id=${d.id},data-signed=${d.signed}"
+             style="margin-bottom:14px; border-radius:10px;">
+
+            <div class="doc-row">
+                <div class="doc-name" th:text="${d.originalName}"
+                     th:title="${d.originalName}">file.pdf</div>
+                <div class="doc-meta">
+                    <span th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</span>
+                    <span th:if="${d.signed}" class="badge ok">Подписан</span>
+                    <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
+                </div>
+                <div class="actions-grid">
+                    <a th:href="@{'/documents/' + ${d.id} + '/view'}"
+                       target="_blank" title="Просмотреть">👁</a>
+                    <a th:href="@{'/documents/' + ${d.id} + '/download'}"
+                       title="Скачать">⬇</a>
+                    <a th:if="${d.signed}"
+                       th:href="@{'/documents/' + ${d.id} + '/visualization'}"
+                       target="_blank" title="Визуализация (PDF)">📄</a>
+                    <span th:unless="${d.signed}" class="spacer"></span>
+                    <a th:if="${d.signed}"
+                       th:href="@{'/documents/' + ${d.id} + '/signing-certificate'}"
+                       title="Справка о подписании (PDF)">📋</a>
+                    <span th:unless="${d.signed}" class="spacer"></span>
+
+                    <form th:action="@{'/documents/' + ${d.id} + '/upload-signature'}"
+                          method="post" enctype="multipart/form-data"
+                          style="display:inline; margin:0; padding:0;">
+                        <label title="Загрузить .sig">
+                            📎
+                            <input type="file" name="file" accept=".sig,.p7s,.der"
+                                   required data-no-drop="1"
+                                   onchange="this.form.submit()"
+                                   style="display:none;"/>
+                        </label>
+                    </form>
+
+                    <button th:if="${not d.hasSignatureByUser(user.id)}" type="button"
+                            class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
+                    <span th:if="${d.hasSignatureByUser(user.id)}"
+                          class="badge ok" title="Вы уже подписали">✓</span>
+
+                    <form th:unless="${d.signed}" method="post"
+                          th:action="@{'/documents/' + ${d.id} + '/delete'}"
+                          onsubmit="return confirm('Удалить документ?')"
+                          style="display:inline">
+                        <button type="submit" class="danger" title="Удалить">🗑</button>
+                    </form>
+                    <span th:if="${d.signed}" class="spacer"></span>
+                </div>
+            </div>
+
+            <div th:if="${not #lists.isEmpty(d.signatures)}" class="sig-block">
+                <div class="sig-icon">✓</div>
+                <div class="sig-info">
+                    <div class="sig-title">
+                        Подписи: <span th:text="${#lists.size(d.signatures)}">0</span>
+                    </div>
+                    <div th:each="sig, st : ${d.signatures}" class="sig-item">
+                        <div class="sig-subject">
+                            <span th:text="${st.index + 1} + '. '">1. </span>
+                            <span th:text="${sig.signerSubject}">ФИО</span>
+                        </div>
+                        <div class="sig-meta">
+                            <span th:text="${#temporals.format(sig.signedAt,'dd.MM.yyyy HH:mm')}">—</span>
+                            <span> · </span>
+                            <span th:text="'serial=' + ${sig.signerSerial}">—</span>
+                        </div>
+                        <div class="sig-actions">
+                            <a th:href="@{'/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/download'}"
+                               class="btn-sig">⬇ .sig</a>
+                            <form method="post"
+                                  th:action="@{'/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/apply-poa'}"
+                                  style="display:inline; margin:0;">
+                                <input type="hidden" name="apply" th:value="${!sig.applyPoa}"/>
+                                <button type="submit" class="btn-ghost btn-sm"
+                                        th:style="${sig.applyPoa} ? 'background:#e6f7ec; color:#166534; border-color:#c2e7cd;' : ''"
+                                        th:text="${sig.applyPoa ? '✓ Доверенность' : 'Применить доверенность'}"></button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<div id="modal-rename-folder" class="modal" style="display:none">
+    <div class="modal-card">
+        <h2>Переименовать раздел</h2>
+        <form method="post" id="rename-folder-form" style="margin-top:16px;">
+            <input type="text" name="name" id="rename-folder-name" required
+                   style="width:100%; padding:10px 12px; border:1px solid #cbd5e1;
+                          border-radius:8px; font-size:14px; margin-bottom:16px;"/>
+            <div class="modal-actions">
+                <button type="button" class="btn-ghost" id="rename-folder-cancel">Отмена</button>
+                <button type="submit" class="btn">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modal = document.getElementById('modal-rename-folder');
+    var form = document.getElementById('rename-folder-form');
+    var input = document.getElementById('rename-folder-name');
+    var cancel = document.getElementById('rename-folder-cancel');
+
+    document.querySelectorAll('.btn-rename-folder').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.dataset.folderId;
+            var name = btn.dataset.folderName;
+            form.action = '/folders/' + id + '/rename';
+            input.value = name || '';
+            modal.style.display = 'flex';
+            setTimeout(function () { input.focus(); input.select(); }, 30);
+        });
+    });
+
+    cancel.addEventListener('click', function () { modal.style.display = 'none'; });
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) modal.style.display = 'none';
+    });
+
+    var multiForm = document.getElementById('multi-upload-form');
+    var multiBtn = document.getElementById('multi-upload-btn');
+    if (multiForm && multiBtn) {
+        multiForm.addEventListener('submit', function () {
+            var inp = multiForm.querySelector('input[type=file]');
+            var n = (inp.files || []).length;
+            multiBtn.disabled = true;
+            multiBtn.textContent = '⏳ Загрузка ' + n + ' файл(ов)…';
+        });
+    }
+})();
+</script>
+
+<script th:src="@{/js/sign-progress.js}"></script>
+<script th:src="@{/js/cert-selector.js}"></script>
+<script th:src="@{/js/stamp.js}"></script>
+<script th:src="@{/js/file-drop.js}"></script>
+<script th:src="@{/js/batch-sign.js}"></script>
+<script th:src="@{/js/command-palette.js}"></script>
+<script th:src="@{/js/skeleton.js}"></script>
+<script type="module" th:src="@{/js/sign.js}"></script>
+</body>
+</html>

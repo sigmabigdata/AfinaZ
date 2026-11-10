@@ -12,7 +12,12 @@ import ru.example.ukep.entity.User;
 import ru.example.ukep.repository.UserRepository;
 import ru.example.ukep.security.PiiEncryptor;
 import ru.example.ukep.service.AuditService;
+import ru.example.ukep.entity.Document;
+import ru.example.ukep.service.DocumentService;
 import ru.example.ukep.service.FolderService;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -33,15 +38,18 @@ public class FolderController {
     private final UserRepository userRepository;
     private final PiiEncryptor pii;
     private final AuditService audit;
+    private final DocumentService documentService;
 
     public FolderController(FolderService folderService,
                             UserRepository userRepository,
                             PiiEncryptor pii,
-                            AuditService audit) {
+                            AuditService audit,
+                            DocumentService documentService) {
         this.folderService = folderService;
         this.userRepository = userRepository;
         this.pii = pii;
         this.audit = audit;
+        this.documentService = documentService;
     }
 
     private User current(UserDetails p) {
@@ -99,5 +107,56 @@ public class FolderController {
             ra.addFlashAttribute("err", e.getMessage());
         }
         return REDIR_DASHBOARD;
+    }
+
+    /** Загрузить несколько документов в раздел разом. */
+    @PostMapping("/{id}/documents/upload")
+    public String uploadMulti(@PathVariable Long id,
+                              @RequestParam("files") List<MultipartFile> files,
+                              @AuthenticationPrincipal UserDetails p,
+                              RedirectAttributes ra) {
+        User user = current(p);
+        DocumentFolder folder;
+        try {
+            folder = folderService.getOwned(id, user);
+        } catch (IllegalArgumentException e) {
+            ra.addFlashAttribute("err", e.getMessage());
+            return REDIR_DASHBOARD;
+        }
+
+        int okCount = 0, failCount = 0;
+        StringBuilder errs = new StringBuilder();
+        List<String> okNames = new ArrayList<>();
+
+        if (files != null) {
+            for (MultipartFile f : files) {
+                if (f == null || f.isEmpty()) continue;
+                try {
+                    Document doc = documentService.upload(f, user, folder);
+                    audit.documentUpload(user.getEmail(), doc.getId(), doc.getOriginalName());
+                    okCount++;
+                    okNames.add(doc.getOriginalName());
+                } catch (Exception e) {
+                    failCount++;
+                    String n = f.getOriginalFilename() != null ? f.getOriginalFilename() : "?";
+                    errs.append(n).append(": ").append(e.getMessage()).append("; ");
+                }
+            }
+        }
+
+        if (okCount > 0) {
+            String msg = "Загружено файлов: " + okCount;
+            if (okNames.size() <= 3) msg += " — " + String.join(", ", okNames);
+            if (failCount > 0) msg += " (ошибок: " + failCount + ")";
+            ra.addFlashAttribute("ok", msg);
+        }
+        if (failCount > 0) {
+            ra.addFlashAttribute("err", "Не удалось загрузить: " + errs);
+        }
+        if (okCount == 0 && failCount == 0) {
+            ra.addFlashAttribute("err", "Не выбрано ни одного файла");
+        }
+
+        return "redirect:/folders/" + id;
     }
 }

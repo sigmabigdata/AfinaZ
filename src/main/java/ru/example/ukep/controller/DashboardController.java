@@ -92,4 +92,38 @@ public class DashboardController {
 
         return "dashboard";
     }
+
+    /** Страница раздела клиента — документы этого раздела. */
+    @GetMapping("/folders/{id}")
+    public String folderPage(Authentication auth,
+                             @org.springframework.web.bind.annotation.PathVariable Long id,
+                             Model model) {
+        if (auth == null || !auth.isAuthenticated()) {
+            return "redirect:/login";
+        }
+        User user = userRepository.findByEmailHash(pii.hash(auth.getName())).orElse(null);
+        if (user == null) {
+            log.warn("folderPage: user not found for '{}'", auth.getName());
+            return "redirect:/login?expired";
+        }
+
+        DocumentFolder folder;
+        try {
+            folder = folderService.getOwned(id, user);
+        } catch (IllegalArgumentException e) {
+            return "redirect:/dashboard";
+        }
+
+        java.util.List<Document> docs =
+                documentRepository.findAllByFolderOrderByUploadedAtDesc(folder);
+        long signed = docs.stream().filter(Document::isSigned).count();
+
+        model.addAttribute("user", user);
+        model.addAttribute("folder", folder);
+        model.addAttribute("documents", docs);
+        model.addAttribute("total", docs.size());
+        model.addAttribute("signed", signed);
+        model.addAttribute("unsigned", docs.size() - signed);
+        return "folder";
+    }
 }

@@ -27,20 +27,18 @@
     <div th:if="${err}" class="alert err" th:text="${err}"></div>
     <div th:if="${param.expired}" class="alert err">Сессия истекла. Войдите заново.</div>
 
-    <h1>Мои документы</h1>
+    <h1>Мои разделы</h1>
 
-    <!-- Онбординг -->
     <div th:if="${allSignedCount == 0}"
          style="background:linear-gradient(135deg,#faf4ea 0%,#fff8ee 100%);
                 border:1px solid #d4c3a7; border-radius:14px; padding:22px 26px;
                 margin-bottom:24px;">
         <h2 style="margin:0 0 4px;font-size:18px;">👋 Добро пожаловать!</h2>
         <p style="margin:0 0 16px;font-size:14px;color:#6b5844;">
-            Создайте раздел, загрузите документ и подпишите его УКЭП.
+            Создайте раздел, откройте его, загрузите документы (можно несколько сразу) и подпишите их УКЭП.
         </p>
     </div>
 
-    <!-- Действия -->
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; align-items:stretch;">
         <form method="post" th:action="@{/folders/create}" class="upload-form"
               style="flex:1; min-width:280px; margin:0;">
@@ -55,194 +53,59 @@
                        color:#fff; white-space:nowrap;">
             ✨ Из шаблона
         </button>
-        </div>
+    </div>
 
     <div th:if="${#lists.isEmpty(folders)}" class="empty-state">
         <span class="icon">📂</span>
         <h3>Пока нет ни одного раздела</h3>
-        <p>Создайте первый раздел и загрузите в него документ.</p>
+        <p>Создайте первый раздел — потом загрузите в него документы.</p>
     </div>
 
-    <!-- Разделы (новые сверху) -->
-    <div th:each="f, folderStat : ${folders}"
-         th:with="docs=${documentsByFolder.get(f.id)},
-                  total=${#lists.size(docs)},
-                  signed=${#lists.size(docs.?[signed])},
-                  unsigned=${total - signed}"
-         class="folder-card"
-         th:attr="data-folder-id=${f.id}">
-
-        <div class="folder-card-header">
-            <div class="folder-card-title-block">
-                <div class="folder-icon">📁</div>
-                <div style="min-width:0;">
-                    <div class="folder-name" th:text="${f.name}">Раздел</div>
-                    <div class="folder-stats">
-                        <span class="folder-stat stat-total">
-                            <b th:text="${total}">0</b> всего
-                        </span>
-                        <span class="folder-stat stat-signed" th:if="${signed > 0}">
-                            ✅ <b th:text="${signed}">0</b>
-                        </span>
-                        <span class="folder-stat stat-unsigned" th:if="${unsigned > 0}">
-                            ⚠️ <b th:text="${unsigned}">0</b>
-                        </span>
-                    </div>
+    <div th:if="${not #lists.isEmpty(folders)}" class="folder-tile-grid">
+        <a th:each="f, folderStat : ${folders}"
+           th:href="@{'/folders/' + ${f.id}}"
+           th:with="docs=${documentsByFolder.get(f.id)},
+                    total=${#lists.size(docs)},
+                    signed=${#lists.size(docs.?[signed])},
+                    unsigned=${total - signed}"
+           th:classappend="'folder-color-' + ${folderStat.index % 6}"
+           class="folder-tile folder-tile-client">
+            <div class="folder-tile-icon">📁</div>
+            <div class="folder-tile-body">
+                <div class="folder-tile-name" th:text="${f.name}">Раздел</div>
+                <div class="folder-tile-stats">
+                    <span th:text="${total} + ' док.'">0 док.</span>
+                    <span th:if="${signed > 0}" class="folder-tile-stat-ok">
+                        ✅ <span th:text="${signed}">0</span>
+                    </span>
+                    <span th:if="${unsigned > 0}" class="folder-tile-stat-warn">
+                        ⚠️ <span th:text="${unsigned}">0</span>
+                    </span>
                 </div>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center; flex-shrink: 0;">
-                <button type="button"
-                        th:attr="data-folder-id=${f.id}"
-                        onclick="if(window.BatchSign &amp;&amp; window.BatchSign.signAllInSection){window.BatchSign.signAllInSection(this.getAttribute('data-folder-id'))}else{alert('Batch недоступен')}"
-                        style="background: linear-gradient(135deg,#2454ff,#7a3fff); color: #ffffff; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; line-height: 1.2;">
-                    ✍ Подписать всё
-                </button>
-                <form method="post" th:action="@{'/folders/' + ${f.id} + '/delete'}"
-                      onsubmit="return confirm('Удалить раздел и все его документы?');"
-                      style="display: inline; margin: 0;">
-                    <button type="submit" class="btn-danger btn-sm"
-                            style="margin: 0;">🗑 Удалить</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Загрузка в раздел -->
-        <form method="post" th:action="@{/documents/upload}"
-              enctype="multipart/form-data" class="upload-form">
-            <input type="hidden" name="folderId" th:value="${f.id}"/>
-            <input type="file" name="file" required/>
-            <button type="submit">📤 Загрузить в раздел</button>
-        </form>
-
-        <!-- Пусто -->
-        <div th:if="${#lists.isEmpty(docs)}" class="folder-empty">
-            <span class="folder-empty-icon">📂</span>
-            <strong>Документов пока нет</strong>
-            Загрузите первый файл в этот раздел.
-        </div>
-
-        <!-- Документы -->
-        <div th:each="d : ${docs}" class="doc-card"
-             th:attr="data-id=${d.id},data-signed=${d.signed}"
-             style="margin:0 22px 16px; border-radius:10px;">
-            <div class="doc-row">
-    
-                <div class="doc-name" th:text="${d.originalName}"
-                     th:title="${d.originalName}">file.pdf</div>
-                <div class="doc-meta">
-                    <span th:text="${#temporals.format(d.uploadedAt,'dd.MM.yyyy HH:mm')}">—</span>
-                    <span th:if="${d.signed}" class="badge ok">Подписан</span>
-                    <span th:unless="${d.signed}" class="badge warn">Не подписан</span>
-                </div>
-                <div class="actions-grid">
-                    <a th:href="@{'/documents/' + ${d.id} + '/view'}"
-                       target="_blank" title="Просмотреть">👁</a>
-                    <a th:href="@{'/documents/' + ${d.id} + '/download'}"
-                       title="Скачать">⬇</a>
-                    <a th:if="${d.signed}"
-                       th:href="@{'/documents/' + ${d.id} + '/visualization'}"
-                       target="_blank" title="Визуализация (PDF)">📄</a>
-                    <span th:unless="${d.signed}" class="spacer"></span>
-                    <a th:if="${d.signed}"
-                       th:href="@{'/documents/' + ${d.id} + '/signing-certificate'}"
-                       title="Справка о подписании (PDF)">📋</a>
-                    <span th:unless="${d.signed}" class="spacer"></span>
-
-                    <!-- Загрузить .sig -->
-                    <form th:action="@{'/documents/' + ${d.id} + '/upload-signature'}"
-                          method="post" enctype="multipart/form-data"
-                          style="display:inline; margin:0; padding:0;">
-                        <label title="Загрузить .sig">
-                            📎
-                            <input type="file" name="file" accept=".sig,.p7s,.der"
-                                   required data-no-drop="1"
-                                   onchange="this.form.submit()"
-                                   style="display:none;"/>
-                        </label>
-                    </form>
-
-                    <button th:if="${not d.hasSignatureByUser(user.id)}" type="button"
-                            class="btn-sign" th:attr="data-id=${d.id}" title="Подписать">✍</button>
-                    <span th:if="${d.hasSignatureByUser(user.id)}"
-                          class="badge ok" title="Вы уже подписали">✓</span>
-
-                    <form th:unless="${d.signed}" method="post"
-                          th:action="@{'/documents/' + ${d.id} + '/delete'}"
-                          onsubmit="return confirm('Удалить документ?')"
-                          style="display:inline">
-                        <button type="submit" class="danger" title="Удалить">🗑</button>
-                    </form>
-                    <span th:if="${d.signed}" class="spacer"></span>
-                </div>
-            </div>
-
-            <!-- Подписи -->
-            <div th:if="${not #lists.isEmpty(d.signatures)}" class="sig-block">
-                <div class="sig-icon">✓</div>
-                <div class="sig-info">
-                    <div class="sig-title">
-                        Подписи: <span th:text="${#lists.size(d.signatures)}">0</span>
-                    </div>
-                    <div th:each="sig, st : ${d.signatures}" class="sig-item">
-                        <div class="sig-subject">
-                            <span th:text="${st.index + 1} + '. '">1. </span>
-                            <span th:text="${sig.signerSubject}">ФИО</span>
-                        </div>
-                        <div class="sig-meta">
-                            <span th:text="${#temporals.format(sig.signedAt,'dd.MM.yyyy HH:mm')}">—</span>
-                            <span> · </span>
-                            <span th:text="'serial=' + ${sig.signerSerial}">—</span>
-                        </div>
-                        <div class="sig-actions">
-                            <a th:href="@{'/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/download'}"
-                               class="btn-sig">⬇ .sig</a>
-                            <form method="post"
-                                  th:action="@{'/documents/' + ${d.id} + '/signatures/' + ${sig.id} + '/apply-poa'}"
-                                  style="display:inline; margin:0;">
-                                <input type="hidden" name="apply" th:value="${!sig.applyPoa}"/>
-                                <button type="submit" class="btn-ghost btn-sm"
-                                        th:style="${sig.applyPoa} ? 'background:#e6f7ec; color:#166534; border-color:#c2e7cd;' : ''"
-                                        th:text="${sig.applyPoa ? '✓ Доверенность' : 'Применить доверенность'}"></button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <div class="folder-tile-arrow">→</div>
+        </a>
     </div>
 </main>
 
 <script th:inline="javascript">
     window.__FOLDERS__ = /*[[${folderOptions}]]*/ [];
 </script>
-<script th:src="@{/js/sign-progress.js}"></script>
 <script th:src="@{/js/cert-selector.js}"></script>
+<script th:src="@{/js/sign-progress.js}"></script>
 <script th:src="@{/js/stamp.js}"></script>
 <script th:src="@{/js/file-drop.js}"></script>
 <script th:src="@{/js/batch-sign.js}"></script>
 <script th:src="@{/js/template-use.js}"></script>
 <script th:src="@{/js/command-palette.js}"></script>
 <script th:src="@{/js/skeleton.js}"></script>
-<script type="module" th:src="@{/js/sign.js}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var btn = document.getElementById('btn-use-template');
         if (btn && window.TemplateUse) {
             btn.addEventListener('click', function () { window.TemplateUse.open(); });
         }
-        var signAllBtn = document.getElementById('btn-sign-all');
-        if (signAllBtn) {
-            signAllBtn.addEventListener('click', function () {
-                if (window.BatchSign && window.BatchSign.signAllUnsigned) {
-                    window.BatchSign.signAllUnsigned();
-                } else {
-                    alert('Batch-подписание недоступно. Обновите страницу.');
-                }
-            });
-        }
-        // Кнопки "Подписать всё" в каждом разделе
-
-        });
+    });
 </script>
 </body>
 </html>
