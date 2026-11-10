@@ -3175,3 +3175,40 @@ table.docs td.actions {
 .folder-card-flat .doc-card:hover {
     box-shadow: 0 4px 16px rgba(30,40,80,0.06);
 }
+
+/* ============================================================
+   Обёртка для таблиц (горизонтальный скролл)
+   ============================================================ */
+
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+}
+
+.table-wrap > table.docs {
+    min-width: 100%;
+}
+
+/* Узкие ячейки — не раздуваем */
+.table-wrap > table.docs td,
+.table-wrap > table.docs th {
+    max-width: 400px;
+}
+
+/* ============================================================
+   Audit table: длинные email, event_type, exception messages
+   ============================================================ */
+
+table.audit-table td,
+table.audit-table th {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: top;
+}
+
+table.audit-table td:nth-child(1) { white-space: nowrap; }  /* время */
+table.audit-table td:nth-child(2) { white-space: nowrap; }  /* event_type — 1 строка */
+table.audit-table td:nth-child(3) { white-space: nowrap; }  /* badge */
+table.audit-table td:nth-child(5) { white-space: nowrap; }  /* IP */
