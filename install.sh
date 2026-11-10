@@ -96,10 +96,24 @@ ok "Файлы проекта найдены"
 
 # ─── Шаг 2: Обязательные файлы ────────────────────────
 hdr "Проверка обязательных файлов"
-if [ ! -f admins.env ]; then
-    echo "Дырул Анатолий Юрьевич|18962570627" > admins.env
+ADMIN_CN="Дырул Анатолий Юрьевич"
+ADMIN_SNILS="18962570627"
+
+# Проверяем: файл отсутствует ИЛИ в нём только комментарии/пустые строки
+if [ ! -f admins.env ] || ! grep -qE "^[^#[:space:]].*\|.*" admins.env 2>/dev/null; then
+    warn "admins.env отсутствует или содержит только комментарии — пересоздаю"
+    cat > admins.env <<ADMEOF
+# admins.env — администраторы (CN|SNILS)
+${ADMIN_CN}|${ADMIN_SNILS}
+ADMEOF
     chmod 644 admins.env
-    ok "Создан admins.env с администратором по умолчанию"
+    ok "Создан admins.env с администратором: ${ADMIN_CN}"
+elif ! grep -q "|${ADMIN_SNILS}" admins.env; then
+    echo "${ADMIN_CN}|${ADMIN_SNILS}" >> admins.env
+    chmod 644 admins.env
+    ok "Добавлен администратор ${ADMIN_CN} в существующий admins.env"
+else
+    ok "admins.env уже содержит администратора ${ADMIN_CN}"
 fi
 [ -f cryptopro-dist/linux-amd64_deb.tgz ] || die "Нет cryptopro-dist/linux-amd64_deb.tgz"
 ls axiom-dist/*.tar.gz >/dev/null 2>&1 || warn "axiom-dist/*.tar.gz не найден (будет системный JDK)"
