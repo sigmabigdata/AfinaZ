@@ -39,7 +39,7 @@ public class AuditEventWriter {
             e.setActorEmail(entry.actorEmail());
             e.setActorRole(entry.actorRole());
             e.setTargetType(entry.targetType());
-            e.setTargetId(entry.targetId());
+            e.setTargetId(normalizeTargetId(entry.targetId()));
             e.setTargetInfo(truncate(entry.targetInfo(), 500));
             e.setDetails(entry.details());
 
@@ -80,4 +80,17 @@ public class AuditEventWriter {
         if (s == null) return null;
         return s.length() > max ? s.substring(0, max - 3) + "..." : s;
     }
+
+    /**
+     * Не писать "null" и пустоту в target_id.
+     * String.valueOf((Long) null) даёт строку "null" —
+     * потом Long.parseLong("null") в экспорте падает с NumberFormatException.
+     */
+    private static String normalizeTargetId(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        if (t.isEmpty() || "null".equalsIgnoreCase(t)) return null;
+        return t;
+    }
+
 }

@@ -232,7 +232,8 @@ public class ClientExportService {
                 .stream()
                 .filter(e -> "DOCUMENT".equals(e.getTargetType())
                         && e.getTargetId() != null
-                        && docIds.contains(Long.valueOf(e.getTargetId())))
+                        && isNumeric(e.getTargetId())
+                        && docIds.contains(Long.parseLong(e.getTargetId())))
                 .toList();
 
         for (AuditEvent e : docEvents) {
@@ -298,5 +299,14 @@ public class ClientExportService {
     private static String csv(String s) {
         if (s == null) return "";
         return "\"" + s.replace("\"", "\"\"") + "\"";
+    }
+
+    /** true, если строка состоит только из цифр (без знака, без пробелов). */
+    private static boolean isNumeric(String s) {
+        if (s == null || s.isEmpty()) return false;
+        for (int i = 0; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i))) return false;
+        }
+        return true;
     }
 }
