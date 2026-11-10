@@ -70,21 +70,35 @@ hdr "Проверка локальных файлов"
 [ -d cryptopro-dist ]          || die "Папка cryptopro-dist/ не найдена"
 [ -d axiom-dist ]              || die "Папка axiom-dist/ не найдена"
 
-# Проверяем образы
-for img in images/afinaz-app.tar.gz images/afinaz-postgres.tar.gz images/angie-1.12.3.tar.gz; do
-    [ -f "$img" ] || die "Образ не найден: $img"
+# Проверяем образы (find — безопасно для zsh)
+IMG_COUNT=$(find images -maxdepth 1 -type f -name '*.tar.gz' | wc -l | tr -d ' ')
+if [ "$IMG_COUNT" -lt 3 ]; then
+    err "Не найдены все 3 образа в images/ (найдено: $IMG_COUNT)"
+    find images -maxdepth 1 -type f -name '*.tar.gz' 2>/dev/null
+    die "Собери образы: docker save ... | gzip > images/...tar.gz"
+fi
+ok "Образы (${IMG_COUNT} шт):"
+find images -maxdepth 1 -type f -name '*.tar.gz' | while read -r f; do
+    echo "     $f $(du -h "$f" | cut -f1)"
 done
-ok "Образы:"
-ls -lh images/*.tar.gz | awk '{print "     " $9, $5}'
 
-# Проверяем сертификаты
-CERT_COUNT=$(ls certs/*.cer certs/*.crt certs/*.pem 2>/dev/null | wc -l)
-[ "$CERT_COUNT" -gt 0 ] || warn "В certs/ нет сертификатов — проверка УКЭП не будет работать"
-ok "Сертификатов: $CERT_COUNT"
+# Проверяем сертификаты (find — работает и в bash, и в zsh)
+CERT_COUNT=0
+if [ -d certs ]; then
+    CERT_COUNT=$(find certs -maxdepth 1 -type f \( -name '*.cer' -o -name '*.crt' -o -name '*.pem' \) | wc -l | tr -d ' ')
+fi
+if [ "${CERT_COUNT:-0}" -gt 0 ]; then
+    ok "Сертификатов: $CERT_COUNT"
+else
+    warn "В certs/ нет сертификатов — проверка УКЭП не будет работать"
+fi
 
-# Проверяем cryptopro-dist
-[ -f cryptopro-dist/linux-amd64_deb.tgz ] || warn "cryptopro-dist/linux-amd64_deb.tgz не найден"
-ok "cryptopro-dist проверен"
+# Проверяем cryptopro-dist (мягко)
+if [ -f cryptopro-dist/linux-amd64_deb.tgz ]; then
+    ok "cryptopro-dist/linux-amd64_deb.tgz найден"
+else
+    warn "cryptopro-dist/linux-amd64_deb.tgz не найден (не критично для offline)"
+fi
 
 # Проверяем admins.env — должна быть хотя бы одна РЕАЛЬНАЯ запись (не комментарий)
 if [ ! -f admins.env ] || ! grep -qE "^[^#[:space:]].*\|.*" admins.env 2>/dev/null; then
@@ -123,10 +137,9 @@ ok "Исходники скопированы"
 
 # ─── 4. Копируем образы (с retry) ───
 hdr "Копируем Docker-образы (1.6 ГБ)"
-IMAGE_TOTAL=$(du -sb images/ | cut -f1)
 for attempt in 1 2 3 4 5; do
     echo -e "  ${B}▶ Попытка $attempt/5${N}"
-    if rsync -avz --partial --info=progress2 \
+    if rsync -avz --partial --partial-dir=.rsync-partial --bwlimit=1500 --info=progress2 \
         -e "$RSYNC_SSH" \
         images/ root@$SERVER:/opt/afinaz/images/ 2>&1 | tail -3; then
         # Проверяем, что все три файла на месте на сервере
