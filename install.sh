@@ -381,6 +381,16 @@ if [ "$BUILD_MODE" = "2" ]; then
             docker load < "$img" | tail -1
         fi
     done
+
+    # Если angie нет локально — загружаем из архива, иначе тянем из интернета
+    if ! docker image inspect docker.angie.software/angie:1.12.3-alpine >/dev/null 2>&1; then
+        if [ -f images/angie-1.12.3.tar.gz ]; then
+            echo -e "  ${B}▶ Загрузка angie из архива...${N}"
+            gunzip -c images/angie-1.12.3.tar.gz | docker load | tail -1
+        else
+            warn "angie-1.12.3.tar.gz не найден, тянем из интернета"
+        fi
+    fi
     ok "Образы загружены"
 else
     echo -e "  ${B}▶ Сборка app (5-10 мин)...${N}"
