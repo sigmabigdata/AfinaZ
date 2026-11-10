@@ -341,18 +341,25 @@ ok "Порт 443 свободен"
 
 # ─── Шаг 8: Права на папки ───────────────────────────
 hdr "Права доступа"
+
+# Гарантированно создаем все нужные папки (они могут отсутствовать в git)
+mkdir -p storage/documents storage/visualizations logs backups crls certs angie-certs secrets
+echo -e "  ${DIM}▶ Папки созданы: storage logs backups crls certs angie-certs secrets${N}"
+
 UID_TO_USE=999
 if id -u 999 >/dev/null 2>&1; then
-    chown -R 999:999 secrets storage logs backups crls certs angie-certs 2>/dev/null || true
+    chown -R 999:999 storage logs backups crls certs angie-certs secrets
+    chmod -R 775 storage logs backups crls certs angie-certs
+    chmod 700 secrets
+    chmod 600 secrets/*.key secrets/backup.pass 2>/dev/null || true
+    ok "Права выданы пользователю 999"
 else
     warn "UID 999 не найден, использую root"
-    chown -R root:root secrets storage logs backups crls certs angie-certs 2>/dev/null || true
+    chown -R root:root storage logs backups crls certs angie-certs secrets
+    chmod -R 775 storage logs backups crls certs angie-certs
+    chmod 700 secrets
+    ok "Права выданы root (не рекомендуется)"
 fi
-chmod 700 secrets
-chmod 600 secrets/*.key secrets/backup.pass 2>/dev/null || true
-chmod 775 storage logs backups crls certs angie-certs 2>/dev/null || true
-chmod 644 angie-certs/*.pem 2>/dev/null || true
-ok "Права установлены"
 
 # ─── Шаг 9: Сборка/загрузка образов ──────────────────
 hdr "Подготовка образов"
