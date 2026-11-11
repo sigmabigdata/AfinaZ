@@ -58,8 +58,10 @@ services:
     env_file:
       - .env.prod
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       SERVER_FORWARD_HEADERS_STRATEGY: framework
+      APP_SETUP_MODE: ${APP_SETUP_MODE:-false}
+      APP_SETUP_TOKEN: ${APP_SETUP_TOKEN:-}
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-afina_db}
       APP_STORAGE_PATH: /app/storage/documents
       ADMINS_FILE: /app/admins.env
@@ -82,6 +84,7 @@ services:
       # Только для /admin/system/cleanup. --volumes НИКОГДА не передаётся.
       - /var/run/docker.sock:/var/run/docker.sock
       - ./angie-certs:/opt/afinaz/angie-certs
+      - ./setup-out:/app/setup-out:rw
     logging:
       driver: json-file
       options:

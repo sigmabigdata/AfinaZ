@@ -134,4 +134,13 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
 USER 999:999
 
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -Dfile.encoding=UTF-8"
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
+# ============================================================
+# Entrypoint wrapper: обрабатывает переход Setup Mode → обычный
+# ============================================================
+COPY entrypoint-wrapper.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Создаём setup-out (для записи .env.prod.new при финализации wizard)
+RUN mkdir -p /app/setup-out && chmod 777 /app/setup-out
+
+ENTRYPOINT ["/entrypoint.sh"]
