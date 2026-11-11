@@ -45,6 +45,9 @@ public class SettingsController {
     @org.springframework.beans.factory.annotation.Value("${app.mail.from:}")
     private String envMailFrom;
 
+    @org.springframework.beans.factory.annotation.Value("${app.admin-ip-whitelist:}")
+    private String envAdminIpWhitelist;
+
     public SettingsController(SettingsService settings,
                               AuditService audit,
                               EmailService emailService,
@@ -65,6 +68,8 @@ public class SettingsController {
         model.addAttribute("rateLimitLogin", settings.getIntOrDefault("auth.rate_limit.login", 5));
         model.addAttribute("rateLimitWindow", settings.getIntOrDefault("auth.rate_limit.window_min", 15));
         model.addAttribute("requireCrl", settings.getBoolOrDefault("signature.require_crl", false));
+        model.addAttribute("adminIpWhitelist", settings.getOrDefault("admin.ip_whitelist", ""));
+        model.addAttribute("envAdminIpWhitelist", envAdminIpWhitelist);
         // SMTP-значения для формы (пароль маскируем)
         model.addAttribute("smtpHost", settings.getOrDefault(K_SMTP_HOST, ""));
         model.addAttribute("smtpPort", settings.getOrDefault(K_SMTP_PORT, "465"));
@@ -90,6 +95,7 @@ public class SettingsController {
                        @RequestParam(required = false) String rateLimitLogin,
                        @RequestParam(required = false) String rateLimitWindow,
                        @RequestParam(required = false) String requireCrl,
+                       @RequestParam(required = false) String adminIpWhitelist,
                        @RequestParam(required = false) String smtpHost,
                        @RequestParam(required = false) String smtpPort,
                        @RequestParam(required = false) String smtpUsername,
@@ -107,6 +113,11 @@ public class SettingsController {
             settings.set("auth.rate_limit.window_min",
                     rateLimitWindow == null ? "15" : rateLimitWindow, who);
             settings.set("signature.require_crl", requireCrl != null ? "true" : FALSE, who);
+            String ipWhitelistVal = adminIpWhitelist == null ? "" : adminIpWhitelist.trim();
+            settings.set("admin.ip_whitelist", ipWhitelistVal, who);
+            if ("*".equals(ipWhitelistVal)) {
+                log.warn("⚠ ADMIN IP whitelist = * (разрешены все IP). by={}", who);
+            }
 
             // SMTP
             settings.set(K_SMTP_HOST, smtpHost == null ? "" : smtpHost.trim(), who);

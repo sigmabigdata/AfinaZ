@@ -34,6 +34,9 @@ public class SecurityConfig {
     @Value("${app.admin-ip-whitelist}")
     private String adminIpWhitelist;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private ru.example.ukep.service.SettingsService settingsService;
+
     @Bean(name = "adminContextRepository")
     public HttpSessionSecurityContextRepository adminContextRepository() {
         HttpSessionSecurityContextRepository repo = new HttpSessionSecurityContextRepository();
@@ -78,28 +81,23 @@ public class SecurityConfig {
     }
 
     private Filter adminIpFilter() {
-        List<String> allowed = Arrays.stream(adminIpWhitelist.split(","))
-                .map(String::trim).filter(s -> !s.isEmpty()).toList();
-
-        // Специальное значение "*" отключает проверку IP (только для отладки/демо!).
-        // CERTIFICATION: вернуть строгий whitelist перед боевой сдачей.
-        boolean allowAll = allowed.contains("*");
-        if (allowAll) {
-            log.warn("⚠️  ADMIN_IP_WHITELIST=* — админка открыта с ЛЮБОГО IP. " +
-                    "Это допустимо только для отладки/демо, НЕ для прода!");
-        }
-
         return new Filter() {
             @Override
             public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
                     throws IOException, ServletException {
-                if (allowAll) {
+                // Whitelist читается из БД на каждом запросе (SettingsService кеширует).
+                // Если в БД пусто — fallback на .env.prod.
+                String whitelistStr = currentWhitelist();
+                List<String> allowed = Arrays.stream(whitelistStr.split(","))
+                        .map(String::trim).filter(s -> !s.isEmpty()).toList();
+
+                if (allowed.contains("*")) {
                     chain.doFilter(req, res);
                     return;
                 }
                 String ip = clientIp((HttpServletRequest) req);
                 if (!isAllowedIp(ip, allowed)) {
-                    log.warn("Blocked admin access from IP: {}", ip);
+                    log.warn("Blocked admin access from IP: {} (whitelist: {})", ip, whitelistStr);
                     ((HttpServletResponse) res).sendError(HttpServletResponse.SC_FORBIDDEN,
                             "Admin area available only from server");
                     return;
@@ -107,6 +105,12 @@ public class SecurityConfig {
                 chain.doFilter(req, res);
             }
         };
+    }
+
+    /** Текущий whitelist: из БД (admin.ip_whitelist) или fallback из .env.prod. */
+    private String currentWhitelist() {
+        String fromDb = settingsService.getOrDefault("admin.ip_whitelist", "");
+        return fromDb.isBlank() ? adminIpWhitelist : fromDb;
     }
 
     /** Проверка IP по whitelist: exact match для одиночных, CIDR для «x.x.x.x/n». */
@@ -173,8 +177,8 @@ public class SecurityConfig {
             UserDetailsService uds,
             @Qualifier("adminContextRepository") HttpSessionSecurityContextRepository adminRepo) throws Exception {
 
-        log.info("Admin IP whitelist: {}",
-                Arrays.stream(adminIpWhitelist.split(",")).map(String::trim).toList());
+        log.info("Admin IP whitelist (dynamic, /admin/settings): {}",
+                Arrays.stream(currentWhitelist().split(",")).map(String::trim).toList());
 
         http
             .securityMatcher("/admin/**", "/api/sign/admin/**")

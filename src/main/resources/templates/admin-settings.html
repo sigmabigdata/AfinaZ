@@ -96,6 +96,27 @@
                    th:value="${rateLimitWindow}"/>
         </div>
 
+        <h2>Безопасность админки</h2>
+
+        <div class="alert warn" style="margin-bottom:14px;">
+            <b>⚠️ Whitelist IP для /admin/*</b><br>
+            Через запятую. Одиночные IP и CIDR (например, <code>10.0.0.0/8</code>).
+            <b>*</b> — разрешить с любого IP (только для отладки!).<br>
+            Пусто — используется значение из <code>.env.prod</code>:
+            <code th:text="${envAdminIpWhitelist} ?: '(не задано)'"></code>.<br>
+            <span class="muted small">Изменения применяются сразу, без перезапуска.</span>
+        </div>
+
+        <div class="form-field">
+            <label>Whitelist IP админки (переопределяет .env.prod)</label>
+            <input type="text" name="adminIpWhitelist"
+                   th:value="${adminIpWhitelist}"
+                   placeholder="127.0.0.1,::1,172.0.0.0/8,203.0.113.5"/>
+            <div class="hint">
+                Текущее из .env.prod: <code th:text="${envAdminIpWhitelist} ?: '(не задано)'"></code>
+            </div>
+        </div>
+
         <h2>SMTP (отправка email)</h2>
 
         <div class="alert warn" style="margin-bottom:16px">
