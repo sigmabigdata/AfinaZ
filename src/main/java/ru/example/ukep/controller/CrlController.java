@@ -99,12 +99,26 @@ public class CrlController {
         try {
             var result = crlOnDemandService.refreshAll(
                     auth != null ? auth.getName() : "admin");
-            ra.addFlashAttribute("ok", String.format(
+            StringBuilder msg = new StringBuilder();
+            msg.append(String.format(
                     "Обновлено: скачано %d CRL, удалено осиротевших %d. "
                     + "Сертификатов: %d из %d подписей (ошибок парсинга: %d).",
                     result.crlDownloaded(), result.crlDeleted(),
                     result.uniqueCerts(), result.totalSignatures(),
                     result.parseErrors()));
+            if (result.crlFailed() > 0) {
+                msg.append(" ❌ Не удалось: ").append(result.crlFailed()).append(". ");
+                int shown = Math.min(result.failures().size(), 3);
+                for (int i = 0; i < shown; i++) {
+                    msg.append(result.failures().get(i)).append("; ");
+                }
+                if (result.failures().size() > 3) {
+                    msg.append("(см. логи для остальных)");
+                }
+                ra.addFlashAttribute("warn", msg.toString());
+            } else {
+                ra.addFlashAttribute("ok", msg.toString());
+            }
         } catch (Exception e) {
             log.error("refresh-all failed", e);
             ra.addFlashAttribute("err", "Ошибка обновления: " + e.getMessage());

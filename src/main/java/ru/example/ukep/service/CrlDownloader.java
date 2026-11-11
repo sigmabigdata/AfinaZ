@@ -75,19 +75,33 @@ public class CrlDownloader {
      * @param force true — игнорировать TTL и перекачать CRL принудительно
      */
     public int ensureCrlsFor(Set<X509Certificate> certs, boolean force) {
+        return ensureCrlsForWithDetails(certs, force).success();
+    }
+
+    /**
+     * @return success — успешных обновлений, failed — неудачных,
+     *         failures — список "url: error" для UI/логов
+     */
+    public record DownloadReport(int success, int failed, java.util.List<String> failures) {}
+
+    public DownloadReport ensureCrlsForWithDetails(Set<X509Certificate> certs, boolean force) {
         Set<String> urls = new HashSet<>();
         for (X509Certificate cert : certs) {
             urls.addAll(extractCdpUrls(cert));
         }
         int count = 0;
+        java.util.List<String> failures = new java.util.ArrayList<>();
         for (String url : urls) {
             try {
                 if (downloadIfStale(url, force)) count++;
             } catch (Exception e) {
+                String shortUrl = url.length() > 60 ? url.substring(0, 60) + "..." : url;
+                String msg = shortUrl + " — " + e.getMessage();
+                failures.add(msg);
                 log.warn("CRL download failed для {}: {}", url, e.getMessage());
             }
         }
-        return count;
+        return new DownloadReport(count, failures.size(), failures);
     }
 
     /** Извлекает все CDP URL (http/https) из расширения 2.5.29.31. */
@@ -239,13 +253,41 @@ public class CrlDownloader {
     }
 
     private void downloadToFile(String url, Path target) throws java.io.IOException {
+        try {
+            downloadOne(url, target);
+        } catch (Exception first) {
+            // Fallback: http → https (некоторые gov-сайты отдают CRL только по https)
+            if (url.startsWith("http://")) {
+                String httpsUrl = "https://" + url.substring("http://".length());
+                log.info("CRL retry as https: {}", httpsUrl);
+                try {
+                    downloadOne(httpsUrl, target);
+                    return;
+                } catch (Exception second) {
+                    log.debug("https retry failed: {}", second.getMessage());
+                }
+            }
+            throw first;
+        }
+    }
+
+    private void downloadOne(String url, Path target) throws java.io.IOException {
         HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
-        conn.setConnectTimeout(10_000);
-        conn.setReadTimeout(30_000);
+        conn.setConnectTimeout(15_000);
+        conn.setReadTimeout(60_000);
         conn.setInstanceFollowRedirects(true);
-        conn.setRequestProperty("User-Agent", "Afina-CRL-Downloader/1.0");
+        // Браузерный UA — некоторые gov-сайты блокируют "ботов" без Referer/UA
+        conn.setRequestProperty("User-Agent",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+                "Chrome/131.0.0.0 Safari/537.36");
+        conn.setRequestProperty("Accept", "*/*");
+        conn.setRequestProperty("Accept-Language", "ru,en;q=0.9");
         int code = conn.getResponseCode();
         if (code != 200) {
+            // 304 Not Modified — это OK (файл не изменился, но обновить mtime надо)
+            if (code == 304) {
+                throw new IllegalStateException("HTTP 304 (не изменён)");
+            }
             throw new IllegalStateException("HTTP " + code);
         }
         try (InputStream in = conn.getInputStream()) {
