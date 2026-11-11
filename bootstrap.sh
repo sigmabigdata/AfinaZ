@@ -417,6 +417,17 @@ generate_secrets() {
 generate_env_prod() {
     hdr "[5/8] .env.prod"
 
+    # DRY-RUN: ничего не пишем, только показываем план
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        ok "[dry-run] .env.prod будет создан:"
+        echo -e "    APP_DOMAIN=${ARG_DOMAIN}"
+        echo -e "    APP_SETUP_MODE=true"
+        echo -e "    APP_SETUP_TOKEN=<32 hex chars>"
+        echo -e "    DB пароли: <сгенерированы или переиспользованы>"
+        echo -e "    Backup существующего: ${ENV_FILE}.bak.<ts> (если был)"
+        return 0
+    fi
+
     # Backup старого
     if [ -f "$ENV_FILE" ]; then
         cp "$ENV_FILE" "${ENV_FILE}.bak.${STAMP}"
@@ -439,15 +450,6 @@ generate_env_prod() {
 
     # Токен setup
     SETUP_TOKEN=$(openssl rand -hex 32)
-
-    if [ "$ARG_DRY_RUN" = "1" ]; then
-        ok "[dry-run] .env.prod будет создан:"
-        echo -e "    APP_DOMAIN=${ARG_DOMAIN}"
-        echo -e "    APP_SETUP_MODE=true"
-        echo -e "    APP_SETUP_TOKEN=<32 hex chars>"
-        echo -e "    DB пароли: <сгенерированы>"
-        return 0
-    fi
 
     cat > "$ENV_FILE" <<ENVEOF
 # ============================================================
@@ -526,12 +528,17 @@ CREDSEOF
 setup_tls() {
     hdr "[6/8] TLS"
 
-    mkdir -p angie-certs
-
+    # DRY-RUN: ничего не пишем
     if [ "$ARG_DRY_RUN" = "1" ]; then
         ok "[dry-run] TLS режим: $ARG_TLS"
+        case "$ARG_TLS" in
+            self-signed) ok "[dry-run] будет сгенерирован self-signed cert (365 дней)" ;;
+            custom)      ok "[dry-run] используются существующие angie-certs/*.pem" ;;
+        esac
         return 0
     fi
+
+    mkdir -p angie-certs
 
     case "$ARG_TLS" in
         self-signed)
