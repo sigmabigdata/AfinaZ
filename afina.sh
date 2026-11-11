@@ -221,6 +221,7 @@ cmd_menu() {
         echo -e "${C} 9.${N} 🗄️  psql"
         echo -e "${C}10.${N} 💾 Восстановить БД из бэкапа (.sql.gz.enc)"
         echo -e "${C}11.${N} 📁 Восстановить файлы из бэкапа (.tar.gz.enc)"
+        echo -e "${C}12.${N} 🔍 Полная диагностика (diag.sh, 20 разделов)"
         echo ""
         echo -e "${C} 0.${N} ❌ Выход"
         echo -e "${C} h.${N} ❓ Справка по командам"
@@ -238,6 +239,7 @@ cmd_menu() {
             9) docker exec -it afina-postgres psql -U postgres -d afina_db ;;
             10|restore)       cmd_restore ;;
             11|restore-files) cmd_restore_files ;;
+            12|diag)          cmd_diag ;;
             0) echo "Пока!"; exit 0 ;;
             h|help) cmd_help ;;
             *) echo "Неверный выбор"; sleep 1; continue ;;
@@ -261,7 +263,9 @@ cmd_help() {
     echo "  logs [app|angie|pg] [-f]     Логи (по умолчанию app, без -f)"
     echo "  shell [app|pg]               Открыть sh/bash в контейнере"
     echo "  db \"SQL\"                     SQL-запрос на проде"
-    echo "  doctor                       Полная диагностика"
+    echo "  doctor                       Быстрая диагностика (10 проверок, ~5 сек)"
+    echo "  diag [опции]                 Полная диагностика (20 разделов, ~70 проверок)"
+    echo "                               Опции: --no-color, --quiet, --markdown-only"
     echo "  health                       Health один раз"
     echo ""
     echo -e "${BOLD}Данные:${N}"
@@ -590,6 +594,17 @@ cmd_doctor() {
 }
 
 # ============================================================
+cmd_diag() {
+    if [ ! -f "$APP_DIR/diag.sh" ]; then
+        err "diag.sh не найден в $APP_DIR"
+        warn "Обновите: git pull origin main"
+        return 1
+    fi
+    [ -x "$APP_DIR/diag.sh" ] || chmod +x "$APP_DIR/diag.sh" 2>/dev/null || true
+    "$APP_DIR/diag.sh" "$@"
+}
+
+# ============================================================
 # Main
 # Если аргументов нет и мы в терминале — показать интерактивное меню
 if [ -z "${1:-}" ] && [ -t 1 ]; then
@@ -615,6 +630,7 @@ case "${1:-help}" in
     crl)           cmd_crl ;;
     cron)          cmd_cron ;;
     doctor|doc)    cmd_doctor ;;
+    diag|diagnose) shift; cmd_diag "$@" ;;
     version|v)     cmd_version ;;
     menu|m)        cmd_menu ;;
     restore)       cmd_restore ;;
