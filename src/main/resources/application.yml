@@ -44,6 +44,15 @@ app:
     from: ${MAIL_FROM:noreply@example.com}
     from-name: ${MAIL_FROM_NAME:ПАО "НБД-Банк"}
 
+  # ─── Setup Mode (wizard первичной настройки) ───
+  # Активируется через APP_SETUP_MODE=true (bootstrap.sh).
+  # После завершения wizard .env.prod перезаписывается, mode=false.
+  setup:
+    mode: ${APP_SETUP_MODE:false}
+    token: ${APP_SETUP_TOKEN:}
+    out-dir: ${APP_SETUP_OUT_DIR:/app/setup-out}
+    session-ttl-minutes: ${APP_SETUP_SESSION_TTL:60}
+
 logging:
   level:
     ru.example.ukep: DEBUG
