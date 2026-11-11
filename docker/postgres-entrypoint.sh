@@ -19,6 +19,11 @@ if [ "${1:0:1}" = '-' ]; then
     set -- postgres "$@"
 fi
 
+# Исправляем ownership, если volume был создан старым образом
+if [ -d "$PGDATA" ]; then
+    chown -R postgres:postgres "$PGDATA" 2>/dev/null || true
+fi
+
 # ============ 1. Инициализация кластера ============
 if [ ! -s "$PGDATA/PG_VERSION" ] || [ ! -f "$PGCONF" ]; then
     echo "▶ Volume пустой — создаём кластер 15/main..."
