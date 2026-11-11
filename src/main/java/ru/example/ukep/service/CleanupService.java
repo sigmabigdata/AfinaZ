@@ -266,19 +266,88 @@ public class CleanupService {
                 "afina-*/rebuild-*/build-* старше " + maxDays + " дн.");
     }
 
+    /**
+     * Считает reclaimable Docker-мусор (build cache + unused images + stopped containers).
+     * Volumes НЕ учитываются — они не удаляются (там БД и angie_data).
+     *
+     * /system/df возвращает массивы с полями:
+     *   Images[].Size, Images[].Containers (0 = unused)
+     *   BuildCache[].Size, BuildCache[].InUse (false = unused)
+     *   Containers[].SizeRw (только для stopped)
+     */
     private Category analyzeDocker() {
         try {
-            // /system/df через docker.sock (curl есть в образе)
             String out = dockerApi("GET", "/v1.43/system/df");
-            // Грубая оценка: сумма BuildCache.Size + Images.SharedSize
             long total = 0;
-            total += parseLongField(out, "Size", true);
+
+            // 1. Unused images (Containers==0)
+            total += sumJsonFieldByPredicate(out, "Images", "Size",
+                    obj -> obj.contains("\"Containers\":0"));
+            // 2. Build cache не в использовании
+            total += sumJsonFieldByPredicate(out, "BuildCache", "Size",
+                    obj -> obj.contains("\"InUse\":false"));
+            // 3. Stopped containers
+            total += sumJsonFieldByPredicate(out, "Containers", "SizeRw",
+                    obj -> obj.contains("\"State\":\"exited\""));
+
             return new Category("docker", "Docker (кэш, образы)", total, 0,
-                    "нажмите «Очистить» для prune");
+                    "reclaimable: cache + unused images + stopped containers");
         } catch (Exception e) {
             return new Category("docker", "Docker (кэш, образы)", 0, 0,
                     "curl+docker.sock недоступен: " + e.getMessage());
         }
+    }
+
+    /**
+     * Суммирует числовое поле {@code numField} в массиве {@code arrayName},
+     * но только для тех элементов, что проходят {@code predicate}.
+     *
+     * Простой парсер без библиотек: находит "arrayName":[...] и внутри
+     * режет на объекты по "{" ... "}", фильтрует predicate, выдёргивает numField.
+     */
+    private static long sumJsonFieldByPredicate(String json, String arrayName,
+                                                 String numField,
+                                                 java.util.function.Predicate<String> predicate) {
+        int arrStart = json.indexOf("\"" + arrayName + "\":[");
+        if (arrStart < 0) return 0;
+        arrStart = json.indexOf('[', arrStart) + 1;
+
+        // Найдём конец массива: балансировка скобок
+        int depth = 1;
+        int arrEnd = arrStart;
+        for (int i = arrStart; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '[') depth++;
+            else if (c == ']') { depth--; if (depth == 0) { arrEnd = i; break; } }
+        }
+        String arrBody = json.substring(arrStart, arrEnd);
+
+        // Разбиваем на объекты по верхнеуровневым { ... }
+        long sum = 0;
+        int objStart = -1;
+        int braceDepth = 0;
+        for (int i = 0; i < arrBody.length(); i++) {
+            char c = arrBody.charAt(i);
+            if (c == '{') {
+                if (braceDepth == 0) objStart = i;
+                braceDepth++;
+            } else if (c == '}') {
+                braceDepth--;
+                if (braceDepth == 0 && objStart >= 0) {
+                    String obj = arrBody.substring(objStart, i + 1);
+                    if (predicate.test(obj)) {
+                        java.util.regex.Matcher m = java.util.regex.Pattern
+                                .compile("\"" + java.util.regex.Pattern.quote(numField) + "\"\\s*:\\s*(\\d+)")
+                                .matcher(obj);
+                        if (m.find()) {
+                            try { sum += Long.parseLong(m.group(1)); } catch (Exception ignored) {}
+                        }
+                    }
+                    objStart = -1;
+                }
+            }
+        }
+        return sum;
     }
 
     /** HTTP-вызов к docker.sock через curl. */
@@ -297,18 +366,7 @@ public class CleanupService {
         return out;
     }
 
-    /** Парсит числовое поле JSON по имени (первое вхождение). */
-    private static long parseLongField(String json, String field, boolean any) {
-        java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("\"" + java.util.regex.Pattern.quote(field) + "\"\\s*:\\s*(\\d+)")
-                .matcher(json);
-        long sum = 0;
-        while (m.find()) {
-            try { sum += Long.parseLong(m.group(1)); } catch (Exception ignored) {}
-            if (!any) break;
-        }
-        return sum;
-    }
+
 
     // ─────────────── Очистка ───────────────
 
@@ -547,4 +605,17 @@ public class CleanupService {
         if (b < 1024L * 1024 * 1024) return String.format("%.1f MB", b / 1024.0 / 1024);
         return String.format("%.2f GB", b / 1024.0 / 1024 / 1024);
     }
+    /** Парсит числовое поле JSON по имени (первое вхождение). */
+    private static long parseLongField(String json, String field, boolean any) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("\"" + java.util.regex.Pattern.quote(field) + "\"\\s*:\\s*(\\d+)")
+                .matcher(json);
+        long sum = 0;
+        while (m.find()) {
+            try { sum += Long.parseLong(m.group(1)); } catch (Exception ignored) {}
+            if (!any) break;
+        }
+        return sum;
+    }
+
 }
