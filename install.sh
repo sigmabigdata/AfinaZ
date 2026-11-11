@@ -513,6 +513,13 @@ ALTER DEFAULT PRIVILEGES FOR ROLE afina_migrator IN SCHEMA public
 EOF
 ok "Роли БД созданы/проверены"
 
+# Сброс старых smtp.* если они указывают на нерабочие значения
+# (не трогаем, если host непустой и не localhost — это может быть реальный внешний SMTP)
+docker exec -i afina-postgres psql -U postgres -d afina_db -tAc \
+  "SELECT value FROM app_settings WHERE key='smtp.host'" 2>/dev/null | grep -qE '^(localhost|127\.0\.0\.1|)$' && \
+  docker exec -i afina-postgres psql -U postgres -d afina_db -c \
+  "UPDATE app_settings SET value='' WHERE key IN ('smtp.host','smtp.port','smtp.username','smtp.password','smtp.from','smtp.ssl')" >/dev/null 2>&1 || true
+
 # 10.3. App
 echo -e "  ${DIM}▶ app...${N}"
 $COMPOSE_CMD -f docker-compose-prod.yml --env-file .env.prod up -d app 2>&1 | tail -2
@@ -618,10 +625,16 @@ SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 0 3 * * * root cd /opt/afinaz && ./backup-prod.sh >> /var/log/afina/backup.log 2>&1
 CRON
+# monitor.sh должен быть исполняемым для cron (./monitor.sh)
+chmod +x /opt/afinaz/monitor.sh 2>/dev/null || true
+mkdir -p /var/log/afina
+touch /var/log/afina/monitor-cron.log
+chmod 644 /var/log/afina/monitor-cron.log
+
 cat > /etc/cron.d/afina-monitor <<'CRON'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-*/5 * * * * root cd /opt/afinaz && ./monitor.sh >> /var/log/afina/monitor.log 2>&1
+*/5 * * * * root cd /opt/afinaz && ./monitor.sh >> /var/log/afina/monitor-cron.log 2>&1
 CRON
 cat > /etc/cron.d/afina-cleanup <<'CRON'
 SHELL=/bin/bash
