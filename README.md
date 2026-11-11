@@ -60,7 +60,14 @@ docker restart afina-app
 ```
 
 ## 6. Управление — утилита `afina`
-1 — Деплой, 2 — Перезапуск, 3 — Health, 4 — Логи, 5 — Бэкап, 6 — Восстановление, 7 — Очистка, 8 — Shell, 9 — psql.
+1 — Деплой, 2 — Перезапуск, 3 — Health, 4 — Логи, 5 — Бэкап, 6 — Восстановление, 7 — Очистка, 8 — Shell, 9 — psql, 10 — restore БД, 11 — restore storage, **12 — полная диагностика**.
+
+Команды для диагностики:
+- `afina doctor` — быстрая (10 проверок, ~5 сек)
+- `afina diag` — полная end-to-end (20 разделов, ~70 проверок)
+- `afina diag --no-color` — без ANSI-цветов (для логов)
+- `afina diag --quiet` — только PASS/WARN/FAIL
+- `afina diag --markdown-only` — только сгенерировать .md-отчёт
 
 ## 7. Решение проблем
 - **502 Bad Gateway** — `docker logs afina-app --tail 50`
