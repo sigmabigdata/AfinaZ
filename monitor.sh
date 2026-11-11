@@ -68,6 +68,8 @@ docker exec afina-postgres pg_isready -q -U postgres 2>/dev/null || \
 if [ -z "$fail_reasons" ]; then
     if [ -f "$STATE" ] && [ "$(cat "$STATE")" != "0" ]; then
         log "✓ Восстановление после сбоя"
+    else
+        log "✓ OK (контейнеры: ${running// /, }, disk=${DISK_PCT}%)"
     fi
     echo "0" > "$STATE"
     exit 0
