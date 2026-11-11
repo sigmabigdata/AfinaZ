@@ -22,21 +22,21 @@
         <a th:href="@{/admin/settings}">Настройки</a>
         <a th:href="@{/admin/poa}">Доверенности</a>
     </nav>
-    <button type="button" class="cmdk-trigger" title="Поиск (⌘K)" style="margin-right:8px;">🔍 <span style="opacity:0.6;">⌘K</span></button>
     <form method="post" th:action="@{/admin/logout}" style="display:inline">
         <button class="btn-ghost" type="submit">Выйти</button>
     </form>
 </header>
 
 <main>
-    <div class="sys-head">
-        <h1>Мониторинг</h1>
-        <div class="sys-actions">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h1 style="margin:0;">Мониторинг</h1>
+        <div style="display:flex; gap:8px;">
             <form method="post" th:action="@{/admin/monitor/check-now}" style="display:inline">
                 <button type="submit" class="btn">↻ Проверить сейчас</button>
             </form>
-            <form method="post" th:action="@{/admin/monitor/reset-counter}" style="display:inline">
-                <button type="submit" class="btn-ghost">Сбросить счётчик</button>
+            <form method="post" th:action="@{/admin/monitor/test-alert}" style="display:inline"
+                  onsubmit="return confirm('Отправить тестовый алерт на '+ '[[${testEmail != null && !testEmail.isEmpty() ? testEmail : mailTo}]]' +'?');">
+                <button type="submit" class="btn-ghost">✉ Тест алерта</button>
             </form>
         </div>
     </div>
@@ -44,133 +44,159 @@
     <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
     <div th:if="${err}" class="alert err" th:text="${err}"></div>
 
+    <!-- Метрики -->
     <div class="metrics-grid">
         <div class="metric-card">
-            <div class="metric-label">Статус</div>
+            <div class="metric-label">Мониторинг</div>
             <div class="metric-value-small">
                 <span th:if="${enabled}" class="badge ok">Включён</span>
                 <span th:unless="${enabled}" class="badge warn">Выключен</span>
             </div>
             <div class="metric-sub">
-                проверка раз в 5 минут
+                раз в 5 минут
                 <span th:if="${lastCheckAt != null}">
                     · последняя: <b th:text="${#temporals.format(lastCheckAt,'HH:mm:ss')}">—</b>
                 </span>
-                <span th:if="${lastCheckAt == null}" class="muted">
-                    · последняя: нет данных
-                </span>
-                <div class="muted small" style="margin-top:4px;">
-                    ℹ️ В истории ниже OK-события пишутся не чаще 1 раза в час
-                    (сбои — сразу). Это для экономии места в БД.
-                </div>
             </div>
         </div>
-
         <div class="metric-card">
             <div class="metric-label">Сбоев подряд</div>
             <div class="metric-value" th:text="${fails}">0</div>
-            <div class="metric-sub">алерт при достижении 3</div>
+            <div class="metric-sub">алерт на 1-м и каждом 5-м</div>
         </div>
-
-        <div class="metric-card">
-            <div class="metric-label">Алертов отправлено</div>
-            <div class="metric-value-small" th:text="${totalFail}">0</div>
-            <div class="metric-sub" th:text="'OK проверок: ' + ${totalOk}">—</div>
-        </div>
-
         <div class="metric-card">
             <div class="metric-label">Email для алертов</div>
-            <div class="metric-value-small" th:text="${mailTo} ?: '(не задан)'">—</div>
-            <div class="metric-sub">
-                <a th:href="@{/admin/settings}">изменить →</a>
-            </div>
+            <div class="metric-value-small"
+                 th:text="${testEmail != null && !testEmail.isEmpty() ? testEmail : (mailTo != null && !mailTo.isEmpty() ? mailTo : '(не задан)')}">—</div>
+            <div class="metric-sub" th:if="${testEmail != null && !testEmail.isEmpty()}">из monitor.test_email</div>
+            <div class="metric-sub" th:if="${testEmail == null || testEmail.isEmpty()}">из monitor.mail_to</div>
         </div>
-
         <div class="metric-card">
             <div class="metric-label">Последний алерт</div>
             <div class="metric-value-small" th:text="${lastAlert}">—</div>
         </div>
     </div>
 
+    <!-- Настройки алертов -->
     <section class="panel">
-        <h2>Рассылка email (24 часа)</h2>
-        <div class="metrics-grid" style="margin-bottom:0;">
-            <div class="metric-card">
-                <div class="metric-icon">✉</div>
-                <div class="metric-label">Отправлено</div>
-                <div class="metric-value" th:text="${emailSent24h}">0</div>
-                <div class="metric-sub">за 24 часа</div>
+        <h2 style="margin-top:0;">⚙️ Настройки алертов</h2>
+        <form method="post" th:action="@{/admin/monitor/save-settings}" class="form-card" style="max-width:100%;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="form-field" style="margin:0;">
+                    <label>Основной email (monitor.mail_to)</label>
+                    <input type="email" name="monitorMailTo" th:value="${mailTo}"
+                           placeholder="admin@company.ru"/>
+                </div>
+                <div class="form-field" style="margin:0;">
+                    <label>Тестовый email (monitor.test_email)</label>
+                    <input type="email" name="testEmail" th:value="${testEmail}"
+                           placeholder="test@company.ru (пусто = основной)"/>
+                </div>
             </div>
-            <div class="metric-card">
-                <div class="metric-icon">⚠</div>
-                <div class="metric-label">Ошибок</div>
-                <div class="metric-value" th:text="${emailFailed24h}"
-                     th:classappend="${emailFailed24h > 0} ? 'err' : ''">0</div>
-                <div class="metric-sub">за 24 часа</div>
+            <div style="display:flex; gap:20px; margin-top:14px;">
+                <label style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" name="enabled" th:checked="${enabled}"/>
+                    Мониторинг включён
+                </label>
+                <label style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" name="alertRecovery" th:checked="${alertRecovery}"/>
+                    Алерт при восстановлении
+                </label>
             </div>
-        </div>
+            <div class="form-actions" style="margin-top:14px;">
+                <button type="submit">Сохранить</button>
+            </div>
+        </form>
+    </section>
 
-        <h3 style="margin-top:22px;">Последние ошибки отправки</h3>
+    <!-- Живой статус компонентов -->
+    <section class="panel">
+        <h2 style="margin-top:0;">🩺 Статус компонентов (живой)</h2>
         <table class="docs">
             <thead>
             <tr>
-                <th>Время</th>
-                <th>Получатель</th>
-                <th>Тема</th>
-                <th>Ошибка</th>
+                <th style="width:36px;"></th>
+                <th>Компонент</th>
+                <th>Сообщение</th>
+                <th style="width:100px;">Латентность</th>
             </tr>
             </thead>
             <tbody>
-            <tr th:each="e : ${emailErrors}">
-                <td class="small"
-                    th:text="${#temporals.format(e.eventTime,'dd.MM HH:mm')}">—</td>
-                <td class="small" th:text="${e.actorEmail}">—</td>
-                <td class="small" th:text="${e.targetInfo} ?: '—'">—</td>
-                <td class="small muted" th:text="${e.details} ?: '—'">—</td>
+            <tr th:each="c : ${checks}">
+                <td th:text="${c.healthy()} ? '✅' : '❌'">✅</td>
+                <td>
+                    <b th:text="${c.title()}">—</b>
+                    <div class="muted small" th:text="${c.component()}">—</div>
+                </td>
+                <td th:text="${c.message()}"
+                    th:classappend="${c.healthy()} ? '' : 'err-text'">—</td>
+                <td class="muted small" th:text="${c.latencyMs()} + ' ms'">0 ms</td>
             </tr>
-            <tr th:if="${#lists.isEmpty(emailErrors)}">
-                <td colspan="4" class="muted center">Ошибок отправки нет</td>
+            <tr th:if="${#lists.isEmpty(checks)}">
+                <td colspan="4" class="muted center">Нажмите «Проверить сейчас»</td>
             </tr>
             </tbody>
         </table>
     </section>
 
-
+    <!-- Email-статистика -->
     <section class="panel">
-        <h2>История проверок (последние 100)</h2>
+        <h2 style="margin-top:0;">📧 Email за 24 часа</h2>
+        <div class="metrics-grid" style="margin-bottom:0;">
+            <div class="metric-card">
+                <div class="metric-label">Отправлено</div>
+                <div class="metric-value" th:text="${emailSent24h}">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Ошибок</div>
+                <div class="metric-value" th:text="${emailFailed24h}"
+                     th:classappend="${emailFailed24h > 0} ? 'err' : ''">0</div>
+            </div>
+        </div>
+        <h3 style="margin-top:20px;">Последние ошибки</h3>
+        <table class="docs">
+            <thead><tr><th>Время</th><th>Получатель</th><th>Тема</th><th>Ошибка</th></tr></thead>
+            <tbody>
+            <tr th:each="e : ${emailErrors}">
+                <td class="small" th:text="${#temporals.format(e.eventTime,'dd.MM HH:mm')}">—</td>
+                <td class="small" th:text="${e.actorEmail}">—</td>
+                <td class="small" th:text="${e.targetInfo} ?: '—'">—</td>
+                <td class="small muted" th:text="${e.details} ?: '—'">—</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(emailErrors)}">
+                <td colspan="4" class="muted center">Ошибок нет</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- История проверок -->
+    <section class="panel">
+        <h2 style="margin-top:0;">📜 История (последние 100)</h2>
         <table class="docs">
             <thead>
-            <tr>
-                <th>Время</th>
-                <th>Статус</th>
-                <th>Причина</th>
-                <th>Алерт</th>
-            </tr>
+            <tr><th>Время</th><th>Компонент</th><th>Статус</th><th>Сообщение</th><th>Алерт</th></tr>
             </thead>
             <tbody>
             <tr th:each="e : ${events}">
-                <td th:text="${#temporals.format(e.checkedAt,'dd.MM.yy HH:mm:ss')}">—</td>
+                <td class="small" th:text="${#temporals.format(e.checkedAt,'dd.MM HH:mm:ss')}">—</td>
+                <td class="small"><code th:text="${e.component} ?: 'app'">app</code></td>
                 <td>
                     <span th:if="${e.status == 'OK'}" class="badge ok">OK</span>
                     <span th:if="${e.status == 'FAIL'}" class="badge err">FAIL</span>
                 </td>
-                <td th:text="${e.reason} ?: '—'">—</td>
+                <td class="small" th:text="${e.reason} ?: '—'">—</td>
                 <td>
                     <span th:if="${e.alertSent}" class="badge warn">отправлен</span>
                     <span th:unless="${e.alertSent}" class="muted small">—</span>
                 </td>
             </tr>
             <tr th:if="${#lists.isEmpty(events)}">
-                <td colspan="4" class="muted center">
-                    Проверок пока не было. Cron запустит их в течение 5 минут,
-                    либо нажмите «Проверить сейчас».
-                </td>
+                <td colspan="5" class="muted center">Проверок пока не было</td>
             </tr>
             </tbody>
         </table>
     </section>
 </main>
-<script th:src="@{/js/command-palette.js}"></script>
-<script th:src="@{/js/skeleton.js}"></script>
 </body>
 </html>

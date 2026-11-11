@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
 # ============================================================
-# Афина · Мониторинг доступности сервиса
+# Афина · Cron-мониторинг (app-level fallback)
 # ============================================================
-# Проверяет:
-#   1. HTTP-ответ /actuator/health (локально)
-#   2. HTTPS-ответ снаружи
-#   3. Все контейнеры running + healthy
-#
-# Если 3 проверки подряд неудачны → письмо на MAIL_TO.
-# Состояние хранится в logs/monitor.state.
+# Работает, когда приложение лежит и MonitoringService не может отправить алерт.
+# Проверяет: контейнеры, порт 443, health endpoint, диск.
+# 3 сбоя подряд → алерт через локальный Postfix (порт 25, без auth).
 # ============================================================
 set -e
 cd "$(dirname "$0")"
 
-# Загрузить .env.prod
 set -a
 # shellcheck disable=SC1091
 source .env.prod
@@ -23,50 +18,54 @@ LOG="logs/monitor.log"
 STATE="logs/monitor.state"
 DOMAIN="${APP_DOMAIN:-}"
 
-# Email для алертов: сначала из БД (app_settings), потом из .env
+# Кому слать алерты: сначала из app_settings, потом MAIL_FROM
 MAIL_TO=""
-if docker exec afina-postgres psql -U postgres -d afina_db -t -A \
-        -c "SELECT value FROM app_settings WHERE key = 'monitor.mail_to'" 2>/dev/null \
-        | grep -q '@'; then
+MAIL_TO=$(docker exec afina-postgres psql -U postgres -d afina_db -t -A \
+    -c "SELECT COALESCE(NULLIF(value,''), '') FROM app_settings WHERE key = 'monitor.test_email'" 2>/dev/null \
+    | tr -d '[:space:]')
+if [ -z "$MAIL_TO" ]; then
     MAIL_TO=$(docker exec afina-postgres psql -U postgres -d afina_db -t -A \
-        -c "SELECT value FROM app_settings WHERE key = 'monitor.mail_to'" 2>/dev/null \
+        -c "SELECT COALESCE(NULLIF(value,''), '') FROM app_settings WHERE key = 'monitor.mail_to'" 2>/dev/null \
         | tr -d '[:space:]')
 fi
 [ -z "$MAIL_TO" ] && MAIL_TO="${MONITOR_MAIL_TO:-$MAIL_FROM}"
 
 mkdir -p logs
-
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 
-# --- Проверки ---
 fail_reasons=""
 
-# 1. Локальный health через контейнер (не зависит от Angie/сети)
+# 1. Контейнеры
+running=$(docker compose -f docker-compose-prod.yml --env-file .env.prod ps \
+    --status running --services 2>/dev/null | sort | tr '\n' ' ')
+for need in app angie postgres; do
+    echo "$running" | grep -qw "$need" || fail_reasons="${fail_reasons}container-${need} "
+done
+
+# 2. Health через контейнер app (локально)
 if ! docker exec afina-app sh -c 'curl -fsS http://localhost:8080/actuator/health 2>/dev/null' \
-        | grep -q '"status":"UP"'; then
+        | grep -q '"status":"UP"' 2>/dev/null; then
     fail_reasons="${fail_reasons}app-health "
 fi
 
-# 2. HTTPS снаружи (проверка Angie + TLS + DNS)
+# 3. HTTPS снаружи (Angie + TLS + DNS)
 if [ -n "$DOMAIN" ]; then
     if ! curl -fsS --max-time 10 "https://${DOMAIN}/actuator/health" \
-            | grep -q '"status":"UP"'; then
+            | grep -q '"status":"UP"' 2>/dev/null; then
         fail_reasons="${fail_reasons}https-external "
     fi
 fi
 
-# 3. Контейнеры
-running=$(docker compose -f docker-compose-prod.yml --env-file .env.prod ps \
-    --status running --services 2>/dev/null | sort | tr '\n' ' ')
-for need in app angie postgres; do
-    if ! echo "$running" | grep -qw "$need"; then
-        fail_reasons="${fail_reasons}container-${need} "
-    fi
-done
+# 4. Диск > 95%
+DISK_PCT=$(df / | awk 'NR==2 {gsub("%",""); print $5}')
+[ "${DISK_PCT:-0}" -ge 95 ] && fail_reasons="${fail_reasons}disk-${DISK_PCT}% "
 
-# --- Обработка результата ---
+# 5. Postgres порт
+docker exec afina-postgres pg_isready -q -U postgres 2>/dev/null || \
+    fail_reasons="${fail_reasons}pg-not-ready "
+
+# === Результат ===
 if [ -z "$fail_reasons" ]; then
-    # OK — сбрасываем счётчик
     if [ -f "$STATE" ] && [ "$(cat "$STATE")" != "0" ]; then
         log "✓ Восстановление после сбоя"
     fi
@@ -74,41 +73,44 @@ if [ -z "$fail_reasons" ]; then
     exit 0
 fi
 
-# Не OK — увеличиваем счётчик
 fails=$(cat "$STATE" 2>/dev/null || echo 0)
 fails=$((fails + 1))
 echo "$fails" > "$STATE"
-
 log "✗ Сбой #${fails}: ${fail_reasons}"
 
-# Алерт после 3 подряд
-if [ "$fails" -eq 3 ]; then
+# Алерт после 3 сбоев подряд, потом каждые 3
+if [ "$fails" -ge 3 ] && [ $((fails % 3)) -eq 0 ]; then
     log "▶ Отправка алерта на ${MAIL_TO}"
-    MAIL_TO="$MAIL_TO" FAIL_REASONS="$fail_reasons" python3 - <<PYEOF >> "$LOG" 2>&1
-import smtplib, ssl, sys, os
+    MAIL_TO="$MAIL_TO" FAIL_REASONS="$fail_reasons" FAILS="$fails" DOMAIN="${DOMAIN}" \
+    MAIL_HOST="${MAIL_HOST:-localhost}" MAIL_PORT="${MAIL_PORT:-25}" \
+    MAIL_FROM="${MAIL_FROM:-noreply@afinasystems.ru}" \
+    python3 - <<'PYEOF' >> "$LOG" 2>&1
+import smtplib, socket, os
 from email.mime.text import MIMEText
 
-host = os.environ.get("MAIL_HOST")
-port = int(os.environ.get("MAIL_PORT", "465"))
-user = os.environ.get("MAIL_USERNAME")
-pwd  = os.environ.get("MAIL_PASSWORD")
+host = os.environ.get("MAIL_HOST", "localhost")
+port = int(os.environ.get("MAIL_PORT", "25"))
 from_ = os.environ.get("MAIL_FROM")
 to   = os.environ.get("MAIL_TO") or from_
-domain = os.environ.get("APP_DOMAIN", "?")
+domain = os.environ.get("DOMAIN", "?")
 reasons = os.environ.get("FAIL_REASONS", "?")
+fails = os.environ.get("FAILS", "0")
 
-subject = f"[Афина] Сервис недоступен: {domain}"
-body = f"""Обнаружена проблема с сервисом.
+subject = f"[Афина CRON] Сервер недоступен: {domain} (#{fails})"
+body = f"""Cron-мониторинг обнаружил проблему.
 
-Домен:    {domain}
-Проблемы: {reasons}
-Проверок подряд провалено: 3
+Домен:     {domain}
+Сбоев:     {fails} подряд
+Проблемы:  {reasons.strip()}
 
 Проверьте сервер:
-  ssh afina-vps
-  cd /opt/afina
+  ssh root@{socket.gethostbyname(domain) if domain != '?' else 'server'}
+  cd /opt/afinaz
   docker compose -f docker-compose-prod.yml --env-file .env.prod ps
-  docker compose -f docker-compose-prod.yml --env-file .env.prod logs app --tail 50
+  docker compose -f docker-compose-prod.yml --env-file .env.prod logs app --tail 100
+
+Открыть мониторинг после восстановления:
+  https://{domain}/admin/monitor
 """
 
 msg = MIMEText(body, "plain", "utf-8")
@@ -116,20 +118,12 @@ msg["Subject"] = subject
 msg["From"] = from_
 msg["To"] = to
 
-# Внутренний SMTP с самоподписанным сертификатом — отключаем верификацию
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
-with smtplib.SMTP_SSL(host, port, context=ctx, timeout=15) as s:
-    s.login(user, pwd)
+# Plain SMTP на 25 без auth (через локальный Postfix, mynetworks)
+with smtplib.SMTP(host, port, timeout=15) as s:
+    s.ehlo()
     s.send_message(msg)
 print("Email sent to", to)
 PYEOF
-fi
-
-# Повторный алерт при 6, 12, 24... (каждые 3 следующих)
-if [ "$fails" -ge 6 ] && [ $((fails % 3)) -eq 0 ]; then
-    log "▶ Повторный алерт #${fails}"
 fi
 
 exit 1

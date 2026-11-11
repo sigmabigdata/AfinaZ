@@ -3268,3 +3268,4 @@ table.audit-table td:nth-child(5) { white-space: nowrap; }  /* IP */
     background: linear-gradient(135deg, #c49a6c, #a67c52);
     box-shadow: 0 2px 6px rgba(166,124,82,0.25);
 }
+.err-text { color: #a82323; }
