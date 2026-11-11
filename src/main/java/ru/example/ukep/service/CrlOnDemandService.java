@@ -52,7 +52,9 @@ public class CrlOnDemandService {
             int parseErrors,
             int uniqueCerts,
             int crlDownloaded,
-            int crlDeleted
+            int crlDeleted,
+            int crlFailed,
+            java.util.List<String> failures
     ) {}
 
     /**
@@ -102,7 +104,10 @@ public class CrlOnDemandService {
         }
 
         // force=true — игнорируем TTL, всегда перекачиваем
-        int downloaded = crlDownloader.ensureCrlsFor(uniqueCerts, true);
+        CrlDownloader.DownloadReport report = crlDownloader.ensureCrlsForWithDetails(uniqueCerts, true);
+        int downloaded = report.success();
+        int failed = report.failed();
+        java.util.List<String> failures = report.failures();
 
         // Удаляем CRL, чей issuer больше не встречается в подписях
         int deleted;
@@ -113,8 +118,11 @@ public class CrlOnDemandService {
             deleted = 0;
         }
 
-        log.info("refreshAll: sigs={}, parsed={}, errors={}, certs={}, downloaded={}, deleted={}",
-                all.size(), parsed, errors, uniqueCerts.size(), downloaded, deleted);
+        log.info("refreshAll: sigs={}, parsed={}, errors={}, certs={}, downloaded={}, failed={}, deleted={}",
+                all.size(), parsed, errors, uniqueCerts.size(), downloaded, failed, deleted);
+        for (String f : failures) {
+            log.warn("  CRL failure: {}", f);
+        }
 
         if (actor != null) {
             audit.event("CRL_REFRESH_ALL", "SUCCESS", actor,
@@ -124,7 +132,7 @@ public class CrlOnDemandService {
         }
 
         return new RefreshResult(all.size(), parsed, errors,
-                uniqueCerts.size(), downloaded, deleted);
+                uniqueCerts.size(), downloaded, deleted, failed, failures);
     }
 
     /**

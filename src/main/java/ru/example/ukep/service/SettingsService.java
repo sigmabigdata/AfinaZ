@@ -73,10 +73,6 @@ public class SettingsService {
         writeSetting(key, value, updatedBy);
     }
 
-    public void setAll(Map<String, String> updates, String updatedBy) {
-        updates.forEach((k, v) -> writeSetting(k, v, updatedBy));
-    }
-
     /** Общее тело записи. */
     private void writeSetting(String key, String value, String updatedBy) {
         AppSetting s = repo.findById(key).orElseGet(() -> {
@@ -92,11 +88,6 @@ public class SettingsService {
         log.info("Setting updated: {} = '{}' (by {})", key,
                 value != null && value.length() > 50 ? value.substring(0, 50) + "..." : value,
                 updatedBy);
-    }
-
-    /** Программный сброс кэша (например, после миграции). */
-    public void invalidateCache() {
-        cache.clear();
     }
 
     // ==================== SMTP helpers ====================

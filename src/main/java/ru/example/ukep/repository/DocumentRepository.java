@@ -41,23 +41,6 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     /**
      * Поиск документов для админки. Pattern (`%значение%`) приходит готовым из контроллера.
      */
-    /**
-     * Поиск документов для админки.
-     * originalName и owner.email — зашифрованы (PII), по ним fuzzy-поиск невозможен.
-     * Работает: fuzzy по owner.fullName, exact по owner.emailHash.
-     * Параметр pattern — готовый %q%, emailHash — SHA-256 от lower(email) или null.
-     */
-    @Query("select d from Document d join fetch d.owner " +
-           "where (:signed is null or d.signed = :signed) " +
-           "and (:q is null " +
-           "     or lower(d.owner.fullName) like :q " +
-           "     or (:emailHash is not null and d.owner.emailHash = :emailHash)" +
-           ") " +
-           "order by d.uploadedAt desc")
-    List<Document> searchForAdmin(@Param("signed") Boolean signed,
-                                  @Param("q") String pattern,
-                                  @Param("emailHash") String emailHash);
-
     long countBySignedTrue();
     long countBySignedFalse();
 
@@ -68,14 +51,10 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     @EntityGraph(attributePaths = {"signatures", "signatures.signerUser"})
     List<Document> findAllByFolderOrderByUploadedAtDesc(DocumentFolder folder);
-
-    long countByFolder(DocumentFolder folder);
     long countByFolderAndSignedTrue(DocumentFolder folder);
 
     /** Документы клиента без папки (legacy). */
     @Query("select d from Document d where d.owner = :owner and d.folder is null " +
            "order by d.uploadedAt desc")
     List<Document> findUnfiledByOwner(@Param("owner") User owner);
-
-    boolean existsByOwnerAndFolderIsNull(User owner);
 }

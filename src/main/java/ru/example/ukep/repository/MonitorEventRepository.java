@@ -9,6 +9,4 @@ import java.util.List;
 public interface MonitorEventRepository extends JpaRepository<MonitorEvent, Long> {
     List<MonitorEvent> findAllByOrderByCheckedAtDesc(Pageable page);
     long countByStatus(String status);
-    long countByComponentAndStatus(String component, String status);
-    java.util.List<MonitorEvent> findByComponentOrderByCheckedAtDesc(String component, Pageable page);
 }

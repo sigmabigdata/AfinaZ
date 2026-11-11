@@ -81,15 +81,6 @@ public class AuditService {
         write("SIGN_FAIL", FAIL, actor, null, T_DOC, String.valueOf(docId), null, reason);
     }
 
-    public void signatureDeleteAttempt(String actor, Long docId) {
-        write("SIGNATURE_DELETE_ATTEMPT", WARN, actor, null, T_DOC, String.valueOf(docId), null,
-                "Попытка удаления подписи заблокирована");
-    }
-
-    public void rateLimit(String ip, String endpoint) {
-        write("RATE_LIMIT", WARN, null, null, "ENDPOINT", endpoint, null, "IP: " + ip);
-    }
-
     public void backupCreate(String actor, String fileName) {
         write("BACKUP_CREATE", OK, actor, null, "BACKUP", fileName, null, null);
     }
@@ -161,11 +152,6 @@ public class AuditService {
     public void poaDelete(String actor, Long id, String docNumber) {
         write("POA_DELETE", WARN, actor, null,
                 T_POA, String.valueOf(id), docNumber, null);
-    }
-
-    public void documentUploadSignature(String actor, Long docId, String signerSubject) {
-        write("DOC_UPLOAD_SIG", OK, actor, null,
-                T_DOC, String.valueOf(docId), signerSubject, "Подпись загружена вручную");
     }
 
     /** Универсальный метод для произвольного события (визуализация, произвольные действия). */

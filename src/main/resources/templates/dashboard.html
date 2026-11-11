@@ -61,28 +61,33 @@
         <p>Создайте первый раздел — потом загрузите в него документы.</p>
     </div>
 
-    <div th:if="${not #lists.isEmpty(folders)}" class="folder-tile-grid">
-        <a th:each="f, folderStat : ${folders}"
+    <div th:if="${not #lists.isEmpty(folders)}" class="user-list">
+        <a th:each="f : ${folders}"
            th:href="@{'/folders/' + ${f.id}}"
            th:with="docs=${documentsByFolder.get(f.id)},
                     total=${#lists.size(docs)},
                     signed=${#lists.size(docs.?[signed])},
                     unsigned=${total - signed}"
-           th:classappend="'folder-color-' + ${folderStat.index % 6}"
-           class="folder-tile folder-tile-client">
-            <div class="folder-tile-icon">📁</div>
-            <div class="folder-tile-body">
-                <div class="folder-tile-name" th:text="${f.name}">Раздел</div>
-                <div class="folder-tile-stats">
+           class="user-row folder-row">
+            <div class="folder-icon-sm">📁</div>
+            <div class="user-row-main">
+                <div class="user-row-name" th:text="${f.name}">Раздел</div>
+                <div class="user-row-sub">
                     <span th:text="${total} + ' док.'">0 док.</span>
-                    <span th:if="${signed > 0}" class="folder-tile-stat-ok">
-                        ✅ <span th:text="${signed}">0</span>
-                    </span>
-                    <span th:if="${unsigned > 0}" class="folder-tile-stat-warn">
-                        ⚠️ <span th:text="${unsigned}">0</span>
-                    </span>
                 </div>
             </div>
+            <div class="user-row-cell user-row-status">
+                <span th:if="${signed > 0}" class="folder-tile-stat-ok">
+                    ✅ <span th:text="${signed}">0</span>
+                </span>
+            </div>
+            <div class="user-row-cell user-row-status">
+                <span th:if="${unsigned > 0}" class="folder-tile-stat-warn">
+                    ⚠️ <span th:text="${unsigned}">0</span>
+                </span>
+            </div>
+            <div class="user-row-cell user-row-date"
+                 th:text="${#temporals.format(f.createdAt,'dd.MM.yyyy')}">—</div>
             <div class="folder-tile-arrow">→</div>
         </a>
     </div>

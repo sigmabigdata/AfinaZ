@@ -11,8 +11,6 @@ import java.util.Optional;
 
 public interface DocumentFolderRepository extends JpaRepository<DocumentFolder, Long> {
 
-    List<DocumentFolder> findAllByOwnerOrderByNameAsc(User owner);
-
     /** Сортировка по дате создания: новые сверху. */
     List<DocumentFolder> findAllByOwnerOrderByCreatedAtDesc(User owner);
 
@@ -26,7 +24,4 @@ public interface DocumentFolderRepository extends JpaRepository<DocumentFolder, 
            "and f.nameHash = :nameHash")
     Optional<DocumentFolder> findByOwnerAndNameHash(@Param("owner") User owner,
                                                      @Param("nameHash") String nameHash);
-
-    /** Есть ли у клиента хоть одна папка. */
-    boolean existsByOwner(User owner);
 }

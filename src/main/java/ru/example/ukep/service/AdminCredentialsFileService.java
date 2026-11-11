@@ -91,21 +91,6 @@ public class AdminCredentialsFileService {
         return n;
     }
 
-    public synchronized void writeAll(List<AdminRecord> list) {
-        List<String> lines = new ArrayList<>();
-        lines.add("# admins.env — автоматически управляется приложением");
-        lines.add("# формат: CN|SNILS");
-        for (AdminRecord r : list) {
-            String roleSuffix = (r.role() == Role.ROLE_EMPLOYEE) ? "|employee" : "";
-            lines.add(r.cn() + "|" + r.snils() + roleSuffix);
-        }
-        try {
-            Files.write(Path.of(adminsFilePath), lines, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            log.error("Не удалось записать файл админов: {}", adminsFilePath, e);
-        }
-    }
-
     /** Убирает пробелы/дефисы из СНИЛС: "123-456-789 01" -> "12345678901". */
     private String normalizeSnils(String snils) {
         return snils == null ? "" : snils.replaceAll("\\D", "");

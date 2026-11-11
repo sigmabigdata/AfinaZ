@@ -615,8 +615,10 @@ docker logs afina-app 2>&1 | grep -q "JCSP provider registered" \
 
 # ─── Шаг 12: CLI и Cron ──────────────────────────────
 hdr "CLI и Cron"
-if [ -f install-afina-cli.sh ]; then
-    bash install-afina-cli.sh && ok "CLI: /usr/local/bin/afina"
+if [ -f afina.sh ]; then
+    chmod +x afina.sh
+    ln -sf /opt/afinaz/afina.sh /usr/local/bin/afina
+    ok "CLI: /usr/local/bin/afina → /opt/afinaz/afina.sh"
 fi
 
 mkdir -p /etc/cron.d /var/log/afina
