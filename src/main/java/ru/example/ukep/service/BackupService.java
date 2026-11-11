@@ -70,7 +70,9 @@ public class BackupService {
                         String n = p.getFileName().toString();
                         return n.endsWith(".sql")
                                 || n.endsWith(".sql.gz")
-                                || n.endsWith(".sql.gz.enc");
+                                || n.endsWith(".sql.gz.enc")
+                                || n.endsWith(".tar.gz.enc")
+                                || n.endsWith(".tar.gz");
                     })
                     .map(p -> {
                         try {
