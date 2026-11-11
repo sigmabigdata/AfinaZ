@@ -56,6 +56,7 @@ ARG_RESET=0
 ARG_ADMIN_CN=""
 ARG_ADMIN_SNILS=""
 ARG_IMAGES_MODE="online"    # online | offline
+ARG_DRY_RUN=0
 
 # ─── Помощники ───
 log()    { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
@@ -96,6 +97,7 @@ parse_args() {
             --admin-snils=*)  ARG_ADMIN_SNILS="${1#*=}" ;;
             --images=*)       ARG_IMAGES_MODE="${1#*=}" ;;
             --images)         ARG_IMAGES_MODE="${2:-}"; shift ;;
+            --dry-run)        ARG_DRY_RUN=1 ;;
             -h|--help)
                 cat <<HELP
 Использование: sudo ./bootstrap.sh [опции]
@@ -113,6 +115,8 @@ parse_args() {
   --non-interactive        Не задавать вопросов (все из флагов)
   --accept-non-astra       Продолжить на не-Astra ОС
   --reset                  Сбросить wizard (не удаляет данные)
+  --dry-run                Только preflight + план, ничего не пишет
+                           Безопасно для тестов на проде
   -h, --help               Эта справка
 
 Примеры:
@@ -363,9 +367,398 @@ install_docker() {
 }
 
 # ═══════════════════════════════════════════════════════════
-# Точка входа (остальные фазы — в части 2, будут добавлены
-# следующими коммитами как отдельные функции: generate_secrets,
-# generate_env_prod, setup_tls, start_stack, wait_health, print_summary)
+# [4/8] Секреты
+# ═══════════════════════════════════════════════════════════
+generate_secrets() {
+    hdr "[4/8] Секреты"
+
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        ok "[dry-run] пропускаю генерацию секретов"
+        return 0
+    fi
+
+    mkdir -p secrets
+    chmod 700 secrets
+    mkdir -p secrets/keys
+
+    # file.key
+    if [ -f secrets/keys/file.key.current ]; then
+        ok "file.key уже существует (версий: $(ls secrets/keys/file.key.v* 2>/dev/null | wc -l))"
+    else
+        openssl rand -base64 32 | tr -d '\n' > secrets/keys/file.key.v1
+        chmod 600 secrets/keys/file.key.v1
+        echo -n "1" > secrets/keys/file.key.current
+        ok "file.key.v1 создан (32 байта)"
+    fi
+
+    # pii.key
+    if [ -f secrets/keys/pii.key.current ]; then
+        ok "pii.key уже существует (версий: $(ls secrets/keys/pii.key.v* 2>/dev/null | wc -l))"
+    else
+        openssl rand -base64 32 | tr -d '\n' > secrets/keys/pii.key.v1
+        chmod 600 secrets/keys/pii.key.v1
+        echo -n "1" > secrets/keys/pii.key.current
+        ok "pii.key.v1 создан (32 байта)"
+    fi
+
+    # backup.pass
+    if [ -f secrets/backup.pass ]; then
+        ok "backup.pass уже существует"
+    else
+        openssl rand -base64 32 | tr -d '\n' > secrets/backup.pass
+        chmod 600 secrets/backup.pass
+        ok "backup.pass создан"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════
+# [5/8] .env.prod
+# ═══════════════════════════════════════════════════════════
+generate_env_prod() {
+    hdr "[5/8] .env.prod"
+
+    # Backup старого
+    if [ -f "$ENV_FILE" ]; then
+        cp "$ENV_FILE" "${ENV_FILE}.bak.${STAMP}"
+        warn "Старый $ENV_FILE → ${ENV_FILE}.bak.${STAMP}"
+    fi
+
+    # Пароли БД — переиспользуем из старого, если есть
+    local DB_PASS="" DB_MIG_PASS="" DB_AUD_PASS="" DB_SUPER_PASS=""
+    if [ -f "${ENV_FILE}.bak.${STAMP}" ]; then
+        DB_PASS=$(grep '^DB_PASSWORD=' "${ENV_FILE}.bak.${STAMP}" 2>/dev/null | cut -d'=' -f2- || true)
+        DB_MIG_PASS=$(grep '^DB_MIGRATOR_PASSWORD=' "${ENV_FILE}.bak.${STAMP}" 2>/dev/null | cut -d'=' -f2- || true)
+        DB_AUD_PASS=$(grep '^DB_AUDITOR_PASSWORD=' "${ENV_FILE}.bak.${STAMP}" 2>/dev/null | cut -d'=' -f2- || true)
+        DB_SUPER_PASS=$(grep '^DB_SUPERUSER_PASSWORD=' "${ENV_FILE}.bak.${STAMP}" 2>/dev/null | cut -d'=' -f2- || true)
+    fi
+
+    [ -z "$DB_PASS" ] && DB_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+    [ -z "$DB_MIG_PASS" ] && DB_MIG_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+    [ -z "$DB_AUD_PASS" ] && DB_AUD_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+    [ -z "$DB_SUPER_PASS" ] && DB_SUPER_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+
+    # Токен setup
+    SETUP_TOKEN=$(openssl rand -hex 32)
+
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        ok "[dry-run] .env.prod будет создан:"
+        echo -e "    APP_DOMAIN=${ARG_DOMAIN}"
+        echo -e "    APP_SETUP_MODE=true"
+        echo -e "    APP_SETUP_TOKEN=<32 hex chars>"
+        echo -e "    DB пароли: <сгенерированы>"
+        return 0
+    fi
+
+    cat > "$ENV_FILE" <<ENVEOF
+# ============================================================
+# AfinaZ · .env.prod (bootstrap $STAMP)
+# ============================================================
+# Этот файл создан bootstrap.sh в режиме Setup Mode.
+# После завершения wizard он будет перезаписан из
+# setup-out/.env.prod.new (entrypoint-wrapper.sh).
+
+APP_DOMAIN=${ARG_DOMAIN}
+APP_BASE_URL=https://${ARG_DOMAIN}
+SECURE_COOKIES=true
+HTTP_PORT=80
+HTTPS_PORT=443
+TLS_MODE=${ARG_TLS}
+
+DB_NAME=afina_db
+DB_SUPERUSER=postgres
+DB_SUPERUSER_PASSWORD=${DB_SUPER_PASS}
+DB_USER=afina_app
+DB_PASSWORD=${DB_PASS}
+DB_MIGRATOR_USER=afina_migrator
+DB_MIGRATOR_PASSWORD=${DB_MIG_PASS}
+DB_AUDITOR_USER=afina_auditor
+DB_AUDITOR_PASSWORD=${DB_AUD_PASS}
+
+# Setup Mode — выключится после завершения wizard
+APP_SETUP_MODE=true
+APP_SETUP_TOKEN=${SETUP_TOKEN}
+
+# SMTP / admin / IP-whitelist задаются через wizard
+ADMIN_IP_WHITELIST=127.0.0.1,::1,172.0.0.0/8
+MAIL_MODE=log
+MAIL_HOST=
+MAIL_PORT=
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM=noreply@${ARG_DOMAIN}
+MAIL_SSL=false
+
+CRYPTO_PRO_ENABLED=true
+ENVEOF
+    chmod 600 "$ENV_FILE"
+    ok ".env.prod создан (600)"
+    warn "Setup Mode URL: https://${ARG_DOMAIN}/setup?token=${SETUP_TOKEN}"
+
+    # Credentials в отдельный файл
+    local creds_file="bootstrap-credentials-${STAMP}.txt"
+    cat > "$creds_file" <<CREDSEOF
+════════════════════════════════════════════════════════
+  AfinaZ · Bootstrap credentials
+  Создано: $(date '+%Y-%m-%d %H:%M:%S')
+════════════════════════════════════════════════════════
+⚠ СОХРАНИТЕ В 1PASSWORD И УДАЛИТЕ ЭТОТ ФАЙЛ
+   shred -u ${creds_file}
+
+Setup Mode:
+  URL:    https://${ARG_DOMAIN}/setup?token=${SETUP_TOKEN}
+  Token:  ${SETUP_TOKEN}
+
+БД (суперпользователь): ${DB_SUPER_PASS}
+БД (приложение):        ${DB_PASS}
+БД (миграции):          ${DB_MIG_PASS}
+БД (аудит):             ${DB_AUD_PASS}
+
+Ключи: secrets/keys/*.key.v*, secrets/backup.pass
+════════════════════════════════════════════════════════
+CREDSEOF
+    chmod 600 "$creds_file"
+    warn "Credentials: $creds_file"
+}
+
+# ═══════════════════════════════════════════════════════════
+# [6/8] TLS
+# ═══════════════════════════════════════════════════════════
+setup_tls() {
+    hdr "[6/8] TLS"
+
+    mkdir -p angie-certs
+
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        ok "[dry-run] TLS режим: $ARG_TLS"
+        return 0
+    fi
+
+    case "$ARG_TLS" in
+        self-signed)
+            if [ -f angie-certs/fullchain.pem ] && [ -f angie-certs/privkey.pem ]; then
+                ok "TLS: self-signed (уже есть)"
+                return 0
+            fi
+            info "Генерирую self-signed для ${ARG_DOMAIN}"
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout angie-certs/privkey.pem \
+                -out angie-certs/fullchain.pem \
+                -subj "/CN=${ARG_DOMAIN}" \
+                -addext "subjectAltName=DNS:${ARG_DOMAIN}" 2>/dev/null \
+                || openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                    -keyout angie-certs/privkey.pem \
+                    -out angie-certs/fullchain.pem \
+                    -subj "/CN=${ARG_DOMAIN}" 2>/dev/null
+            [ -f angie-certs/fullchain.pem ] || die "Не удалось создать self-signed cert"
+            chmod 600 angie-certs/privkey.pem
+            chmod 644 angie-certs/fullchain.pem
+            ok "TLS: self-signed создан"
+            ;;
+        custom)
+            if [ -f angie-certs/fullchain.pem ] && [ -f angie-certs/privkey.pem ]; then
+                ok "TLS: custom (файлы на месте)"
+            else
+                die "TLS: custom — положите fullchain.pem + privkey.pem в angie-certs/ и повторите"
+            fi
+            ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════
+# [7/8] Запуск стека
+# ═══════════════════════════════════════════════════════════
+dc() { docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"; }
+
+wait_health() {
+    local timeout="${1:-180}"
+    local elapsed=0
+    echo -n "  Ждём health (timeout ${timeout}s): "
+    while [ $elapsed -lt $timeout ]; do
+        local code
+        code=$(curl -sk -o /dev/null -w "%{http_code}" https://localhost/actuator/health 2>/dev/null || echo "000")
+        if [ "$code" = "200" ]; then
+            echo ""
+            ok "Health: 200 OK (за ${elapsed}s)"
+            return 0
+        fi
+        echo -n "."
+        sleep 3
+        elapsed=$((elapsed + 3))
+    done
+    echo ""
+    err "Health не поднялся за ${timeout}s"
+    echo -e "  ${DIM}Последние логи app:${N}"
+    docker logs afina-app --tail 20 2>&1 | tail -20
+    return 1
+}
+
+start_stack() {
+    hdr "[7/8] Запуск стека"
+
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        ok "[dry-run] план: postgres → роли БД → app → angie"
+        return 0
+    fi
+
+    # 7.1. Postgres
+    info "Postgres..."
+    dc up -d postgres 2>&1 | tail -2
+    local elapsed=0
+    while [ $elapsed -lt 90 ]; do
+        docker exec afina-postgres pg_isready -U postgres >/dev/null 2>&1 && break
+        sleep 2
+        elapsed=$((elapsed + 2))
+    done
+    [ $elapsed -lt 90 ] || die "Postgres не запустился за 90s"
+    ok "Postgres готов (~${elapsed}s)"
+
+    # 7.2. Роли БД
+    info "Роли БД..."
+    local DB_NAME DB_MIG_PASS DB_APP_PASS DB_AUD_PASS
+    DB_NAME=$(grep '^DB_NAME=' .env.prod | cut -d'=' -f2-)
+    DB_MIG_PASS=$(grep '^DB_MIGRATOR_PASSWORD=' .env.prod | cut -d'=' -f2-)
+    DB_APP_PASS=$(grep '^DB_PASSWORD=' .env.prod | cut -d'=' -f2-)
+    DB_AUD_PASS=$(grep '^DB_AUDITOR_PASSWORD=' .env.prod | cut -d'=' -f2-)
+
+    local role_pair role pass
+    for role_pair in "afina_migrator:${DB_MIG_PASS}" "afina_app:${DB_APP_PASS}" "afina_auditor:${DB_AUD_PASS}"; do
+        role="${role_pair%%:*}"
+        pass="${role_pair#*:}"
+        if ! docker exec -i afina-postgres psql -U postgres -d postgres -tAc \
+                "SELECT 1 FROM pg_roles WHERE rolname='${role}'" | grep -q 1; then
+            docker exec -i afina-postgres psql -U postgres -d postgres \
+                -c "CREATE ROLE ${role} WITH LOGIN PASSWORD '${pass}';" >/dev/null
+        fi
+        docker exec -i afina-postgres psql -U postgres -d postgres \
+            -c "ALTER USER ${role} WITH PASSWORD '${pass}';" >/dev/null
+    done
+
+    docker exec -i afina-postgres psql -U postgres -d postgres \
+        -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO afina_migrator; GRANT CONNECT ON DATABASE ${DB_NAME} TO afina_app, afina_auditor;" >/dev/null
+    docker exec -i afina-postgres psql -U postgres -d "${DB_NAME}" >/dev/null 2>&1 <<GRANTEOF || true
+ALTER SCHEMA public OWNER TO afina_migrator;
+GRANT USAGE, CREATE ON SCHEMA public TO afina_migrator;
+GRANT USAGE ON SCHEMA public TO afina_app, afina_auditor;
+GRANTEOF
+    ok "Роли БД готовы"
+
+    # 7.3. App
+    info "App..."
+    dc up -d app 2>&1 | tail -2
+    wait_health 180 || die "App не поднялось за 180s"
+
+    # 7.4. Angie
+    info "Angie..."
+    dc up -d angie 2>&1 | tail -2
+    sleep 5
+    ok "Angie запущен"
+
+    # 7.5. Health через 443
+    info "Health через Angie (443)..."
+    wait_health 60 || warn "Health через 443 не поднялся — проверьте afina-angie"
+}
+
+# ═══════════════════════════════════════════════════════════
+# [8/8] Итог
+# ═══════════════════════════════════════════════════════════
+print_summary() {
+    hdr "[8/8] Готово"
+
+    local creds_file
+    creds_file=$(ls -t bootstrap-credentials-*.txt 2>/dev/null | head -1 || true)
+
+    echo ""
+    echo -e "${G}${BOLD}════════════════════════════════════════════════════════${N}"
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        echo -e "${G}${BOLD}  ✅ DRY-RUN: ПРОВЕРКИ ПРОЙДЕНЫ${N}"
+    else
+        echo -e "${G}${BOLD}  ✅ BOOTSTRAP ЗАВЕРШЁН${N}"
+    fi
+    echo -e "${G}${BOLD}════════════════════════════════════════════════════════${N}"
+    echo ""
+
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        echo -e "${BOLD}Режим: --dry-run (ничего не изменено)${N}"
+        echo ""
+        echo "Для реального запуска уберите --dry-run:"
+        echo -e "  ${C}sudo ./bootstrap.sh --domain=${ARG_DOMAIN} --accept-non-astra${N}"
+        echo ""
+        return 0
+    fi
+
+    echo -e "${BOLD}Следующий шаг — откройте в браузере:${N}"
+    echo ""
+    echo -e "  ${C}https://${ARG_DOMAIN}/setup?token=${SETUP_TOKEN}${N}"
+    echo ""
+    echo -e "${BOLD}Wizard 6 шагов:${N}"
+    echo "  1. Домен + TLS (self-signed / custom)"
+    echo "  2. Email (log / local postfix / external SMTP)"
+    echo "  3. Администратор (CN + SNILS)"
+    echo "  4. IP-whitelist для /admin"
+    echo "  5. Pre-flight проверки"
+    echo "  6. Подтверждение → рестарт в обычный режим"
+    echo ""
+
+    if [ -n "$creds_file" ] && [ -f "$creds_file" ]; then
+        echo -e "${Y}${BOLD}⚠ Сохраните credentials в 1Password:${N}"
+        echo -e "  ${creds_file}"
+        echo -e "  ${DIM}После сохранения: shred -u ${creds_file}${N}"
+        echo ""
+    fi
+
+    echo -e "${BOLD}Логи:${N}"
+    echo -e "  bootstrap: ${LOG_FILE}"
+    echo -e "  app:       docker logs afina-app -f"
+    echo -e "  angie:     docker logs afina-angie -f"
+    echo ""
+    echo -e "${BOLD}Статус:${N}"
+    dc ps
+    echo ""
+    echo -e "${DIM}Токен действителен, пока wizard не завершён.${N}"
+    echo -e "${DIM}Для сброса: sudo ./bootstrap.sh --reset --domain=${ARG_DOMAIN}${N}"
+    echo ""
+}
+
+# ═══════════════════════════════════════════════════════════
+# Reset (сброс wizard без удаления данных)
+# ═══════════════════════════════════════════════════════════
+do_reset() {
+    hdr "Reset wizard"
+
+    warn "Режим --reset:"
+    warn "  • Будет backup .env.prod → .env.prod.bak.${STAMP}"
+    warn "  • Будет удалён setup-out/* (маркеры wizard)"
+    warn "  • Будет удалён secrets/initialized (если есть)"
+    warn "НЕ будет затронуто:"
+    warn "  • storage/  (файлы документов)"
+    warn "  • backups/  (бэкапы БД)"
+    warn "  • secrets/keys/  (ключи шифрования)"
+    warn "  • certs/, crls/  (сертификаты, CRL)"
+    warn "  • admins.env"
+    echo ""
+
+    if [ "$ARG_NON_INTERACTIVE" = "0" ]; then
+        local ans
+        read -r -p "Продолжить reset? [y/N]: " ans
+        [ "$ans" = "y" ] || die "Отменено"
+    fi
+
+    [ -f .env.prod ] && cp .env.prod ".env.prod.bak.${STAMP}" && ok "Backup: .env.prod.bak.${STAMP}"
+
+    rm -f setup-out/setup.complete setup-out/.env.prod.new setup-out/.env.prod.applied
+    ok "setup-out/* очищен"
+
+    rm -f secrets/initialized
+    ok "secrets/initialized удалён (если был)"
+
+    ok "Reset завершён"
+    echo ""
+    echo "Для повторного запуска wizard:"
+    echo -e "  ${C}sudo ./bootstrap.sh --domain=${ARG_DOMAIN} --accept-non-astra${N}"
+}
+
+# ═══════════════════════════════════════════════════════════
+# Точка входа
 # ═══════════════════════════════════════════════════════════
 main() {
     clear
@@ -374,20 +767,33 @@ main() {
     echo -e "${BOLD}════════════════════════════════════════════════════════${N}"
     echo -e "${DIM}Лог: $LOG_FILE${N}"
     echo -e "${DIM}Дата: $(date '+%Y-%m-%d %H:%M:%S %Z')${N}"
+    [ "$ARG_DRY_RUN" = "1" ] && echo -e "${Y}${BOLD}Режим: DRY-RUN (ничего не изменяется)${N}"
     echo ""
     : > "$LOG_FILE"
 
     parse_args "$@"
+
+    if [ "$ARG_RESET" = "1" ]; then
+        cd "$APP_DIR" 2>/dev/null || die "$APP_DIR не найден"
+        do_reset
+        exit 0
+    fi
+
     preflight
     detect_os
     install_docker
 
-    echo ""
-    echo -e "${G}${BOLD}✓ Пре-проверки пройдены (часть 1/2)${N}"
-    echo -e "${DIM}Далее: secrets, .env.prod, TLS, stack, health.${N}"
-    echo -e "${DIM}Это будет добавлено в bootstrap.sh (часть 2).${N}"
-    echo ""
-    echo -e "${BOLD}Лог:${N} $LOG_FILE"
+    # Интерактивный ввод домена, если не задан
+    if [ -z "$ARG_DOMAIN" ]; then
+        ARG_DOMAIN=$(ask "Домен или IP")
+        [ -n "$ARG_DOMAIN" ] || die "Домен обязателен"
+    fi
+
+    generate_secrets
+    generate_env_prod
+    setup_tls
+    start_stack
+    print_summary
 }
 
 main "$@"
