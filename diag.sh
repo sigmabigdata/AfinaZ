@@ -517,6 +517,35 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════
+# [21/21] Setup Mode / setup-applier
+# ═══════════════════════════════════════════════════════════
+hdr "[21/21] Setup Mode и setup-applier"
+
+# Setup Mode активен?
+SETUP_MODE_ENV=$(grep '^APP_SETUP_MODE=' .env.prod 2>/dev/null | cut -d'=' -f2 || echo "")
+if [ "$SETUP_MODE_ENV" = "true" ]; then
+    warn "APP_SETUP_MODE=true — приложение в режиме настройки (wizard на /setup)"
+else
+    pass "APP_SETUP_MODE=false (обычный режим)"
+fi
+
+# Маркеры (должны отсутствовать в обычном режиме)
+if [ -f setup-out/setup.complete ]; then
+    warn "setup-out/setup.complete присутствует — setup не завершён?"
+else
+    pass "setup-out/setup.complete отсутствует"
+fi
+
+# setup-applier service
+if systemctl is-active --quiet afina-setup-applier.service 2>/dev/null; then
+    pass "afina-setup-applier: active"
+elif [ -f /etc/systemd/system/afina-setup-applier.service ]; then
+    warn "afina-setup-applier: установлен, но НЕ активен"
+else
+    info "afina-setup-applier: не установлен (только для setup-режима)"
+fi
+
+# ═══════════════════════════════════════════════════════════
 # Сводка
 # ═══════════════════════════════════════════════════════════
 echo ""

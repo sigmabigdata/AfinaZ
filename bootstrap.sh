@@ -765,6 +765,53 @@ do_reset() {
 }
 
 # ═══════════════════════════════════════════════════════════
+# [install] setup-applier (systemd unit)
+# ═══════════════════════════════════════════════════════════
+install_setup_applier() {
+    hdr "setup-applier (systemd)"
+
+    if [ ! -f setup-applier.sh ]; then
+        warn "setup-applier.sh не найден в $APP_DIR — пропускаю"
+        return 0
+    fi
+
+    chmod +x setup-applier.sh
+    mkdir -p /var/log/afina
+    touch /var/log/afina/setup-applier.log
+
+    local unit_file="/etc/systemd/system/afina-setup-applier.service"
+
+    cat > "$unit_file" <<'SERVICE_EOF'
+[Unit]
+Description=AfinaZ Setup Applier (watches setup-out/setup.complete)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/afinaz
+ExecStart=/opt/afinaz/setup-applier.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+
+    chmod 644 "$unit_file"
+    systemctl daemon-reload
+    systemctl enable afina-setup-applier.service >/dev/null 2>&1 || true
+    systemctl restart afina-setup-applier.service
+
+    sleep 2
+    if systemctl is-active --quiet afina-setup-applier.service; then
+        ok "afina-setup-applier: active (systemctl status для проверки)"
+    else
+        warn "afina-setup-applier: НЕ активен — проверьте: journalctl -u afina-setup-applier"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════
 # Точка входа
 # ═══════════════════════════════════════════════════════════
 main() {
@@ -800,6 +847,7 @@ main() {
     generate_env_prod
     setup_tls
     start_stack
+    install_setup_applier
     print_summary
 }
 
