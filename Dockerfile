@@ -4,7 +4,7 @@
 # Runtime: Astra Linux SE 1.8 + Axiom JDK Pro 17 + КриптоПро CSP 5.0
 # Build:   Maven + Temurin (для компиляции JDK-поставщик не критичен)
 #
-# ВАЖНО: базовый образ runtime — community (epicmorg/astralinux:1.8-light).
+# ВАЖНО: базовый образ runtime — community (registry.astralinux.ru/library/astra/ubi18:1.8.3).
 # Для боевой сдачи заменить на официальный из registry.astralinux.ru.
 # ============================================================
 
@@ -49,7 +49,7 @@ COPY src ./src
 RUN mvn -B clean package -DskipTests
 
 # ---------- Стадия исполнения ----------
-FROM epicmorg/astralinux:1.8-light
+FROM registry.astralinux.ru/library/astra/ubi18:1.8.3
 WORKDIR /app
 
 ENV DEBIAN_FRONTEND=noninteractive \

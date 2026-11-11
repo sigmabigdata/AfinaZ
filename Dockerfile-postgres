@@ -6,7 +6,7 @@
 #   Config: /etc/postgresql/15/main/postgresql.conf
 # ============================================================
 
-FROM epicmorg/astralinux:1.8-light
+FROM registry.astralinux.ru/library/astra/ubi18:1.8.3
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=ru_RU.UTF-8 \
