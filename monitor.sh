@@ -69,7 +69,8 @@ if [ -z "$fail_reasons" ]; then
     if [ -f "$STATE" ] && [ "$(cat "$STATE")" != "0" ]; then
         log "✓ Восстановление после сбоя"
     else
-        log "✓ OK (контейнеры: ${running// /, }, disk=${DISK_PCT}%)"
+        running_clean="${running% }"  # strip trailing space
+        log "✓ OK (контейнеры: ${running_clean// /, }, disk=${DISK_PCT}%)"
     fi
     echo "0" > "$STATE"
     exit 0
