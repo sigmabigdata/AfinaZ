@@ -131,10 +131,17 @@ public class UserService implements UserDetailsService {
         return safeCn + "+" + snils + "@ukep.local";
     }
 
+    public java.util.Optional<User> findEmployeeByCnAndSnils(String cn, String snils) {
+        if (cn == null || cn.isBlank() || snils == null || snils.isBlank()) return java.util.Optional.empty();
+        String hash = pii.hash(snils);
+        return userRepository.findByFullNameIgnoreCaseAndSnilsHash(cn.trim(), hash)
+                .filter(u -> u.getRole() == Role.ROLE_EMPLOYEE || u.getRole() == Role.ROLE_ADMIN);
+    }
+
     // ============ CRUD ============
 
     @Transactional
-    public User adminCreate(String email, String fullName, String phone, Role role, boolean enabled) {
+    public User adminCreate(String email, String fullName, String phone, String snils, Role role, boolean enabled) {
         if (email == null || email.isBlank())
             throw new IllegalArgumentException("Email обязателен");
         String emailHash = pii.hash(email);
@@ -149,13 +156,17 @@ public class UserService implements UserDetailsService {
             u.setPhone(phone.trim());
             u.setPhoneHash(pii.hashPhone(phone));
         }
+        if (snils != null && !snils.isBlank()) {
+            u.setSnils(snils.trim());
+            u.setSnilsHash(pii.hash(snils));
+        }
         u.setRole(role == null ? Role.ROLE_USER : role);
         u.setEnabled(enabled);
         return userRepository.save(u);
     }
 
     @Transactional
-    public User adminUpdate(Long id, String email, String fullName, String phone,
+    public User adminUpdate(Long id, String email, String fullName, String phone, String snils,
                             Role role, boolean enabled) {
         User u = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
@@ -174,6 +185,13 @@ public class UserService implements UserDetailsService {
         } else {
             u.setPhone(null);
             u.setPhoneHash(null);
+        }
+        if (snils != null && !snils.isBlank()) {
+            u.setSnils(snils.trim());
+            u.setSnilsHash(pii.hash(snils));
+        } else if (role == Role.ROLE_USER) {
+            u.setSnils(null);
+            u.setSnilsHash(null);
         }
         if (role != null) u.setRole(role);
         u.setEnabled(enabled);

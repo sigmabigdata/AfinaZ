@@ -16,6 +16,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import ru.example.ukep.dto.CertLoginRequest;
 import ru.example.ukep.entity.User;
+import ru.example.ukep.entity.Role;
 import ru.example.ukep.service.AdminCredentialsFileService;
 import ru.example.ukep.service.AuditService;
 import ru.example.ukep.service.SignatureVerifier;
@@ -86,19 +87,35 @@ public class AdminCertAuthController {
                 return challengeError;
             }
 
-            // 2. Проверяем CN + СНИЛС в admins.env
-            var admin = adminFile.find(req.getCn(), req.getSnils());
-            if (admin.isEmpty()) {
-                if (log.isWarnEnabled()) {
-                    log.warn("Cert login rejected: CN={}, SNILS={}",
-                            req.getCn(), maskSnils(req.getSnils()));
+            // 2. Проверяем CN + СНИЛС: сначала в admins.env, потом в БД (сотрудники)
+            User existingUser = null;
+            String expectedCn;
+            Role expectedRole;
+
+            var envAdmin = adminFile.find(req.getCn(), req.getSnils());
+            if (envAdmin.isPresent()) {
+                expectedCn = envAdmin.get().cn();
+                expectedRole = envAdmin.get().role();
+                if (log.isInfoEnabled()) {
+                    log.info("Admin CN/SNILS matched in admins.env: {} / {}",
+                            expectedCn, maskSnils(envAdmin.get().snils()));
                 }
-                return ResponseEntity.status(403).body(
-                        Map.of(K_ERROR, "Пользователь не является администратором"));
-            }
-            if (log.isInfoEnabled()) {
-                log.info("Admin CN/SNILS matched: {} / {}",
-                        admin.get().cn(), maskSnils(admin.get().snils()));
+            } else {
+                existingUser = userService.findEmployeeByCnAndSnils(req.getCn(), req.getSnils()).orElse(null);
+                if (existingUser == null) {
+                    if (log.isWarnEnabled()) {
+                        log.warn("Cert login rejected (not in env, not in DB): CN={}, SNILS={}",
+                                req.getCn(), maskSnils(req.getSnils()));
+                    }
+                    return ResponseEntity.status(403).body(
+                            Map.of(K_ERROR, "Пользователь не найден или не является сотрудником"));
+                }
+                expectedCn = existingUser.getFullName();
+                expectedRole = existingUser.getRole();
+                if (log.isInfoEnabled()) {
+                    log.info("Employee CN/SNILS matched in DB: {} / {}",
+                            expectedCn, maskSnils(req.getSnils()));
+                }
             }
 
             // 3. Криптографическая проверка подписи челленджа
@@ -106,21 +123,25 @@ public class AdminCertAuthController {
             Map<String, Object> result =
                     signatureVerifier.verifyDetached(challengeBytes, req.getSignatureBase64());
 
-            // 4. Сверяем CN в подписи с CN из admins.env
+            // 4. Сверяем CN в подписи с ожидаемым CN
             String signerCn = String.valueOf(
                     result.getOrDefault("signerSubject", "")).trim();
-            if (signerCn.isEmpty() || !signerCn.equalsIgnoreCase(admin.get().cn())) {
+            if (signerCn.isEmpty() || !signerCn.equalsIgnoreCase(expectedCn)) {
                 if (log.isWarnEnabled()) {
                     log.warn("CN mismatch: signer='{}', expected='{}'",
-                            signerCn, admin.get().cn());
+                            signerCn, expectedCn);
                 }
                 return ResponseEntity.status(403).body(
-                        Map.of(K_ERROR, "CN в сертификате не совпадает с CN в admins.env"));
+                        Map.of(K_ERROR, "CN в сертификате не совпадает"));
             }
 
             // 5. Создаём/находим запись в БД и логиним
-            User user = userService.upsertAdminByCert(
-                    admin.get().cn(), admin.get().snils(), admin.get().role());
+            User user;
+            if (existingUser != null) {
+                user = existingUser;
+            } else {
+                user = userService.upsertAdminByCert(expectedCn, req.getSnils(), expectedRole);
+            }
 
             var details = org.springframework.security.core.userdetails.User
                     .withUsername(user.getEmail())
@@ -135,9 +156,9 @@ public class AdminCertAuthController {
             adminContextRepository.saveContext(ctx, request, response);
 
             if (log.isInfoEnabled()) {
-                log.info("Admin logged in via cert: {}", admin.get().cn());
+                log.info("Admin/Employee logged in via cert: {}", expectedCn);
             }
-            audit.adminLoginSuccess(admin.get().cn());
+            audit.adminLoginSuccess(expectedCn);
             return ResponseEntity.ok(Map.of("success", true, "redirect", "/admin"));
         } catch (Exception e) {
             log.error("Cert login failed", e);

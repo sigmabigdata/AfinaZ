@@ -196,22 +196,28 @@ public class AdminController {
             Role desiredRole = resolveDesiredRole(role, auth);
             String who = auth != null ? auth.getName() : UNKNOWN;
 
-            // Сотрудник/Администратор — создаём через admins.env + upsertAdminByCert
-            if (desiredRole == Role.ROLE_EMPLOYEE || desiredRole == Role.ROLE_ADMIN) {
+            if (desiredRole == Role.ROLE_ADMIN) {
+                throw new IllegalArgumentException("Администраторов добавляйте через файл admins.env");
+            }
+
+            if (desiredRole == Role.ROLE_EMPLOYEE) {
                 if (fullName == null || fullName.isBlank()) {
-                    throw new IllegalArgumentException("ФИО обязательно для сотрудника/администратора");
+                    throw new IllegalArgumentException("ФИО обязательно для сотрудника");
                 }
                 if (snils == null || snils.isBlank()) {
-                    throw new IllegalArgumentException("СНИЛС обязателен для сотрудника/администратора");
+                    throw new IllegalArgumentException("СНИЛС обязателен для сотрудника");
                 }
-                User u = createStaffUser(fullName.trim(), snils.trim(), desiredRole);
+                if (email == null || email.isBlank()) {
+                    email = ru.example.ukep.service.UserService.buildAdminEmail(fullName, snils);
+                }
+                User u = userService.adminCreate(email, fullName, phone, snils, desiredRole, enabled);
                 audit.userCreate(who, u.getId(), u.getEmail());
-                ra.addFlashAttribute("ok", "Сотрудник создан: " + fullName + " (" + desiredRole.name() + ")");
+                ra.addFlashAttribute("ok", "Сотрудник создан: " + fullName);
                 return REDIR_USERS + u.getId();
             }
 
             // Клиент — обычный флоу
-            User u = userService.adminCreate(email, fullName, phone, desiredRole, enabled);
+            User u = userService.adminCreate(email, fullName, phone, null, desiredRole, enabled);
             audit.userCreate(who, u.getId(), u.getEmail());
             ra.addFlashAttribute("ok", "Клиент создан: " + u.getEmail());
             return REDIR_USERS + u.getId();
@@ -219,19 +225,6 @@ public class AdminController {
             ra.addFlashAttribute("err", e.getMessage());
             return "redirect:/admin/users/new";
         }
-    }
-
-    /** Создаёт сотрудника: пишет admins.env и создаёт/обновляет User. */
-    private User createStaffUser(String fullName, String snils, Role role) {
-        var existing = adminFile.readAll().stream()
-                .filter(r -> r.cn().equalsIgnoreCase(fullName))
-                .toList();
-        var list = new java.util.ArrayList<>(adminFile.readAll());
-        list.removeIf(r -> r.cn().equalsIgnoreCase(fullName));
-        list.add(new ru.example.ukep.service.AdminCredentialsFileService.AdminRecord(
-                fullName, snils, role));
-        adminFile.writeAll(list);
-        return userService.upsertAdminByCert(fullName, snils, role);
     }
 
     @GetMapping("/users/{id}/edit")
@@ -263,31 +256,23 @@ public class AdminController {
             Role desiredRole = resolveDesiredRole(role, auth);
             String who = auth != null ? auth.getName() : UNKNOWN;
 
-            // Сотрудник/Администратор — синхронизируем admins.env
-            if (desiredRole == Role.ROLE_EMPLOYEE || desiredRole == Role.ROLE_ADMIN) {
+            if (desiredRole == Role.ROLE_ADMIN) {
+                throw new IllegalArgumentException("Администраторов редактируйте через файл admins.env");
+            }
+
+            if (desiredRole == Role.ROLE_EMPLOYEE) {
                 if (fullName == null || fullName.isBlank() || snils == null || snils.isBlank()) {
-                    throw new IllegalArgumentException("ФИО и СНИЛС обязательны для этой роли");
+                    throw new IllegalArgumentException("ФИО и СНИЛС обязательны для сотрудника");
                 }
                 User existing = userRepository.findById(id)
                         .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
-                // удаляем из admins.env старое имя (если было), пишем новое
-                var list = new java.util.ArrayList<>(adminFile.readAll());
-                list.removeIf(r -> r.cn().equalsIgnoreCase(existing.getFullName()));
-                list.removeIf(r -> r.cn().equalsIgnoreCase(fullName));
-                list.add(new ru.example.ukep.service.AdminCredentialsFileService.AdminRecord(
-                        fullName, snils, desiredRole));
-                adminFile.writeAll(list);
-
-                User u = userService.upsertAdminByCert(fullName, snils, desiredRole);
-                // enabled/phone всё же обновим
-                userService.adminUpdate(u.getId(),
-                        u.getEmail(), fullName, phone, desiredRole, enabled);
-                audit.userUpdate(who, u.getId(), u.getEmail());
-                ra.addFlashAttribute("ok", "Сотрудник сохранён, admins.env обновлён");
-                return REDIR_USERS + u.getId();
+                userService.adminUpdate(id, existing.getEmail(), fullName, phone, snils, desiredRole, enabled);
+                audit.userUpdate(who, id, existing.getEmail());
+                ra.addFlashAttribute("ok", "Сотрудник сохранён");
+                return REDIR_USERS + id;
             }
 
-            userService.adminUpdate(id, email, fullName, phone, desiredRole, enabled);
+            userService.adminUpdate(id, email, fullName, phone, null, desiredRole, enabled);
             audit.userUpdate(who, id, email);
             ra.addFlashAttribute("ok", "Сохранено");
             return REDIR_USERS + id;

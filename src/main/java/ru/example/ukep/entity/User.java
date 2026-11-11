@@ -30,6 +30,13 @@ public class User {
     @Column(name = "phone_hash", length = 64)
     private String phoneHash;
 
+    @Column(name = "snils_enc", columnDefinition = "TEXT")
+    @Convert(converter = ru.example.ukep.security.PiiStringConverter.class)
+    private String snils;
+
+    @Column(name = "snils_hash", length = 64)
+    private String snilsHash;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.ROLE_USER;
@@ -52,6 +59,8 @@ public class User {
     public String getEmail() { return email; }
     public String getEmailHash() { return emailHash; }
     public String getPhoneHash() { return phoneHash; }
+    public String getSnils() { return snils; }
+    public String getSnilsHash() { return snilsHash; }
     public String getFullName() { return fullName; }
     public String getPhone() { return phone; }
     public Role getRole() { return role; }
@@ -67,6 +76,8 @@ public class User {
     public void setEmail(String email) { this.email = email; }
     public void setEmailHash(String emailHash) { this.emailHash = emailHash; }
     public void setPhoneHash(String phoneHash) { this.phoneHash = phoneHash; }
+    public void setSnils(String snils) { this.snils = snils; }
+    public void setSnilsHash(String snilsHash) { this.snilsHash = snilsHash; }
     public void setFullName(String fullName) { this.fullName = fullName; }
     public void setPhone(String phone) { this.phone = phone; }
     public void setRole(Role role) { this.role = role; }

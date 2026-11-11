@@ -69,10 +69,7 @@
                         th:selected="${mode == 'edit' && user.role.name() == 'ROLE_EMPLOYEE'}">
                     Сотрудник (ROLE_EMPLOYEE) — админ без настроек/системы
                 </option>
-                <option value="ROLE_ADMIN"
-                        th:selected="${mode == 'edit' && user.role.name() == 'ROLE_ADMIN'}">
-                    Администратор (ROLE_ADMIN) — полный доступ
-                </option>
+
             </select>
         </div>
 
@@ -82,8 +79,8 @@
                    th:value="${mode == 'edit' && snils != null} ? ${snils} : ''"
                    placeholder="12345678901"/>
             <div class="hint">
-                При сохранении роли Сотрудник/Администратор запись добавляется в
-                <code>admins.env</code> (CN|SNILS|role).
+                Обязательно для роли Сотрудник. Сохраняется в базе данных.
+                Для входа по сертификату УКЭП.
             </div>
         </div>
 
