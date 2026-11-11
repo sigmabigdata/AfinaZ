@@ -3,9 +3,12 @@ package ru.example.ukep.controller.setup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import ru.example.ukep.dto.setup.SetupFinalizeResponse;
 import ru.example.ukep.dto.setup.SetupPreflightDto;
 import ru.example.ukep.dto.setup.SetupStateDto;
@@ -36,21 +39,32 @@ public class SetupController {
         this.setup = setup;
     }
 
-    /** HTML страница wizard'а — заглушка до этапа 3. */
+    /**
+     * HTML страница wizard'а.
+     *
+     * <p>{@code ?step=N} — открыть конкретный шаг (иначе текущий из draft).</p>
+     */
     @GetMapping({"", "/"})
-    @ResponseBody
-    public ResponseEntity<?> index() {
-        return ResponseEntity.ok(Map.of(
-                "message", "AfinaZ Setup Mode",
-                "api", Map.of(
-                        "state", "GET /setup/state",
-                        "step", "POST /setup/step/{1..6}",
-                        "preflight", "GET /setup/preflight",
-                        "finalize", "POST /setup/finalize",
-                        "reset", "POST /setup/reset"
-                ),
-                "ui", "Wizard UI будет добавлен на этапе 3"
-        ));
+    public String wizard(@RequestParam(value = "step", required = false) Integer stepParam,
+                         Model model) {
+        ru.example.ukep.dto.setup.SetupStateDto state = setup.getState();
+        int step = stepParam != null
+                ? Math.max(1, Math.min(6, stepParam))
+                : state.getCurrentStep();
+
+        model.addAttribute("step", step);
+        model.addAttribute("draft", state.getDraft());
+        model.addAttribute("state", state);
+
+        return switch (step) {
+            case 1 -> "setup/step1-domain";
+            case 2 -> "setup/step2-smtp";
+            case 3 -> "setup/step3-admin";
+            case 4 -> "setup/step4-ip";
+            case 5 -> "setup/step5-preflight";
+            case 6 -> "setup/step6-confirm";
+            default -> "setup/step1-domain";
+        };
     }
 
     /** Текущее состояние wizard'а. */
@@ -60,8 +74,34 @@ public class SetupController {
         return setup.getState();
     }
 
-    /** Сохранить данные шага. */
-    @PostMapping("/step/{step}")
+    /** Сохранить шаг — форма (urlencoded). После сохранения — redirect на следующий шаг. */
+    @PostMapping(value = "/step/{step}",
+                 consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public String saveStepForm(@PathVariable int step,
+                               @RequestParam Map<String, String> params,
+                               java.security.Principal principal,
+                               RedirectAttributes ra) {
+        if (step < 1 || step > 6) {
+            ra.addFlashAttribute("error", "step должен быть 1..6");
+            return "redirect:/setup?step=1";
+        }
+        try {
+            String actor = principal != null ? principal.getName() : "setup-wizard";
+            // Убираем служебные поля (на всякий случай)
+            Map<String, String> data = new java.util.LinkedHashMap<>(params);
+            data.remove("_csrf");
+            setup.saveStep(step, data, actor);
+            int next = Math.min(step + 1, 6);
+            return "redirect:/setup?step=" + next;
+        } catch (IllegalArgumentException e) {
+            ra.addFlashAttribute("error", e.getMessage());
+            return "redirect:/setup?step=" + step;
+        }
+    }
+
+    /** Сохранить шаг — JSON (для curl-тестов / CI/CD). */
+    @PostMapping(value = "/step/{step}",
+                 consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<?> saveStep(@PathVariable int step,
                                       @RequestBody SetupStepRequest req,
@@ -162,13 +202,37 @@ public class SetupController {
         return result;
     }
 
-    /** Финализация — запись setup-out/*, System.exit(0) через 2s. */
-    @PostMapping("/finalize")
+    /** Финализация — форма (urlencoded) → finalizing.html (автопереход). */
+    @PostMapping(value = "/finalize",
+                 consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public String finalizeForm(java.security.Principal principal,
+                               Model model,
+                               RedirectAttributes ra) {
+        String actor = principal != null ? principal.getName() : "setup-wizard";
+        log.warn("setup: finalize requested by {} (form)", actor);
+
+        // Запоминаем домен ДО вызова finalize (finalize может очистить draft)
+        ru.example.ukep.dto.setup.SetupStateDto state = setup.getState();
+        String domain = state.getDraft().getOrDefault("domain", "localhost");
+
+        SetupFinalizeResponse response = setup.finalizeSetup(actor);
+        if (!response.isSuccess()) {
+            ra.addFlashAttribute("error", response.getMessage());
+            return "redirect:/setup?step=6";
+        }
+        model.addAttribute("domain", domain);
+        model.addAttribute("step", 6);
+        return "setup/finalizing";
+    }
+
+    /** Финализация — JSON (для curl/CI/CD). */
+    @PostMapping(value = "/finalize",
+                 consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<SetupFinalizeResponse> finalizeSetup(
             java.security.Principal principal) {
         String actor = principal != null ? principal.getName() : "setup-wizard";
-        log.warn("setup: finalize requested by {}", actor);
+        log.warn("setup: finalize requested by {} (json)", actor);
         SetupFinalizeResponse response = setup.finalizeSetup(actor);
         return response.isSuccess()
                 ? ResponseEntity.ok(response)

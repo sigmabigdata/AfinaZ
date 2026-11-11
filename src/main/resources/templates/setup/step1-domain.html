@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{setup/layout :: head('Домен и TLS')}"></head>
+<body>
+<div th:replace="~{setup/layout :: page(1, 'Домен и TLS', ~{::form})}">
+
+    <form method="post" action="/setup/step/1" class="setup-form"
+          th:object="${draft}" autocomplete="off">
+
+        <p class="setup-intro">
+            Укажите <b>домен</b>, по которому будет доступен сервис,
+            и выберите способ защиты соединения.
+        </p>
+
+        <!-- Домен -->
+        <div class="setup-field">
+            <label for="domain">Домен или IP <span class="req">*</span></label>
+            <input type="text" id="domain" name="domain" required
+                   th:value="${draft.domain}"
+                   placeholder="afina.example.ru"
+                   pattern="^[a-zA-Z0-9.\-]+$"
+                   autocomplete="off"/>
+            <div class="field-hint">
+                Например: <code>afina.example.ru</code> или IP-адрес сервера.
+                Домен должен указывать (A-запись) на этот сервер.
+            </div>
+        </div>
+
+        <!-- TLS -->
+        <fieldset class="setup-fieldset">
+            <legend>TLS-сертификат <span class="req">*</span></legend>
+
+            <label class="setup-radio">
+                <input type="radio" name="tls" value="self-signed"
+                       th:checked="${draft.tls == null or draft.tls == 'self-signed'}"/>
+                <span>
+                    <b>Self-signed</b> (рекомендуется для первого запуска)
+                    <small>Автоматически сгенерируется сертификат на 1 год.
+                        Позже можно заменить на свой в /admin/ssl.</small>
+                </span>
+            </label>
+
+            <label class="setup-radio">
+                <input type="radio" name="tls" value="custom"
+                       th:checked="${draft.tls == 'custom'}"/>
+                <span>
+                    <b>Свой сертификат</b>
+                    <small>Если у вас уже есть fullchain.pem и privkey.pem в
+                        <code>angie-certs/</code>. Можно загрузить позже в /admin/ssl.</small>
+                </span>
+            </label>
+        </fieldset>
+
+        <!-- Кнопки -->
+        <div class="setup-actions">
+            <button type="submit" class="setup-btn setup-btn-primary">
+                Далее: Email →
+            </button>
+        </div>
+
+        <p class="setup-hint-muted">
+            ℹ️ Если используете Let's Encrypt с внешним доменом — установите self-signed
+            сейчас, а после завершения wizard зайдите в <code>/admin/ssl</code>
+            и замените на LE или корпоративный сертификат.
+        </p>
+    </form>
+
+</div>
+</body>
+</html>

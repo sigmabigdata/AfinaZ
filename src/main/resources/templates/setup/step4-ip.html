@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{setup/layout :: head('IP-whitelist')}"></head>
+<body>
+<div th:replace="~{setup/layout :: page(4, 'IP-whitelist для /admin', ~{::form})}">
+
+    <form method="post" action="/setup/step/4" class="setup-form"
+          th:object="${draft}" autocomplete="off">
+
+        <p class="setup-intro">
+            Укажите IP-адреса и подсети, с которых разрешён доступ
+            в административную панель (<code>/admin/*</code>).
+            Клиенты (<code>/dashboard</code>) — доступны с любых IP.
+        </p>
+
+        <div class="setup-alert setup-alert-info">
+            <span class="alert-icon">ℹ</span>
+            <div>
+                <b>Если не уверены</b> — оставьте значение по умолчанию.
+                <br>Админка будет доступна только с самого сервера (localhost + приватные подсети Docker).
+                <br>Позже можно изменить в <code>/admin/settings</code>.
+            </div>
+        </div>
+
+        <div class="setup-field">
+            <label for="ipWhitelist">Список IP / CIDR <span class="req">*</span></label>
+            <input type="text" id="ipWhitelist" name="ipWhitelist" required
+                   th:value="${draft.ipWhitelist != null ? draft.ipWhitelist : '127.0.0.1,::1,172.0.0.0/8'}"
+                   placeholder="127.0.0.1,::1,172.0.0.0/8"/>
+            <div class="field-hint">
+                Через запятую. Одиночные IP (<code>203.0.113.5</code>) или CIDR-подсети (<code>10.0.0.0/8</code>).
+                <br>Текущее значение по умолчанию: <code>127.0.0.1,::1,172.0.0.0/8</code>
+                (localhost + приватные Docker-подсети).
+            </div>
+        </div>
+
+        <div class="setup-alert setup-alert-info">
+            <span class="alert-icon">🔒</span>
+            <div>
+                <b>Лучшая практика:</b> администраторы заходят в /admin через VPN или
+                ssh-туннель, поэтому whitelist обычно содержит только <code>127.0.0.1</code>
+                и корпоративные подсети.
+            </div>
+        </div>
+
+        <div class="setup-actions">
+            <a href="/setup?step=3" class="setup-btn setup-btn-ghost">← Назад</a>
+            <button type="submit" class="setup-btn setup-btn-primary">
+                Далее: Проверки →
+            </button>
+        </div>
+    </form>
+</div>
+</body>
+</html>

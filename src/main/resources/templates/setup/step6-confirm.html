@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{setup/layout :: head('Подтверждение')}"></head>
+<body>
+<div th:replace="~{setup/layout :: page(6, 'Подтверждение', ~{::div})}">
+
+    <div>
+        <p class="setup-intro">
+            Проверьте все параметры. После нажатия <b>«Завершить»</b>
+            приложение сохранит настройки и перезапустится в обычном режиме.
+        </p>
+
+        <div class="setup-summary">
+            <h3 class="summary-title">📋 Итоговые параметры</h3>
+
+            <dl class="summary-list">
+                <dt>Домен / URL</dt>
+                <dd><code th:text="'https://' + ${draft.domain}">https://example.ru</code></dd>
+
+                <dt>TLS-режим</dt>
+                <dd>
+                    <span th:if="${draft.tls == 'self-signed'}">Self-signed (можно заменить в /admin/ssl)</span>
+                    <span th:if="${draft.tls == 'custom'}">Свой сертификат (angie-certs/)</span>
+                </dd>
+
+                <dt>SMTP</dt>
+                <dd>
+                    <span th:if="${draft.smtpMode == 'log'}">Только в логи (для теста)</span>
+                    <span th:if="${draft.smtpMode == 'local'}">
+                        Локальный Postfix (<span th:text="${draft.smtpFrom}">noreply@…</span>)
+                    </span>
+                    <span th:if="${draft.smtpMode == 'external'}">
+                        Внешний SMTP: <code th:text="${draft.smtpHost} + ':' + (${draft.smtpPort} ?: '587')">smtp:587</code>
+                        <br><small>From: <code th:text="${draft.smtpFrom}">noreply@…</code></small>
+                    </span>
+                </dd>
+
+                <dt>Администратор</dt>
+                <dd>
+                    <b th:text="${draft.adminCn}">Иванов Иван</b>
+                    <br><small>СНИЛС: <code th:text="'***' + ${#strings.substring(draft.adminSnils, 7)}">***1234</code></small>
+                </dd>
+
+                <dt>IP-whitelist</dt>
+                <dd><code th:text="${draft.ipWhitelist}">127.0.0.1,::1</code></dd>
+
+                <dt>Ключи шифрования</dt>
+                <dd>✅ Уже сгенерированы (bootstrap.sh, 32 байта)</dd>
+
+                <dt>БД (PostgreSQL)</dt>
+                <dd>✅ Инициализирована (27 миграций)</dd>
+            </dl>
+        </div>
+
+        <div class="setup-alert setup-alert-err">
+            <span class="alert-icon">⚠</span>
+            <div>
+                <b>После нажатия «Завершить»:</b>
+                <ol style="margin: 6px 0 0; padding-left: 20px;">
+                    <li>Приложение сохранит настройки в <code>setup-out/.env.prod.new</code></li>
+                    <li>Через 2 секунды контейнер перезапустится</li>
+                    <li>После перезапуска <code>/setup</code> будет недоступен (setup выключится)</li>
+                    <li>Вы попадёте на страницу входа администратора</li>
+                </ol>
+            </div>
+        </div>
+
+        <form method="post" action="/setup/finalize" id="finalize-form">
+            <div class="setup-actions">
+                <a href="/setup?step=5" class="setup-btn setup-btn-ghost">← Назад</a>
+                <button type="submit" class="setup-btn setup-btn-primary" id="btn-finalize">
+                    🚀 Завершить и перезапустить
+                </button>
+            </div>
+        </form>
+
+        <p class="setup-hint-muted">
+            ℹ️ После рестарта вход в <code>/admin</code> — только с УКЭП-сертификатом,
+            где CN и СНИЛС совпадают с указанными выше.
+        </p>
+    </div>
+
+    <script th:inline="none">
+    document.getElementById('finalize-form').addEventListener('submit', function(e) {
+        var btn = document.getElementById('btn-finalize');
+        btn.disabled = true;
+        btn.textContent = '⏳ Применяю настройки…';
+    });
+    </script>
+</div>
+</body>
+</html>

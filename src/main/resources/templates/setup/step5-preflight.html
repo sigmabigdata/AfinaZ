@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{setup/layout :: head('Проверки')}"></head>
+<body>
+<div th:replace="~{setup/layout :: page(5, 'Проверки перед запуском', ~{::div})}">
+
+    <div>
+        <p class="setup-intro">
+            Автоматические проверки перед завершением настройки.
+            Если что-то не так — вернитесь на соответствующий шаг и исправьте.
+        </p>
+
+        <div id="preflight-container" class="setup-preflight">
+            <div class="preflight-loading">⏳ Выполняю проверки…</div>
+        </div>
+
+        <div id="preflight-summary" class="setup-alert" style="display:none;"></div>
+
+        <div class="setup-actions">
+            <a href="/setup?step=4" class="setup-btn setup-btn-ghost">← Назад</a>
+            <button type="button" id="btn-rerun" class="setup-btn setup-btn-ghost">
+                ↻ Перепроверить
+            </button>
+            <a href="/setup?step=6" id="btn-next" class="setup-btn setup-btn-primary" disabled>
+                Далее: Подтверждение →
+            </a>
+        </div>
+
+        <p class="setup-hint-muted">
+            ℹ️ Проверки проходят на сервере. Если DNS ещё не распространился — это нормально,
+            можно продолжить (DNS обновится в течение 1-2 часов).
+        </p>
+    </div>
+
+    <script th:inline="none" src="/js/setup.js"></script>
+    <script th:inline="none">
+    document.addEventListener('DOMContentLoaded', function () {
+        SetupWizard.runPreflight('preflight-container', 'preflight-summary', 'btn-next', 'btn-rerun');
+    });
+    </script>
+</div>
+</body>
+</html>

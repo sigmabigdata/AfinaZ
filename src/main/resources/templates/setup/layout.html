@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<!--
+  Общий layout для wizard'а Setup Mode.
+  Используется через th:replace="~{setup/layout :: page(...)}".
+
+  Параметры:
+    step (int)      — текущий шаг 1..6
+    title (String)  — заголовок шага
+    content         — вложенный фрагмент (передаётся через th:insert)
+-->
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <title th:text="'AfinaZ Setup · ' + ${title}">AfinaZ Setup</title>
+    <link rel="stylesheet" th:href="@{/css/setup.css}">
+</head>
+<body>
+
+<div th:fragment="page(step, title, content)" class="setup-page">
+
+    <!-- ═══ Шапка ═══ -->
+    <header class="setup-header">
+        <div class="setup-brand">
+            <img src="/img/logo.png" alt="НБД-Банк" class="setup-logo">
+            <span class="setup-brand-text">AfinaZ Setup</span>
+        </div>
+        <div class="setup-security-badge" title="Соединение защищено, доступ по одноразовому токену">
+            🔒 Безопасная настройка
+        </div>
+    </header>
+
+    <!-- ═══ Прогресс-бар (6 шагов) ═══ -->
+    <nav class="setup-progress" aria-label="Шаги настройки">
+        <div class="setup-step"
+             th:each="n : ${#numbers.sequence(1, 6)}"
+             th:classappend="${n == step} ? 'active' : (${n < step} ? 'done' : '')"
+             th:attr="data-step=${n},aria-current=${n == step} ? 'step' : 'false'">
+            <span class="step-num">
+                <span th:if="${n < step}">✓</span>
+                <span th:if="${n >= step}" th:text="${n}">1</span>
+            </span>
+            <span class="step-label">
+                <span th:switch="${n}">
+                    <span th:case="1">Домен</span>
+                    <span th:case="2">Email</span>
+                    <span th:case="3">Админ</span>
+                    <span th:case="4">IP</span>
+                    <span th:case="5">Проверки</span>
+                    <span th:case="6">Готово</span>
+                </span>
+            </span>
+        </div>
+    </nav>
+
+    <!-- ═══ Контент шага ═══ -->
+    <main class="setup-main">
+        <h1 class="setup-title" th:text="${title}">Заголовок</h1>
+
+        <!-- Flash-сообщения -->
+        <div th:if="${error}" class="setup-alert setup-alert-err">
+            <span class="alert-icon">✗</span>
+            <span th:text="${error}">Ошибка</span>
+        </div>
+        <div th:if="${ok}" class="setup-alert setup-alert-ok">
+            <span class="alert-icon">✓</span>
+            <span th:text="${ok}">Готово</span>
+        </div>
+
+        <!-- Вложенный контент шага -->
+        <div th:insert="${content}">…</div>
+    </main>
+
+    <!-- ═══ Футер ═══ -->
+    <footer class="setup-footer">
+        <div>
+            ПАО «НБД-Банк» · Сервис подписания документов УКЭП
+        </div>
+        <div class="setup-footer-hint">
+            Шаг <span th:text="${step}">1</span> из 6.
+            <span th:if="${step < 6}">Данные сохраняются на каждом шаге — можно вернуться позже.</span>
+            <span th:if="${step == 6}">После подтверждения приложение перезапустится в обычном режиме.</span>
+        </div>
+    </footer>
+
+</div>
+
+</body>
+</html>

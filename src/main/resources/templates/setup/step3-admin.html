@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{setup/layout :: head('Администратор')}"></head>
+<body>
+<div th:replace="~{setup/layout :: page(3, 'Администратор', ~{::form})}">
+
+    <form method="post" action="/setup/step/3" class="setup-form"
+          th:object="${draft}" autocomplete="off">
+
+        <p class="setup-intro">
+            Укажите <b>CN</b> и <b>СНИЛС</b> главного администратора.
+            Вход в /admin возможен только с УКЭП-сертификатом, где эти значения совпадают.
+        </p>
+
+        <div class="setup-alert setup-alert-info">
+            <span class="alert-icon">ℹ</span>
+            <div>
+                <b>Где взять CN и СНИЛС?</b>
+                <br>Из квалифицированного сертификата (в КриптоПро CSP → просмотр сертификата).
+                <br>Или уточните у вашего УЦ.
+            </div>
+        </div>
+
+        <!-- CN -->
+        <div class="setup-field">
+            <label for="adminCn">CN администратора <span class="req">*</span></label>
+            <input type="text" id="adminCn" name="adminCn" required
+                   th:value="${draft.adminCn}"
+                   placeholder="Иванов Иван Иванович"
+                   autocomplete="off"/>
+            <div class="field-hint">
+                Полное ФИО как в сертификате, например: <code>Дырул Анатолий Юрьевич</code>
+            </div>
+        </div>
+
+        <!-- SNILS -->
+        <div class="setup-field">
+            <label for="adminSnils">СНИЛС <span class="req">*</span></label>
+            <input type="text" id="adminSnils" name="adminSnils" required
+                   th:value="${draft.adminSnils}"
+                   pattern="[0-9]{11}"
+                   placeholder="12345678901"
+                   inputmode="numeric"
+                   maxlength="11"
+                   autocomplete="off"/>
+            <div class="field-hint">
+                11 цифр без дефисов и пробелов. Используется для проверки подлинности при входе.
+            </div>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="setup-actions">
+            <a href="/setup?step=2" class="setup-btn setup-btn-ghost">← Назад</a>
+            <button type="submit" class="setup-btn setup-btn-primary">
+                Далее: IP-whitelist →
+            </button>
+        </div>
+
+        <p class="setup-hint-muted">
+            ℹ️ Дополнительных администраторов можно добавлять позже в файле
+            <code>admins.env</code> (формат: <code>ФИО|СНИЛС</code>).
+        </p>
+    </form>
+
+    <script th:inline="none">
+    document.getElementById('adminSnils').addEventListener('input', function(e) {
+        // отсекаем всё, кроме цифр
+        e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11);
+    });
+    </script>
+
+</div>
+</body>
+</html>

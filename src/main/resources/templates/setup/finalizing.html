@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{setup/layout :: head('Перезапуск')}"></head>
+<body>
+<div th:replace="~{setup/layout :: page(6, 'Перезапуск приложения', ~{::div})}">
+
+    <div class="setup-finalizing">
+        <div class="finalizing-spinner"></div>
+
+        <h2 class="finalizing-title">Настройки сохранены</h2>
+        <p class="finalizing-sub">
+            Приложение перезапускается в обычном режиме.
+            Это занимает <b>30–60 секунд</b>.
+        </p>
+
+        <div class="finalizing-steps">
+            <div class="finalizing-step" data-state="done">
+                <span class="step-icon">✓</span>
+                <span>Настройки записаны</span>
+            </div>
+            <div class="finalizing-step" data-state="active">
+                <span class="step-icon">⏳</span>
+                <span>Перезапуск контейнера…</span>
+            </div>
+            <div class="finalizing-step" data-state="pending">
+                <span class="step-icon">○</span>
+                <span>Готов к работе</span>
+            </div>
+        </div>
+
+        <p class="finalizing-hint">
+            Браузер автоматически перенаправит вас на страницу входа администратора.
+            Если этого не произошло через минуту — перейдите вручную:
+            <br>
+            <a th:href="'https://' + ${domain} + '/admin/login'"
+               th:text="'https://' + ${domain} + '/admin/login'"
+               class="finalizing-link">https://…/admin/login</a>
+        </p>
+
+        <div class="finalizing-countdown">
+            Перенаправление через <span id="countdown">40</span> сек…
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+    var targetUrl = /*[[${'https://' + domain + '/admin/login'}]]*/ 'https://localhost/admin/login';
+    var countdownEl = document.getElementById('countdown');
+    var seconds = 40;
+
+    function tick() {
+        if (seconds <= 0) {
+            window.location.href = targetUrl;
+            return;
+        }
+        seconds--;
+        countdownEl.textContent = seconds;
+        setTimeout(tick, 1000);
+    }
+
+    setTimeout(tick, 1000);
+    </script>
+</div>
+</body>
+</html>

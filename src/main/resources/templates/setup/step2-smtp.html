@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{setup/layout :: head('Email / SMTP')}"></head>
+<body>
+<div th:replace="~{setup/layout :: page(2, 'Email / SMTP', ~{::form})}">
+
+    <form method="post" action="/setup/step/2" class="setup-form"
+          th:object="${draft}" autocomplete="off" id="smtp-form">
+
+        <p class="setup-intro">
+            Настройте отправку писем. Сервис использует email для
+            <b>magic-link</b> входа клиентов и <b>алертов</b> мониторинга.
+        </p>
+
+        <!-- Режим SMTP -->
+        <fieldset class="setup-fieldset">
+            <legend>Режим отправки <span class="req">*</span></legend>
+
+            <label class="setup-radio">
+                <input type="radio" name="smtpMode" value="log"
+                       th:checked="${draft.smtpMode == null or draft.smtpMode == 'log'}"
+                       onchange="afinaSmtpMode(this.value)"/>
+                <span>
+                    <b>Только в логи</b> (для теста)
+                    <small>Письма не отправляются, а пишутся в лог приложения.
+                        Подходит для первоначальной проверки.</small>
+                </span>
+            </label>
+
+            <label class="setup-radio">
+                <input type="radio" name="smtpMode" value="local"
+                       th:checked="${draft.smtpMode == 'local'}"
+                       onchange="afinaSmtpMode(this.value)"/>
+                <span>
+                    <b>Локальный Postfix</b> (порт 25)
+                    <small>Postfix на этом же сервере. Отправка через
+                        <code>localhost:25</code>, без пароля.</small>
+                </span>
+            </label>
+
+            <label class="setup-radio">
+                <input type="radio" name="smtpMode" value="external"
+                       th:checked="${draft.smtpMode == 'external'}"
+                       onchange="afinaSmtpMode(this.value)"/>
+                <span>
+                    <b>Внешний SMTP</b> (Yandex / Mailgun / корпоративный)
+                    <small>Порт 465 (SSL) или 587 (STARTTLS), с логином и паролем.</small>
+                </span>
+            </label>
+        </fieldset>
+
+        <!-- Local: mail domain -->
+        <div class="setup-field smtp-local-group" style="display:none;">
+            <label for="smtpFromLocal">Email отправителя <span class="req">*</span></label>
+            <input type="email" id="smtpFromLocal"
+                   th:value="${draft.smtpFrom}"
+                   placeholder="noreply@afina.example.ru"/>
+            <div class="field-hint">
+                Письма будут отправляться через локальный Postfix с этим адресом.
+            </div>
+        </div>
+
+        <!-- External: full config -->
+        <div class="smtp-external-group" style="display:none;">
+            <div class="setup-field">
+                <label for="smtpHost">SMTP-хост <span class="req">*</span></label>
+                <input type="text" id="smtpHost" name="smtpHost"
+                       th:value="${draft.smtpHost}"
+                       placeholder="smtp.yandex.ru"/>
+            </div>
+
+            <div class="setup-row">
+                <div class="setup-field">
+                    <label for="smtpPort">Порт</label>
+                    <input type="number" id="smtpPort" name="smtpPort"
+                           th:value="${draft.smtpPort} ?: '587'"
+                           min="1" max="65535" placeholder="587"/>
+                </div>
+                <div class="setup-field">
+                    <label>
+                        <input type="checkbox" id="smtpSsl" name="smtpSsl" value="true"
+                               th:checked="${draft.smtpSsl == 'true'}"/>
+                        SSL (порт 465)
+                    </label>
+                    <div class="field-hint">Если выкл — STARTTLS (587)</div>
+                </div>
+            </div>
+
+            <div class="setup-field">
+                <label for="smtpUser">Логин</label>
+                <input type="text" id="smtpUser" name="smtpUser"
+                       th:value="${draft.smtpUser}"
+                       placeholder="afina@yandex.ru"
+                       autocomplete="off"/>
+            </div>
+
+            <div class="setup-field">
+                <label for="smtpPassword">Пароль</label>
+                <input type="password" id="smtpPassword" name="smtpPassword"
+                       placeholder="(оставьте пустым, чтобы не менять)"
+                       autocomplete="new-password"/>
+                <div class="field-hint">
+                    Пароль хранится в <code>.env.prod</code> с правами 600.
+                </div>
+            </div>
+
+            <div class="setup-field">
+                <label for="smtpFrom">Email отправителя <span class="req">*</span></label>
+                <input type="email" id="smtpFrom" name="smtpFrom"
+                       th:value="${draft.smtpFrom}"
+                       placeholder="noreply@example.ru"/>
+            </div>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="setup-actions">
+            <a href="/setup?step=1" class="setup-btn setup-btn-ghost">← Назад</a>
+            <button type="submit" class="setup-btn setup-btn-primary">
+                Далее: Администратор →
+            </button>
+        </div>
+
+    </form>
+
+    <!-- JS для переключения режимов SMTP (inline, не требует setup.js) -->
+    <script th:inline="none">
+    function afinaSmtpMode(mode) {
+        var local = document.querySelector('.smtp-local-group');
+        var external = document.querySelector('.smtp-external-group');
+        local.style.display = (mode === 'local') ? 'block' : 'none';
+        external.style.display = (mode === 'external') ? 'block' : 'none';
+        // переименовываем поле "smtpFrom" для local, чтобы ушло как smtpFrom
+        var localInput = document.getElementById('smtpFromLocal');
+        if (localInput) {
+            localInput.name = (mode === 'local') ? 'smtpFrom' : '';
+        }
+        // для external — поле smtpFrom в external-group
+        var extInput = document.getElementById('smtpFrom');
+        if (extInput) {
+            extInput.name = (mode === 'external') ? 'smtpFrom' : '';
+            extInput.disabled = (mode !== 'external');
+        }
+    }
+    // инициализация при загрузке
+    document.addEventListener('DOMContentLoaded', function() {
+        var checked = document.querySelector('input[name="smtpMode"]:checked');
+        if (checked) afinaSmtpMode(checked.value);
+    });
+    </script>
+
+</div>
+</body>
+</html>
