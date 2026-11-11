@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru" xmlns:th="http://www.thymeleaf.org"
-     xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <title>НБД-Банк · Админ · Клиенты</title>
@@ -32,7 +32,7 @@
 <main>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <h1 style="margin:0;">Клиенты и администраторы</h1>
-        <a th:href="@{/admin/users/new}" class="btn">+ Создать клиента</a>
+        <a th:href="@{/admin/users/new}" class="btn">+ Создать</a>
     </div>
 
     <div th:if="${ok}" class="alert ok" th:text="${ok}"></div>
@@ -53,28 +53,30 @@
     <div th:if="${#lists.isEmpty(users)}" class="empty-state">
         <span class="icon">👥</span>
         <h3>Нет пользователей по заданным условиям</h3>
-        <p>Измените фильтр или создайте нового клиента.</p>
     </div>
 
     <th:block th:if="${not #lists.isEmpty(users)}">
-        <th:block th:with="admins=${users.?[role.name() == 'ROLE_ADMIN']},
-                         clients=${users.?[role.name() != 'ROLE_ADMIN']}">
+        <th:block th:with="admins=${users.?[role.name() == 'ROLE_ADMIN' or role.name() == 'ROLE_EMPLOYEE']},
+                         clients=${users.?[role.name() == 'ROLE_USER']}">
 
+            <!-- Секция «Сотрудники и администраторы» -->
             <section th:if="${not #lists.isEmpty(admins)}" class="user-section">
                 <h2 class="user-section-title">
                     <span class="user-section-icon">🛡️</span>
-                    Администраторы
+                    Сотрудники и администраторы
                     <span class="user-section-count" th:text="${#lists.size(admins)}">0</span>
                 </h2>
                 <div class="user-list">
-                    <a th:each="u : ${admins}"
-                       th:href="@{'/admin/users/' + ${u.id}}"
-                       class="user-row user-row-admin">
+                    <div th:each="u : ${admins}"
+                         class="user-row user-row-admin"
+                         th:attr="data-href=@{'/admin/users/' + ${u.id}}">
+                        <input sec:authorize="hasRole('ADMIN')" type="checkbox"
+                               class="user-row-check" th:attr="data-id=${u.id}"/>
                         <div class="user-avatar-sm user-avatar-admin"
                              th:text="${#strings.substring(u.fullName, 0, 1)}">И</div>
                         <div class="user-row-main">
                             <div class="user-row-name" th:text="${u.fullName}">Иванов Иван Иванович</div>
-                            <div class="user-row-sub" th:text="${u.email}">a@b.c</div>
+                            <div class="user-row-sub" th:text="${u.role.name() == 'ROLE_ADMIN' ? 'Администратор' : 'Сотрудник'}">Роль</div>
                         </div>
                         <div class="user-row-cell user-row-phone">
                             <span th:text="${u.phone} ?: '—'">—</span>
@@ -86,7 +88,7 @@
                             <span th:if="${u.enabled}" class="badge ok">Активен</span>
                             <span th:unless="${u.enabled}" class="badge warn">Заблокирован</span>
                         </div>
-                        <div class="user-row-actions" onclick="event.stopPropagation(); event.preventDefault();">
+                        <div class="user-row-actions">
                             <a th:href="@{'/admin/users/' + ${u.id} + '/edit'}"
                                class="action-icon" title="Редактировать">✎</a>
                             <form method="post"
@@ -96,10 +98,11 @@
                                 <button type="submit" class="action-icon action-danger" title="Удалить">🗑</button>
                             </form>
                         </div>
-                    </a>
+                    </div>
                 </div>
             </section>
 
+            <!-- Секция «Клиенты» -->
             <section th:if="${not #lists.isEmpty(clients)}" class="user-section">
                 <h2 class="user-section-title">
                     <span class="user-section-icon">👤</span>
@@ -107,9 +110,11 @@
                     <span class="user-section-count" th:text="${#lists.size(clients)}">0</span>
                 </h2>
                 <div class="user-list">
-                    <a th:each="u : ${clients}"
-                       th:href="@{'/admin/users/' + ${u.id}}"
-                       class="user-row">
+                    <div th:each="u : ${clients}"
+                         class="user-row"
+                         th:attr="data-href=@{'/admin/users/' + ${u.id}}">
+                        <input sec:authorize="hasRole('ADMIN')" type="checkbox"
+                               class="user-row-check" th:attr="data-id=${u.id}"/>
                         <div class="user-avatar-sm"
                              th:text="${#strings.substring(u.fullName, 0, 1)}">И</div>
                         <div class="user-row-main">
@@ -126,7 +131,7 @@
                             <span th:if="${u.enabled}" class="badge ok">Активен</span>
                             <span th:unless="${u.enabled}" class="badge warn">Заблокирован</span>
                         </div>
-                        <div class="user-row-actions" onclick="event.stopPropagation(); event.preventDefault();">
+                        <div class="user-row-actions">
                             <a th:href="@{'/admin/users/' + ${u.id} + '/edit'}"
                                class="action-icon" title="Редактировать">✎</a>
                             <form method="post"
@@ -144,12 +149,71 @@
                                 <button type="submit" class="action-icon action-danger" title="Удалить">🗑</button>
                             </form>
                         </div>
-                    </a>
+                    </div>
                 </div>
             </section>
         </th:block>
+
+        <!-- Плавающая панель массовых операций -->
+        <form sec:authorize="hasRole('ADMIN')" id="bulk-bar" method="post"
+              th:action="@{/admin/users/bulk}"
+              class="bulk-bar">
+            <span>Выбрано: <b id="bulk-count">0</b></span>
+            <button type="submit" name="action" value="block" class="bulk-btn">🚫 Заблокировать</button>
+            <button type="submit" name="action" value="unblock" class="bulk-btn">✓ Разблокировать</button>
+            <button type="submit" name="action" value="delete"
+                    class="bulk-btn bulk-btn-danger"
+                    onclick="return confirm('Удалить выбранных пользователей и все их документы?');">
+                🗑 Удалить
+            </button>
+            <button type="button" class="bulk-btn bulk-btn-ghost" onclick="clearSel()">✕ Сбросить</button>
+            <div id="bulk-ids"></div>
+        </form>
     </th:block>
 </main>
+
+<script>
+(function() {
+    // Клик по строке → карточка (кроме actions, checkbox, ссылок)
+    document.querySelectorAll('.user-row[data-href]').forEach(function(row) {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+            if (e.target.closest('.user-row-actions, a, button, form, input')) return;
+            window.location.href = this.dataset.href;
+        });
+    });
+
+    var bar = document.getElementById('bulk-bar');
+    var countEl = document.getElementById('bulk-count');
+    var idsEl = document.getElementById('bulk-ids');
+    if (!bar) return;
+
+    function refresh() {
+        var checked = Array.from(document.querySelectorAll('.user-row-check:checked'))
+            .map(function(cb) { return cb.dataset.id; });
+        countEl.textContent = checked.length;
+        idsEl.innerHTML = checked.map(function(id) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'ids'; inp.value = id;
+            return inp.outerHTML;
+        }).join('');
+        bar.classList.toggle('visible', checked.length > 0);
+    }
+
+    window.clearSel = function() {
+        document.querySelectorAll('.user-row-check:checked').forEach(function(cb) { cb.checked = false; });
+        refresh();
+    };
+
+    document.querySelectorAll('.user-row-check').forEach(function(cb) {
+        cb.addEventListener('change', refresh);
+        cb.addEventListener('click', function(e) { e.stopPropagation(); });
+    });
+
+    refresh();
+})();
+</script>
+
 <script th:src="@{/js/command-palette.js}"></script>
 <script th:src="@{/js/skeleton.js}"></script>
 </body>

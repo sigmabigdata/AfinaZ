@@ -74,7 +74,7 @@ services:
       - ./logs:/var/log/afina
       - ./logs:/app/logs
       - ./backups:/app/backups
-      - ./admins.env:/app/admins.env:ro
+      - ./admins.env:/app/admins.env:rw
       - ./crls:/app/crls
       - ./certs:/app/certs:ro
       - ./secrets:/opt/afinaz/secrets:ro

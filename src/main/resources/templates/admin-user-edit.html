@@ -76,6 +76,17 @@
             </select>
         </div>
 
+        <div class="form-field">
+            <label>СНИЛС <span class="muted small">(обязательно для роли Сотрудник/Администратор)</span></label>
+            <input type="text" name="snils"
+                   th:value="${mode == 'edit' && snils != null} ? ${snils} : ''"
+                   placeholder="16353493273"/>
+            <div class="hint">
+                При сохранении роли Сотрудник/Администратор запись добавляется в
+                <code>admins.env</code> (CN|SNILS|role).
+            </div>
+        </div>
+
         <div class="checkbox-field">
             <input type="checkbox" id="enabled" name="enabled" value="true"
                    th:checked="${mode == 'create' ? true : user.enabled}"/>

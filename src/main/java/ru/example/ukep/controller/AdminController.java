@@ -53,6 +53,7 @@ public class AdminController {
     private String baseUrl;
 
     private final ru.example.ukep.service.FolderService folderService;
+    private final ru.example.ukep.service.AdminCredentialsFileService adminFile;
 
     @SuppressWarnings("java:S107")  // 8 зависимостей — рефакторинг в builder отложен
     public AdminController(UserRepository userRepository,
@@ -62,7 +63,8 @@ public class AdminController {
                            EmailService emailService,
                            PiiEncryptor pii,
                            AuditService audit,
-                           ru.example.ukep.service.FolderService folderService) {
+                           ru.example.ukep.service.FolderService folderService,
+                           ru.example.ukep.service.AdminCredentialsFileService adminFile) {
         this.userRepository = userRepository;
         this.pii = pii;
         this.documentRepository = documentRepository;
@@ -71,6 +73,7 @@ public class AdminController {
         this.emailService = emailService;
         this.audit = audit;
         this.folderService = folderService;
+        this.adminFile = adminFile;
     }
 
     // ==================== ДАШБОРД ====================
@@ -141,6 +144,13 @@ public class AdminController {
         model.addAttribute("documentsByFolder", byFolder);
         model.addAttribute("docsTotal", documentRepository.countByOwner(user));
         model.addAttribute("docsSigned", documentRepository.countByOwnerAndSignedTrue(user));
+        // SNILS для редактирования (из admins.env)
+        if (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_EMPLOYEE) {
+            adminFile.readAll().stream()
+                    .filter(r -> r.cn().equalsIgnoreCase(user.getFullName()))
+                    .findFirst()
+                    .ifPresent(r -> model.addAttribute("snils", r.snils()));
+        }
         return "admin-user-card";
     }
 
@@ -174,17 +184,34 @@ public class AdminController {
     }
 
     @PostMapping("/users")
-    public String createUser(@RequestParam String email,
+    public String createUser(@RequestParam(required = false) String email,
                              @RequestParam(required = false) String fullName,
                              @RequestParam(required = false) String phone,
                              @RequestParam(defaultValue = "false") boolean enabled,
                              @RequestParam(required = false) String role,
+                             @RequestParam(required = false) String snils,
                              java.security.Principal auth,
                              RedirectAttributes ra) {
         try {
             Role desiredRole = resolveDesiredRole(role, auth);
-            User u = userService.adminCreate(email, fullName, phone, desiredRole, enabled);
             String who = auth != null ? auth.getName() : UNKNOWN;
+
+            // Сотрудник/Администратор — создаём через admins.env + upsertAdminByCert
+            if (desiredRole == Role.ROLE_EMPLOYEE || desiredRole == Role.ROLE_ADMIN) {
+                if (fullName == null || fullName.isBlank()) {
+                    throw new IllegalArgumentException("ФИО обязательно для сотрудника/администратора");
+                }
+                if (snils == null || snils.isBlank()) {
+                    throw new IllegalArgumentException("СНИЛС обязателен для сотрудника/администратора");
+                }
+                User u = createStaffUser(fullName.trim(), snils.trim(), desiredRole);
+                audit.userCreate(who, u.getId(), u.getEmail());
+                ra.addFlashAttribute("ok", "Сотрудник создан: " + fullName + " (" + desiredRole.name() + ")");
+                return REDIR_USERS + u.getId();
+            }
+
+            // Клиент — обычный флоу
+            User u = userService.adminCreate(email, fullName, phone, desiredRole, enabled);
             audit.userCreate(who, u.getId(), u.getEmail());
             ra.addFlashAttribute("ok", "Клиент создан: " + u.getEmail());
             return REDIR_USERS + u.getId();
@@ -194,28 +221,73 @@ public class AdminController {
         }
     }
 
+    /** Создаёт сотрудника: пишет admins.env и создаёт/обновляет User. */
+    private User createStaffUser(String fullName, String snils, Role role) {
+        var existing = adminFile.readAll().stream()
+                .filter(r -> r.cn().equalsIgnoreCase(fullName))
+                .toList();
+        var list = new java.util.ArrayList<>(adminFile.readAll());
+        list.removeIf(r -> r.cn().equalsIgnoreCase(fullName));
+        list.add(new ru.example.ukep.service.AdminCredentialsFileService.AdminRecord(
+                fullName, snils, role));
+        adminFile.writeAll(list);
+        return userService.upsertAdminByCert(fullName, snils, role);
+    }
+
     @GetMapping("/users/{id}/edit")
     public String editUserForm(@PathVariable Long id, Model model) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
         model.addAttribute("mode", "edit");
         model.addAttribute("user", user);
+        if (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_EMPLOYEE) {
+            adminFile.readAll().stream()
+                    .filter(r -> r.cn().equalsIgnoreCase(user.getFullName()))
+                    .findFirst()
+                    .ifPresent(r -> model.addAttribute("snils", r.snils()));
+        }
         return "admin-user-edit";
     }
 
     @PostMapping("/users/{id}")
     public String updateUser(@PathVariable Long id,
-                             @RequestParam String email,
+                             @RequestParam(required = false) String email,
                              @RequestParam(required = false) String fullName,
                              @RequestParam(required = false) String phone,
                              @RequestParam(defaultValue = "false") boolean enabled,
                              @RequestParam(required = false) String role,
+                             @RequestParam(required = false) String snils,
                              java.security.Principal auth,
                              RedirectAttributes ra) {
         try {
             Role desiredRole = resolveDesiredRole(role, auth);
-            userService.adminUpdate(id, email, fullName, phone, desiredRole, enabled);
             String who = auth != null ? auth.getName() : UNKNOWN;
+
+            // Сотрудник/Администратор — синхронизируем admins.env
+            if (desiredRole == Role.ROLE_EMPLOYEE || desiredRole == Role.ROLE_ADMIN) {
+                if (fullName == null || fullName.isBlank() || snils == null || snils.isBlank()) {
+                    throw new IllegalArgumentException("ФИО и СНИЛС обязательны для этой роли");
+                }
+                User existing = userRepository.findById(id)
+                        .orElseThrow(() -> new IllegalArgumentException(USER_NOT_FOUND));
+                // удаляем из admins.env старое имя (если было), пишем новое
+                var list = new java.util.ArrayList<>(adminFile.readAll());
+                list.removeIf(r -> r.cn().equalsIgnoreCase(existing.getFullName()));
+                list.removeIf(r -> r.cn().equalsIgnoreCase(fullName));
+                list.add(new ru.example.ukep.service.AdminCredentialsFileService.AdminRecord(
+                        fullName, snils, desiredRole));
+                adminFile.writeAll(list);
+
+                User u = userService.upsertAdminByCert(fullName, snils, desiredRole);
+                // enabled/phone всё же обновим
+                userService.adminUpdate(u.getId(),
+                        u.getEmail(), fullName, phone, desiredRole, enabled);
+                audit.userUpdate(who, u.getId(), u.getEmail());
+                ra.addFlashAttribute("ok", "Сотрудник сохранён, admins.env обновлён");
+                return REDIR_USERS + u.getId();
+            }
+
+            userService.adminUpdate(id, email, fullName, phone, desiredRole, enabled);
             audit.userUpdate(who, id, email);
             ra.addFlashAttribute("ok", "Сохранено");
             return REDIR_USERS + id;
@@ -516,6 +588,60 @@ public class AdminController {
             case "ROLE_EMPLOYEE" -> Role.ROLE_EMPLOYEE;
             default -> Role.ROLE_USER;
         };
+    }
+
+    /** Массовые операции: block / unblock / delete. */
+    @PostMapping("/users/bulk")
+    public String bulkUsers(@RequestParam("action") String action,
+                            @RequestParam(value = "ids", required = false) java.util.List<Long> ids,
+                            java.security.Principal auth,
+                            RedirectAttributes ra) {
+        if (ids == null || ids.isEmpty()) {
+            ra.addFlashAttribute("err", "Не выбрано ни одного пользователя");
+            return "redirect:/admin/users";
+        }
+        String who = auth != null ? auth.getName() : UNKNOWN;
+        int ok = 0, fail = 0;
+        for (Long id : ids) {
+            try {
+                User u = userRepository.findById(id).orElseThrow();
+                if (u.getRole() == Role.ROLE_ADMIN) {
+                    fail++; continue; // админа не трогаем
+                }
+                switch (action) {
+                    case "block" -> {
+                        if (!u.isEnabled()) { fail++; continue; }
+                        if (u.getRole() == Role.ROLE_EMPLOYEE) {
+                            u.setEnabled(false);
+                            userRepository.save(u);
+                        } else {
+                            userService.adminToggle(id);
+                        }
+                        ok++;
+                    }
+                    case "unblock" -> {
+                        if (u.isEnabled()) { fail++; continue; }
+                        if (u.getRole() == Role.ROLE_EMPLOYEE) {
+                            u.setEnabled(true);
+                            userRepository.save(u);
+                        } else {
+                            userService.adminToggle(id);
+                        }
+                        ok++;
+                    }
+                    case "delete" -> {
+                        userService.adminDelete(id, who);
+                        audit.userDelete(who, id, "bulk");
+                        ok++;
+                    }
+                    default -> throw new IllegalArgumentException("Неизвестное действие");
+                }
+            } catch (Exception e) {
+                fail++;
+            }
+        }
+        ra.addFlashAttribute("ok", "Готово: " + ok + " успешно, " + fail + " пропущено");
+        return "redirect:/admin/users";
     }
 
 }

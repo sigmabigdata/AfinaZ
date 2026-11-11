@@ -268,22 +268,46 @@ public class CleanupService {
 
     private Category analyzeDocker() {
         try {
-            String out = runProcess("docker", "system", "df", "--format",
-                    "{{.Type}}\t{{.Size}}\t{{.Reclaimable}}");
+            // /system/df через docker.sock (curl есть в образе)
+            String out = dockerApi("GET", "/v1.43/system/df");
+            // Грубая оценка: сумма BuildCache.Size + Images.SharedSize
             long total = 0;
-            StringBuilder note = new StringBuilder();
-            for (String line : out.split("\n")) {
-                if (line.isBlank()) continue;
-                String[] parts = line.split("\t");
-                if (parts.length < 3) continue;
-                note.append(parts[0]).append("=").append(parts[1]).append(" ");
-                String reclaim = parts[2].replaceAll("\\s*\\(.*", "").trim();
-                total += parseHumanBytes(reclaim);
-            }
-            return new Category("docker", "Docker (кэш, образы)", total, 0, note.toString().trim());
+            total += parseLongField(out, "Size", true);
+            return new Category("docker", "Docker (кэш, образы)", total, 0,
+                    "нажмите «Очистить» для prune");
         } catch (Exception e) {
-            return new Category("docker", "Docker (кэш, образы)", 0, 0, "недоступно: " + e.getMessage());
+            return new Category("docker", "Docker (кэш, образы)", 0, 0,
+                    "curl+docker.sock недоступен: " + e.getMessage());
         }
+    }
+
+    /** HTTP-вызов к docker.sock через curl. */
+    private String dockerApi(String method, String path) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(
+                "curl", "-s", "-S", "--unix-socket", "/var/run/docker.sock",
+                "-X", method, "http://localhost" + path);
+        pb.environment().clear();
+        pb.environment().put("PATH", safePath);
+        pb.redirectErrorStream(true);
+        Process p = pb.start();
+        String out = new String(p.getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+        int rc = p.waitFor();
+        if (rc != 0) throw new java.io.IOException("curl exit " + rc + ": " + out);
+        return out;
+    }
+
+    /** Парсит числовое поле JSON по имени (первое вхождение). */
+    private static long parseLongField(String json, String field, boolean any) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("\"" + java.util.regex.Pattern.quote(field) + "\"\\s*:\\s*(\\d+)")
+                .matcher(json);
+        long sum = 0;
+        while (m.find()) {
+            try { sum += Long.parseLong(m.group(1)); } catch (Exception ignored) {}
+            if (!any) break;
+        }
+        return sum;
     }
 
     // ─────────────── Очистка ───────────────
@@ -412,18 +436,36 @@ public class CleanupService {
     public CleanResult cleanDocker() {
         long freed = 0;
         StringBuilder msg = new StringBuilder();
+
+        // 1. Build cache
         try {
-            String r1 = runProcess("docker", "builder", "prune", "-a", "-f");
-            freed += parseReclaimed(r1); msg.append("cache: ").append(parseReclaimStr(r1)).append("; ");
-        } catch (Exception e) { msg.append("cache fail; "); }
+            String r = dockerApi("POST", "/v1.43/build/prune?all=true");
+            long f = parseLongField(r, "SpaceReclaimed", false);
+            freed += f;
+            msg.append("cache: ").append(formatBytes(f)).append("; ");
+        } catch (Exception e) {
+            log.warn("docker build prune: {}", e.getMessage());
+            msg.append("cache fail; ");
+        }
+
+        // 2. Unused images
         try {
-            String r2 = runProcess("docker", "image", "prune", "-a", "-f");
-            freed += parseReclaimed(r2); msg.append("images: ").append(parseReclaimStr(r2)).append("; ");
-        } catch (Exception e) { msg.append("images fail; "); }
+            String r = dockerApi("POST", "/v1.43/images/prune?all=true");
+            long f = parseLongField(r, "SpaceReclaimed", false);
+            freed += f;
+            msg.append("images: ").append(formatBytes(f)).append("; ");
+        } catch (Exception e) {
+            log.warn("docker image prune: {}", e.getMessage());
+            msg.append("images fail; ");
+        }
+
+        // 3. Stopped containers (без volumes)
         try {
-            String r3 = runProcess("docker", "container", "prune", "-f");
-            msg.append("containers: ").append(parseReclaimStr(r3)).append("; ");
-        } catch (Exception e) { msg.append("containers fail; "); }
+            dockerApi("POST", "/v1.43/containers/prune");
+            msg.append("containers: pruned; ");
+        } catch (Exception e) {
+            msg.append("containers fail; ");
+        }
 
         return new CleanResult("docker", freed, 0,
                 "Docker: " + formatBytes(freed) + " (" + msg + ")");

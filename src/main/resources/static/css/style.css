@@ -3212,3 +3212,47 @@ table.audit-table td:nth-child(1) { white-space: nowrap; }  /* время */
 table.audit-table td:nth-child(2) { white-space: nowrap; }  /* event_type — 1 строка */
 table.audit-table td:nth-child(3) { white-space: nowrap; }  /* badge */
 table.audit-table td:nth-child(5) { white-space: nowrap; }  /* IP */
+
+/* ============================================================
+   Массовые операции в списке клиентов
+   ============================================================ */
+.user-row-check {
+    width: 16px; height: 16px; cursor: pointer; accent-color: #2454ff;
+    margin: 0 4px 0 0; flex-shrink: 0;
+}
+.bulk-bar {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    background: #1f2430; color: #fff;
+    padding: 10px 16px; border-radius: 999px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+    display: flex; align-items: center; gap: 12px;
+    z-index: 10000; font-size: 13px;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.bulk-bar.visible { transform: translateX(-50%) translateY(0); }
+.bulk-bar > span { color: #cfd6e4; }
+.bulk-bar > span b { color: #fff; }
+.bulk-btn {
+    background: #2454ff; color: #fff; border: none;
+    padding: 7px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    font-family: inherit; white-space: nowrap;
+}
+.bulk-btn:hover { background: #1a3fd6; }
+.bulk-btn-danger { background: #d33; }
+.bulk-btn-danger:hover { background: #b02020; }
+.bulk-btn-ghost {
+    background: transparent; border: 1px solid rgba(255,255,255,0.2);
+}
+.bulk-btn-ghost:hover { background: rgba(255,255,255,0.1); }
+
+/* Разделы клиента — строки в списке */
+.folder-icon-sm {
+    width: 36px; height: 36px; flex-shrink: 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #e6efff, #f0f4ff);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px;
+}
+.folder-row { text-decoration: none; color: inherit; }
