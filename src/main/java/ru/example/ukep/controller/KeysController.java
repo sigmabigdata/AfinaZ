@@ -52,6 +52,8 @@ public class KeysController {
         model.addAttribute("downloadCount", keys.getDownloadCount());
         model.addAttribute("daysSinceLastBackup", keys.daysSinceLastBackup());
         model.addAttribute("minPasswordLength", MIN_PASSWORD_LENGTH);
+        model.addAttribute("piiVersion", keys.getPiiCurrentVersion());
+        model.addAttribute("fileVersion", keys.getFileCurrentVersion());
         return "admin-keys";
     }
 
@@ -187,4 +189,36 @@ public class KeysController {
                 Для распаковки: 7z x afina-keys-*.zip   (или zip4j, WinRAR 5+)
                 """.formatted(LocalDate.now());
     }
+    @PostMapping("/rotate/pii")
+    public String rotatePii(java.security.Principal auth, RedirectAttributes ra) {
+        try {
+            int v = keys.rotatePii();
+            audit.event("KEYS_ROTATE_PII", "SUCCESS",
+                    auth != null ? auth.getName() : "unknown", "KEYS", "pii", null,
+                    "new version v" + v);
+            ra.addFlashAttribute("ok", "Ключ PII ротирован → v" + v +
+                    " (старые данные остаются расшифровываемыми)");
+        } catch (Exception e) {
+            log.error("rotatePii failed", e);
+            ra.addFlashAttribute("err", "Ошибка ротации PII: " + e.getMessage());
+        }
+        return REDIR_KEYS;
+    }
+
+    @PostMapping("/rotate/file")
+    public String rotateFile(java.security.Principal auth, RedirectAttributes ra) {
+        try {
+            int v = keys.rotateFile();
+            audit.event("KEYS_ROTATE_FILE", "SUCCESS",
+                    auth != null ? auth.getName() : "unknown", "KEYS", "file", null,
+                    "new version v" + v);
+            ra.addFlashAttribute("ok", "Ключ файлов ротирован → v" + v +
+                    " (старые файлы остаются читаемыми)");
+        } catch (Exception e) {
+            log.error("rotateFile failed", e);
+            ra.addFlashAttribute("err", "Ошибка ротации файлов: " + e.getMessage());
+        }
+        return REDIR_KEYS;
+    }
+
 }

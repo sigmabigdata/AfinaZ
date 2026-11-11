@@ -26,15 +26,20 @@ public class KeysService {
     private final Path piiKeyPath;
     private final SettingsService settings;
 
+    private final ru.example.ukep.security.PiiEncryptor piiEncryptor;
+    private final FileEncryptor fileEncryptor;
+
     public KeysService(
-            @Value("${app.file-encryption-key-path:/opt/afinaz/secrets/file.key}")
-            String fileKey,
-            @Value("${app.pii-key-path:/opt/afinaz/secrets/pii.key}")
-            String piiKey,
-            SettingsService settings) {
+            @Value("${app.file-encryption-key-path:/opt/afinaz/secrets/file.key}") String fileKey,
+            @Value("${app.pii-key-path:/opt/afinaz/secrets/pii.key}") String piiKey,
+            SettingsService settings,
+            ru.example.ukep.security.PiiEncryptor piiEncryptor,
+            FileEncryptor fileEncryptor) {
         this.fileKeyPath = Path.of(fileKey);
         this.piiKeyPath = Path.of(piiKey);
         this.settings = settings;
+        this.piiEncryptor = piiEncryptor;
+        this.fileEncryptor = fileEncryptor;
     }
 
     public record KeyInfo(
@@ -129,4 +134,22 @@ public class KeysService {
 
     public Path getFileKeyPath() { return fileKeyPath; }
     public Path getPiiKeyPath() { return piiKeyPath; }
+    // ==================== Ротация ====================
+
+    public int rotatePii() throws java.io.IOException {
+        return piiEncryptor.rotate();
+    }
+
+    public int rotateFile() throws java.io.IOException {
+        return fileEncryptor.rotate();
+    }
+
+    public int getPiiCurrentVersion() {
+        return piiEncryptor.getCurrentVersion();
+    }
+
+    public int getFileCurrentVersion() {
+        return fileEncryptor.getCurrentVersion();
+    }
+
 }

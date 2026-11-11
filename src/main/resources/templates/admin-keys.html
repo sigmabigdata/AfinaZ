@@ -99,6 +99,61 @@
         </p>
     </section>
 
+    <!-- Ротация ключей -->
+    <section class="panel">
+        <div class="panel-head">
+            <h2 style="margin:0">🔄 Ротация ключей шифрования</h2>
+        </div>
+        <p class="muted small" style="margin-top:0;">
+            При ротации создаётся новая версия ключа (v+1). Новые данные шифруются новым ключом,
+            старые — остаются расшифровываемыми старым. Это безопасно и не требует простоя.
+            <br>
+            Полная перешифровка старых данных <b>не выполняется автоматически</b> —
+            старые файлы и записи PII просто используют ту версию, с которой были созданы.
+        </p>
+
+        <table class="docs" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Тип ключа</th>
+                    <th>Текущая версия</th>
+                    <th style="width:200px;">Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><b>PII</b> (email, телефон, ФИО, имена файлов)</td>
+                    <td><span class="badge ok" th:text="'v' + ${piiVersion}">v1</span></td>
+                    <td>
+                        <form method="post" th:action="@{/admin/keys/rotate/pii}"
+                              onsubmit="return confirm('Ротировать ключ PII? Новые данные будут шифроваться новым ключом. Старые останутся читаемыми. Продолжить?');"
+                              style="margin:0;">
+                            <button type="submit" class="btn">🔄 Ротировать PII</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr>
+                    <td><b>Файлы документов</b> (AES-256-GCM)</td>
+                    <td><span class="badge ok" th:text="'v' + ${fileVersion}">v1</span></td>
+                    <td>
+                        <form method="post" th:action="@{/admin/keys/rotate/file}"
+                              onsubmit="return confirm('Ротировать ключ файлов? Новые файлы будут шифроваться новым ключом. Старые останутся читаемыми. Продолжить?');"
+                              style="margin:0;">
+                            <button type="submit" class="btn">🔄 Ротировать файлы</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="alert info" style="margin-top:16px;">
+            <b>Как это работает:</b> в шифротексте PII хранится префикс <code>vN:</code>,
+            а в каждом файле — запись <code>documents.key_version = vN</code>.
+            При расшифровке приложение автоматически выбирает нужный ключ.
+            Старые ключи хранятся в <code>secrets/keys/</code> и не удаляются.
+        </div>
+    </section>
+
     <!-- Что делать с бэкапом -->
     <section class="panel">
         <h2>Что делать со скачанным архивом</h2>
