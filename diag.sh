@@ -133,7 +133,8 @@ H_EXT=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 15 "$APP_URL/actuator
 STARTED=$(docker logs afina-app 2>&1 | grep -c "Started UkepSignApplication" || echo "0")
 [ "$STARTED" -ge 1 ] && pass "приложение стартовало ($STARTED раз в логе)" || fail "приложение не стартовало"
 
-ERR_COUNT=$(docker logs afina-app --since 1h 2>&1 | grep -c " ERROR " || echo "0")
+ERR_COUNT=$(docker logs afina-app --since 1h 2>&1 | grep -c " ERROR " 2>/dev/null | head -1)
+[ -z "$ERR_COUNT" ] && ERR_COUNT=0
 [ "$ERR_COUNT" -eq 0 ] && pass "логи за час: 0 ERROR" \
     || { [ "$ERR_COUNT" -lt 5 ] && warn "логи за час: $ERR_COUNT ERROR" || fail "логи за час: $ERR_COUNT ERROR"; }
 
@@ -200,8 +201,9 @@ for k in file pii; do
             if [ -f "$ACTIVE" ]; then
                 SIZE=$(stat -c '%s' "$ACTIVE" 2>/dev/null || stat -f '%z' "$ACTIVE")
                 PERM=$(stat -c '%a' "$ACTIVE" 2>/dev/null || stat -f '%p' "$ACTIVE" | tail -c 4)
-                [ "$SIZE" = "45" ] && pass "$k.key: $EXIST версий, активна v$CUR, 45B" \
-                    || fail "$k.key v$CUR: размер $SIZE ≠ 45"
+                DECODED=$(base64 -d "$ACTIVE" 2>/dev/null | wc -c | tr -d ' ')
+                [ "$DECODED" = "32" ] && pass "$k.key: $EXIST версий, активна v$CUR, 32B decoded ($SIZE B base64)" \
+                    || fail "$k.key v$CUR: decoded $DECODED ≠ 32 (файл $SIZE B)"
                 [ "$PERM" = "600" ] && pass "$k.key v$CUR: права 600" || warn "$k.key v$CUR: права $PERM ≠ 600"
             else
                 fail "$k.key: .current указывает на v$CUR, но файл отсутствует"
@@ -294,13 +296,13 @@ MAIL_HOST=$(docker exec afina-app sh -c 'echo "${MAIL_HOST:-localhost}"' 2>/dev/
 MAIL_PORT=$(docker exec afina-app sh -c 'echo "${MAIL_PORT:-25}"' 2>/dev/null)
 info "SMTP: $MAIL_HOST:$MAIL_PORT"
 
-SMTP_TEST=$(docker exec afina-app sh -c "timeout 5 sh -c 'echo QUIT | nc -w 3 ${MAIL_HOST} ${MAIL_PORT}' 2>&1 || echo FAIL" 2>/dev/null)
-if echo "$SMTP_TEST" | grep -qE "220|221|250|OK"; then
-    pass "SMTP: соединение с $MAIL_HOST:$MAIL_PORT OK"
-elif echo "$SMTP_TEST" | grep -qE "nc.*not found|FAIL"; then
-    warn "SMTP: nc недоступен в контейнере, проверить вручную"
+SMTP_TEST=$(docker exec afina-app bash -c "
+  timeout 5 bash -c 'exec 3<>/dev/tcp/${MAIL_HOST}/${MAIL_PORT}; head -1 <&3' 2>/dev/null
+" 2>/dev/null | head -1)
+if echo "$SMTP_TEST" | grep -q "^220"; then
+    pass "SMTP: $MAIL_HOST:$MAIL_PORT → ${SMTP_TEST:0:50}"
 else
-    warn "SMTP: соединение с $MAIL_HOST:$MAIL_PORT не удалось (см. .env.prod)"
+    warn "SMTP: соединение с $MAIL_HOST:$MAIL_PORT не удалось (результат: ${SMTP_TEST:0:50})"
 fi
 
 SMTP_DB_HOST=$(psql_q "SELECT COALESCE(value, '') FROM app_settings WHERE key = 'smtp.host'")
@@ -472,8 +474,20 @@ check_http "/admin/login" 200 "admin/login GET"
 check_http "/admin" 302 "admin (без авторизации → login)"
 check_http "/admin/users" 302 "admin/users (без авторизации)"
 check_http "/admin/system" 302 "admin/system (без авторизации)"
-check_http "/api/search" 401 "api/search (без авторизации)"
-check_http "/api/templates" 401 "api/templates (без авторизации)"
+# API endpoints возвращают 401 при Accept: application/json, 302 без него
+api_code() {
+    local path="$1" name="$2"
+    local code
+    code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 \
+           -H "Accept: application/json" "$APP_URL$path" 2>/dev/null)
+    if [ "$code" = "401" ]; then
+        pass "$name: $path → 401"
+    else
+        fail "$name: $path → $code (ожидалось 401 с Accept: application/json)"
+    fi
+}
+api_code "/api/search" "api/search (без авторизации)"
+api_code "/api/templates" "api/templates (без авторизации)"
 check_http "/css/style.css" 200 "static css"
 
 # ═══════════════════════════════════════════════════════════
