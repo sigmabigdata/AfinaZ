@@ -95,6 +95,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 90s
+    # GID docker-группы на хосте — нужен для доступа к /var/run/docker.sock
+    # (cleanup docker из UI). На сервере: stat -c '%g' /var/run/docker.sock
+    group_add:
+      - "1000"
     restart: unless-stopped
     networks:
       - afina
