@@ -78,6 +78,7 @@ services:
       - ./crls:/app/crls
       - ./certs:/app/certs:ro
       - ./secrets:/opt/afinaz/secrets:ro
+      - ./secrets/keys:/opt/afinaz/secrets/keys:rw
       # Только для /admin/system/cleanup. --volumes НИКОГДА не передаётся.
       - /var/run/docker.sock:/var/run/docker.sock
       - ./angie-certs:/opt/afinaz/angie-certs
