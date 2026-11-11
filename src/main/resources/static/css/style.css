@@ -3256,3 +3256,15 @@ table.audit-table td:nth-child(5) { white-space: nowrap; }  /* IP */
     font-size: 18px;
 }
 .folder-row { text-decoration: none; color: inherit; }
+
+/* Сотрудник — промежуточный стиль между клиентом и админом */
+.user-row-employee {
+    background: linear-gradient(90deg, #fdf9f0 0%, #ffffff 60%);
+}
+.user-row-employee:hover {
+    background: linear-gradient(90deg, #fbf4e2 0%, #fdf9f0 60%);
+}
+.user-avatar-employee {
+    background: linear-gradient(135deg, #c49a6c, #a67c52);
+    box-shadow: 0 2px 6px rgba(166,124,82,0.25);
+}

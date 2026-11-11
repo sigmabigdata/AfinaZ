@@ -56,14 +56,15 @@
     </div>
 
     <th:block th:if="${not #lists.isEmpty(users)}">
-        <th:block th:with="admins=${users.?[role.name() == 'ROLE_ADMIN' or role.name() == 'ROLE_EMPLOYEE']},
+        <th:block th:with="admins=${users.?[role.name() == 'ROLE_ADMIN']},
+                         employees=${users.?[role.name() == 'ROLE_EMPLOYEE']},
                          clients=${users.?[role.name() == 'ROLE_USER']}">
 
-            <!-- Секция «Сотрудники и администраторы» -->
+            <!-- Секция «Администраторы» -->
             <section th:if="${not #lists.isEmpty(admins)}" class="user-section">
                 <h2 class="user-section-title">
                     <span class="user-section-icon">🛡️</span>
-                    Сотрудники и администраторы
+                    Администраторы
                     <span class="user-section-count" th:text="${#lists.size(admins)}">0</span>
                 </h2>
                 <div class="user-list">
@@ -76,7 +77,7 @@
                              th:text="${#strings.substring(u.fullName, 0, 1)}">И</div>
                         <div class="user-row-main">
                             <div class="user-row-name" th:text="${u.fullName}">Иванов Иван Иванович</div>
-                            <div class="user-row-sub" th:text="${u.role.name() == 'ROLE_ADMIN' ? 'Администратор' : 'Сотрудник'}">Роль</div>
+                            <div class="user-row-sub">Администратор</div>
                         </div>
                         <div class="user-row-cell user-row-phone">
                             <span th:text="${u.phone} ?: '—'">—</span>
@@ -93,7 +94,50 @@
                                class="action-icon" title="Редактировать">✎</a>
                             <form method="post"
                                   th:action="@{'/admin/users/' + ${u.id} + '/delete'}"
-                                  onsubmit="return confirm('Удалить пользователя?');"
+                                  onsubmit="return confirm('Удалить администратора?');"
+                                  style="display:inline; margin:0;">
+                                <button type="submit" class="action-icon action-danger" title="Удалить">🗑</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Секция «Сотрудники» -->
+            <section th:if="${not #lists.isEmpty(employees)}" class="user-section">
+                <h2 class="user-section-title">
+                    <span class="user-section-icon">👔</span>
+                    Сотрудники
+                    <span class="user-section-count" th:text="${#lists.size(employees)}">0</span>
+                </h2>
+                <div class="user-list">
+                    <div th:each="u : ${employees}"
+                         class="user-row user-row-employee"
+                         th:attr="data-href=@{'/admin/users/' + ${u.id}}">
+                        <input sec:authorize="hasRole('ADMIN')" type="checkbox"
+                               class="user-row-check" th:attr="data-id=${u.id}"/>
+                        <div class="user-avatar-sm user-avatar-employee"
+                             th:text="${#strings.substring(u.fullName, 0, 1)}">И</div>
+                        <div class="user-row-main">
+                            <div class="user-row-name" th:text="${u.fullName}">Иванов Иван Иванович</div>
+                            <div class="user-row-sub">Сотрудник</div>
+                        </div>
+                        <div class="user-row-cell user-row-phone">
+                            <span th:text="${u.phone} ?: '—'">—</span>
+                        </div>
+                        <div class="user-row-cell user-row-date">
+                            <span th:text="${#temporals.format(u.createdAt,'dd.MM.yyyy')}">—</span>
+                        </div>
+                        <div class="user-row-cell user-row-status">
+                            <span th:if="${u.enabled}" class="badge ok">Активен</span>
+                            <span th:unless="${u.enabled}" class="badge warn">Заблокирован</span>
+                        </div>
+                        <div class="user-row-actions">
+                            <a th:href="@{'/admin/users/' + ${u.id} + '/edit'}"
+                               class="action-icon" title="Редактировать">✎</a>
+                            <form method="post"
+                                  th:action="@{'/admin/users/' + ${u.id} + '/delete'}"
+                                  onsubmit="return confirm('Удалить сотрудника?');"
                                   style="display:inline; margin:0;">
                                 <button type="submit" class="action-icon action-danger" title="Удалить">🗑</button>
                             </form>
