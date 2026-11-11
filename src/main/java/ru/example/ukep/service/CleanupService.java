@@ -270,84 +270,55 @@ public class CleanupService {
      * Считает reclaimable Docker-мусор (build cache + unused images + stopped containers).
      * Volumes НЕ учитываются — они не удаляются (там БД и angie_data).
      *
-     * /system/df возвращает массивы с полями:
-     *   Images[].Size, Images[].Containers (0 = unused)
-     *   BuildCache[].Size, BuildCache[].InUse (false = unused)
-     *   Containers[].SizeRw (только для stopped)
+     * Использует Jackson для точного подсчёта с учётом SharedSize.
+     * Без вычитания SharedSize сумма Size всех образов раздувается в 10-20 раз,
+     * так как каждый слой учитывается в каждом образе.
      */
     private Category analyzeDocker() {
         try {
             String out = dockerApi("GET", "/v1.43/system/df");
+            com.fasterxml.jackson.databind.JsonNode root = 
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(out);
             long total = 0;
 
-            // 1. Unused images (Containers==0)
-            total += sumJsonFieldByPredicate(out, "Images", "Size",
-                    obj -> obj.contains("\"Containers\":0"));
-            // 2. Build cache не в использовании
-            total += sumJsonFieldByPredicate(out, "BuildCache", "Size",
-                    obj -> obj.contains("\"InUse\":false"));
+            // 1. Unused images: вычитаем SharedSize
+            com.fasterxml.jackson.databind.JsonNode images = root.path("Images");
+            if (images.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode img : images) {
+                    if (img.path("Containers").asInt(1) == 0) {
+                        long size = img.path("Size").asLong(0);
+                        long shared = img.path("SharedSize").asLong(0);
+                        total += Math.max(0, size - shared);
+                    }
+                }
+            }
+
+            // 2. Build Cache: только InUse == false
+            com.fasterxml.jackson.databind.JsonNode cache = root.path("BuildCache");
+            if (cache.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode c : cache) {
+                    if (!c.path("InUse").asBoolean(true)) {
+                        total += c.path("Size").asLong(0);
+                    }
+                }
+            }
+
             // 3. Stopped containers
-            total += sumJsonFieldByPredicate(out, "Containers", "SizeRw",
-                    obj -> obj.contains("\"State\":\"exited\""));
+            com.fasterxml.jackson.databind.JsonNode containers = root.path("Containers");
+            if (containers.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode c : containers) {
+                    if ("exited".equals(c.path("State").asText())) {
+                        total += c.path("SizeRw").asLong(0);
+                    }
+                }
+            }
 
             return new Category("docker", "Docker (кэш, образы)", total, 0,
-                    "reclaimable: cache + unused images + stopped containers");
+                    "reclaimable: cache + unused images (без shared-слоёв) + stopped containers");
         } catch (Exception e) {
             return new Category("docker", "Docker (кэш, образы)", 0, 0,
                     "curl+docker.sock недоступен: " + e.getMessage());
         }
-    }
-
-    /**
-     * Суммирует числовое поле {@code numField} в массиве {@code arrayName},
-     * но только для тех элементов, что проходят {@code predicate}.
-     *
-     * Простой парсер без библиотек: находит "arrayName":[...] и внутри
-     * режет на объекты по "{" ... "}", фильтрует predicate, выдёргивает numField.
-     */
-    private static long sumJsonFieldByPredicate(String json, String arrayName,
-                                                 String numField,
-                                                 java.util.function.Predicate<String> predicate) {
-        int arrStart = json.indexOf("\"" + arrayName + "\":[");
-        if (arrStart < 0) return 0;
-        arrStart = json.indexOf('[', arrStart) + 1;
-
-        // Найдём конец массива: балансировка скобок
-        int depth = 1;
-        int arrEnd = arrStart;
-        for (int i = arrStart; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (c == '[') depth++;
-            else if (c == ']') { depth--; if (depth == 0) { arrEnd = i; break; } }
-        }
-        String arrBody = json.substring(arrStart, arrEnd);
-
-        // Разбиваем на объекты по верхнеуровневым { ... }
-        long sum = 0;
-        int objStart = -1;
-        int braceDepth = 0;
-        for (int i = 0; i < arrBody.length(); i++) {
-            char c = arrBody.charAt(i);
-            if (c == '{') {
-                if (braceDepth == 0) objStart = i;
-                braceDepth++;
-            } else if (c == '}') {
-                braceDepth--;
-                if (braceDepth == 0 && objStart >= 0) {
-                    String obj = arrBody.substring(objStart, i + 1);
-                    if (predicate.test(obj)) {
-                        java.util.regex.Matcher m = java.util.regex.Pattern
-                                .compile("\"" + java.util.regex.Pattern.quote(numField) + "\"\\s*:\\s*(\\d+)")
-                                .matcher(obj);
-                        if (m.find()) {
-                            try { sum += Long.parseLong(m.group(1)); } catch (Exception ignored) {}
-                        }
-                    }
-                    objStart = -1;
-                }
-            }
-        }
-        return sum;
     }
 
     /** HTTP-вызов к docker.sock через curl. */
