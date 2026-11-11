@@ -116,7 +116,7 @@ public class DocumentService {
         doc.setSize(original.length);
         doc.setFileSha256(sha256Bytes(original));
         doc.setEncryptionIv(enc.ivBase64());
-        doc.setKeyVersion("v1");
+        doc.setKeyVersion("v" + enc.version());
         doc.setEncrypted(true);
         doc.setOwner(owner);
         doc.setFolder(folder);
@@ -142,7 +142,12 @@ public class DocumentService {
         }
         byte[] raw = Files.readAllBytes(p);
         if (!doc.isEncrypted()) return raw;
-        return encryptor.decrypt(raw);
+        int version = 1;
+        String kv = doc.getKeyVersion();
+        if (kv != null && kv.startsWith("v")) {
+            try { version = Integer.parseInt(kv.substring(1)); } catch (Exception ignored) { }
+        }
+        return encryptor.decrypt(raw, version);
     }
 
     public Resource loadAsResource(Document doc) throws IOException {
