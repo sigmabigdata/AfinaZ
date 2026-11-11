@@ -36,8 +36,9 @@ public class CrlService {
             long sizeBytes,
             String sizePretty,
             String issuer,
-            Instant lastUpdate,
-            Instant nextUpdate,
+            Instant lastUpdate,        // "This Update" из самого CRL (дата выпуска CA)
+            Instant nextUpdate,        // "Next Update" из CRL (до какой даты действует)
+            Instant downloadedAt,      // mtime файла = когда реально скачали на сервер
             long daysToExpiry,
             boolean manual
     ) {}
@@ -66,6 +67,7 @@ public class CrlService {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             X509CRL crl = (X509CRL) cf.generateCRL(is);
             long size = Files.size(f);
+            Instant downloadedAt = Files.getLastModifiedTime(f).toInstant();
 
             Instant lastUpdate = crl.getThisUpdate() != null
                     ? crl.getThisUpdate().toInstant() : null;
@@ -81,7 +83,7 @@ public class CrlService {
             return new CrlInfo(
                     name, size, prettySize(size),
                     crl.getIssuerX500Principal().getName(),
-                    lastUpdate, nextUpdate, daysToExpiry, manual);
+                    lastUpdate, nextUpdate, downloadedAt, daysToExpiry, manual);
         } catch (Exception e) {
             log.warn("Не удалось разобрать {}: {}", f.getFileName(), e.getMessage());
             return null;
