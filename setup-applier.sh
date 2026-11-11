@@ -67,6 +67,11 @@ while true; do
                 up -d --force-recreate --no-deps app >> "$LOG" 2>&1; then
             log "✓ app пересоздан с новыми env vars"
             rm -f "$MARKER" "$ENV_NEW"
+
+            # Ротация .env.prod.bak — оставляем последние 3
+            ls -t .env.prod.bak.* 2>/dev/null | tail -n +4 | xargs -r rm -f
+            log "✓ ротация .env.prod.bak (≤3)"
+
             log "✓ маркеры очищены — setup завершён"
         else
             log "✗ docker compose up failed — откат .env.prod"
