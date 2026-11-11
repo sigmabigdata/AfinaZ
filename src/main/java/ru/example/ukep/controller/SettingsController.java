@@ -70,6 +70,11 @@ public class SettingsController {
         model.addAttribute("requireCrl", settings.getBoolOrDefault("signature.require_crl", false));
         model.addAttribute("adminIpWhitelist", settings.getOrDefault("admin.ip_whitelist", ""));
         model.addAttribute("envAdminIpWhitelist", envAdminIpWhitelist);
+        model.addAttribute("tokenTtlHours", settings.getIntOrDefault("auth.token_ttl_hours", 10));
+        model.addAttribute("loginSubject",
+                settings.getOrDefault("email.login.subject", ""));
+        model.addAttribute("loginBody",
+                settings.getOrDefault("email.login.body", ""));
         // SMTP-значения для формы (пароль маскируем)
         model.addAttribute("smtpHost", settings.getOrDefault(K_SMTP_HOST, ""));
         model.addAttribute("smtpPort", settings.getOrDefault(K_SMTP_PORT, "465"));
@@ -96,6 +101,9 @@ public class SettingsController {
                        @RequestParam(required = false) String rateLimitWindow,
                        @RequestParam(required = false) String requireCrl,
                        @RequestParam(required = false) String adminIpWhitelist,
+                       @RequestParam(required = false) String tokenTtlHours,
+                       @RequestParam(required = false) String loginSubject,
+                       @RequestParam(required = false) String loginBody,
                        @RequestParam(required = false) String smtpHost,
                        @RequestParam(required = false) String smtpPort,
                        @RequestParam(required = false) String smtpUsername,
@@ -115,6 +123,22 @@ public class SettingsController {
             settings.set("signature.require_crl", requireCrl != null ? "true" : FALSE, who);
             String ipWhitelistVal = adminIpWhitelist == null ? "" : adminIpWhitelist.trim();
             settings.set("admin.ip_whitelist", ipWhitelistVal, who);
+
+            // TTL magic-link: допустимо 1..720 часов
+            int ttl = 10;
+            try {
+                ttl = tokenTtlHours != null && !tokenTtlHours.isBlank()
+                        ? Integer.parseInt(tokenTtlHours.trim()) : 10;
+            } catch (Exception ignored) { }
+            if (ttl < 1) ttl = 1;
+            if (ttl > 720) ttl = 720;
+            settings.set("auth.token_ttl_hours", String.valueOf(ttl), who);
+
+            // Тема и тело письма (пусто → фолбэк в EmailService)
+            settings.set("email.login.subject",
+                    loginSubject != null ? loginSubject.trim() : "", who);
+            settings.set("email.login.body",
+                    loginBody != null ? loginBody : "", who);
             if ("*".equals(ipWhitelistVal)) {
                 log.warn("⚠ ADMIN IP whitelist = * (разрешены все IP). by={}", who);
             }

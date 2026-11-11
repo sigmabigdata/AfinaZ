@@ -117,6 +117,44 @@
             </div>
         </div>
 
+        <h2>Email — письмо со ссылкой для входа</h2>
+
+        <div class="alert info" style="margin-bottom:14px;">
+            Плейсхолдеры в теле письма:
+            <code>{user_name}</code> — ФИО получателя,
+            <code>{token_url}</code> — ссылка для входа,
+            <code>{expires_hours}</code> — срок действия в часах.
+            <br>
+            Пусто → используется шаблон по умолчанию из кода.
+        </div>
+
+        <div class="form-field">
+            <label>Время действия magic-link (часы)</label>
+            <input type="number" name="tokenTtlHours" min="1" max="720"
+                   th:value="${tokenTtlHours}"/>
+            <div class="hint">По умолчанию 10. Диапазон: 1–720.</div>
+        </div>
+
+        <div class="form-field">
+            <label>Тема письма</label>
+            <input type="text" name="loginSubject"
+                   th:value="${loginSubject}"
+                   placeholder='ПАО "НБД-Банк" · Ссылка для входа'/>
+        </div>
+
+        <div class="form-field">
+            <label>Текст письма</label>
+            <textarea name="loginBody" rows="10"
+                      style="width:100%; padding:10px 12px; border:1px solid #cfd6e4;
+                             border-radius:8px; font-size:13px; font-family:inherit;
+                             resize:vertical;"
+                      th:text="${loginBody}"
+                      placeholder="Здравствуйте, {user_name}!"></textarea>
+            <div class="hint">
+                HTML не поддерживается — обычный текст. Переносы строк сохраняются.
+            </div>
+        </div>
+
         <h2>SMTP (отправка email)</h2>
 
         <div class="alert warn" style="margin-bottom:16px">

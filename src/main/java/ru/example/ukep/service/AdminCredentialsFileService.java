@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import ru.example.ukep.entity.Role;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -48,12 +49,19 @@ public class AdminCredentialsFileService {
 
     /** Разбирает строку «CN|SNILS». Возвращает null, если строка невалидна. */
     private AdminRecord parseLine(String s) {
-        String[] parts = s.split("\\|", 2);
+        String[] parts = s.split("\\|", 3);
         if (parts.length < 2) return null;
         String cn = normalizeCn(parts[0]);
         String snils = normalizeSnils(parts[1].trim());
         if (cn.isEmpty() || snils.isEmpty()) return null;
-        return new AdminRecord(cn, snils);
+        Role role = Role.ROLE_ADMIN;  // default
+        if (parts.length >= 3) {
+            String r = parts[2].trim().toLowerCase();
+            if ("employee".equals(r) || "сотрудник".equals(r) || "role_employee".equals(r)) {
+                role = Role.ROLE_EMPLOYEE;
+            }
+        }
+        return new AdminRecord(cn, snils, role);
     }
 
     /** Ищет администратора по CN и СНИЛС (с нормализацией Unicode и пробелов). */
@@ -88,7 +96,8 @@ public class AdminCredentialsFileService {
         lines.add("# admins.env — автоматически управляется приложением");
         lines.add("# формат: CN|SNILS");
         for (AdminRecord r : list) {
-            lines.add(r.cn() + "|" + r.snils());
+            String roleSuffix = (r.role() == Role.ROLE_EMPLOYEE) ? "|employee" : "";
+            lines.add(r.cn() + "|" + r.snils() + roleSuffix);
         }
         try {
             Files.write(Path.of(adminsFilePath), lines, StandardCharsets.UTF_8);
@@ -102,5 +111,5 @@ public class AdminCredentialsFileService {
         return snils == null ? "" : snils.replaceAll("\\D", "");
     }
 
-    public record AdminRecord(String cn, String snils) {}
+    public record AdminRecord(String cn, String snils, Role role) {}
 }

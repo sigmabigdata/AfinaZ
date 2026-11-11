@@ -119,12 +119,13 @@ public class AdminCertAuthController {
             }
 
             // 5. Создаём/находим запись в БД и логиним
-            User user = userService.upsertAdminByCert(admin.get().cn(), admin.get().snils());
+            User user = userService.upsertAdminByCert(
+                    admin.get().cn(), admin.get().snils(), admin.get().role());
 
             var details = org.springframework.security.core.userdetails.User
                     .withUsername(user.getEmail())
                     .password("{noop}cert")
-                    .authorities(List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                    .authorities(List.of(new SimpleGrantedAuthority(user.getRole().name())))
                     .build();
 
             var auth = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());

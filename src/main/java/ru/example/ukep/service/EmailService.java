@@ -41,19 +41,38 @@ public class EmailService {
         this.audit = audit;
     }
 
-    public void sendLoginLink(String to, String loginUrl) {
-        String subject = "ПАО \"НБД-Банк\" · Ссылка для входа";
-        String body = """
-                Здравствуйте!
+    private static final String DEFAULT_LOGIN_SUBJECT =
+            "ПАО \"НБД-Банк\" · Ссылка для входа";
+    private static final String DEFAULT_LOGIN_BODY =
+            "Здравствуйте!\n\n"
+            + "Для входа в личный кабинет ПАО \"НБД-Банк\" перейдите по ссылке:\n"
+            + "{token_url}\n\n"
+            + "Ссылка действует {expires_hours} часов и может быть использована один раз.\n"
+            + "Если вы не запрашивали вход — просто проигнорируйте это письмо.";
 
-                Для входа в личный кабинет ПАО "НБД-Банк" перейдите по ссылке:
-                %s
+    /**
+     * Отправка magic-link. Тема/тело/TTL берутся из app_settings
+     * (email.login.subject, email.login.body, auth.token_ttl_hours),
+     * с фолбэком на константы.
+     */
+    public void sendLoginLink(String to, String loginUrl, String userName) {
+        int ttlHours = settings.getIntOrDefault("auth.token_ttl_hours", 10);
+        String subject = settings.getOrDefault("email.login.subject", DEFAULT_LOGIN_SUBJECT);
+        String bodyTpl = settings.getOrDefault("email.login.body", DEFAULT_LOGIN_BODY);
 
-                Ссылка действует 10 часов и может быть использована только один раз.
-                Если вы не запрашивали вход — просто проигнорируйте это письмо.
-                """.formatted(loginUrl).replace("\n", System.lineSeparator());
+        String nameForBody = (userName != null && !userName.isBlank()) ? userName : "клиент";
+        String body = bodyTpl
+                .replace("{user_name}", nameForBody)
+                .replace("{token_url}", loginUrl)
+                .replace("{expires_hours}", String.valueOf(ttlHours))
+                .replace("\\n", System.lineSeparator());
 
         send(to, subject, body);
+    }
+
+    /** Совместимость со старым API. */
+    public void sendLoginLink(String to, String loginUrl) {
+        sendLoginLink(to, loginUrl, null);
     }
 
     public void sendAlert(String to, int failCount, String reason) {

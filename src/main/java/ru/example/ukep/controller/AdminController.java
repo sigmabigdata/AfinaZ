@@ -160,7 +160,7 @@ public class AdminController {
         if (link == null) {
             ra.addFlashAttribute("err", "Не удалось создать ссылку");
         } else {
-            emailService.sendLoginLink(u.getEmail(), link);
+            emailService.sendLoginLink(u.getEmail(), link, u.getFullName());
             ra.addFlashAttribute("ok", "Ссылка отправлена на " + u.getEmail());
         }
         return REDIR_USERS + id;
@@ -178,10 +178,12 @@ public class AdminController {
                              @RequestParam(required = false) String fullName,
                              @RequestParam(required = false) String phone,
                              @RequestParam(defaultValue = "false") boolean enabled,
+                             @RequestParam(required = false) String role,
                              java.security.Principal auth,
                              RedirectAttributes ra) {
         try {
-            User u = userService.adminCreate(email, fullName, phone, Role.ROLE_USER, enabled);
+            Role desiredRole = resolveDesiredRole(role, auth);
+            User u = userService.adminCreate(email, fullName, phone, desiredRole, enabled);
             String who = auth != null ? auth.getName() : UNKNOWN;
             audit.userCreate(who, u.getId(), u.getEmail());
             ra.addFlashAttribute("ok", "Клиент создан: " + u.getEmail());
@@ -207,10 +209,12 @@ public class AdminController {
                              @RequestParam(required = false) String fullName,
                              @RequestParam(required = false) String phone,
                              @RequestParam(defaultValue = "false") boolean enabled,
+                             @RequestParam(required = false) String role,
                              java.security.Principal auth,
                              RedirectAttributes ra) {
         try {
-            userService.adminUpdate(id, email, fullName, phone, Role.ROLE_USER, enabled);
+            Role desiredRole = resolveDesiredRole(role, auth);
+            userService.adminUpdate(id, email, fullName, phone, desiredRole, enabled);
             String who = auth != null ? auth.getName() : UNKNOWN;
             audit.userUpdate(who, id, email);
             ra.addFlashAttribute("ok", "Сохранено");
@@ -495,4 +499,23 @@ public class AdminController {
                 ? "redirect:/admin/users/" + ownerId + "/folders/" + folderId
                 : REDIR_USERS + ownerId;
     }
+    /** Какую роль может выставить текущий пользователь. */
+    private Role resolveDesiredRole(String requested, java.security.Principal auth) {
+        User me = userRepository.findByEmailHash(pii.hash(auth.getName())).orElse(null);
+        boolean isFullAdmin = me != null && me.getRole() == Role.ROLE_ADMIN;
+
+        if (requested == null || requested.isBlank()) {
+            return Role.ROLE_USER;
+        }
+        if (!isFullAdmin) {
+            // Сотрудник может создавать только клиентов
+            return Role.ROLE_USER;
+        }
+        return switch (requested) {
+            case "ROLE_ADMIN" -> Role.ROLE_ADMIN;
+            case "ROLE_EMPLOYEE" -> Role.ROLE_EMPLOYEE;
+            default -> Role.ROLE_USER;
+        };
+    }
+
 }

@@ -188,7 +188,16 @@ public class SecurityConfig {
             .addFilterBefore(adminIpFilter(), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/admin/login", "/admin/challenge", "/admin/cert-login").permitAll()
-                .anyRequest().hasRole("ADMIN"))
+                .requestMatchers(
+                        "/admin/system/**",
+                        "/admin/monitor/**",
+                        "/admin/crl/**",
+                        "/admin/audit/**",
+                        "/admin/keys/**",
+                        "/admin/settings/**",
+                        "/admin/ssl/**"
+                ).hasRole("ADMIN")
+                .anyRequest().hasAnyRole("ADMIN", "EMPLOYEE"))
             .formLogin(f -> f.disable())
             .httpBasic(b -> b.disable())
             .logout(l -> l.disable())

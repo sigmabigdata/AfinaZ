@@ -28,10 +28,14 @@ public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
     private final ru.example.ukep.security.PiiEncryptor pii;
 
+    private final SettingsService settings;
+
     public UserService(UserRepository userRepository,
-                       ru.example.ukep.security.PiiEncryptor pii) {
+                       ru.example.ukep.security.PiiEncryptor pii,
+                       SettingsService settings) {
         this.userRepository = userRepository;
         this.pii = pii;
+        this.settings = settings;
     }
 
     // ============ Spring Security ============
@@ -60,7 +64,8 @@ public class UserService implements UserDetailsService {
 
         String token = UUID.randomUUID().toString().replace("-", "");
         u.setLoginToken(token);
-        u.setLoginTokenExpires(Instant.now().plus(LOGIN_TOKEN_TTL));
+        int ttlHours = settings.getIntOrDefault("auth.token_ttl_hours", 10);
+        u.setLoginTokenExpires(Instant.now().plus(Duration.ofHours(ttlHours)));
         u.setLoginTokenUsedAt(null);
         userRepository.save(u);
 
@@ -99,18 +104,24 @@ public class UserService implements UserDetailsService {
     // ============ Админ по сертификату ============
 
     @Transactional
-    public User upsertAdminByCert(String cn, String snils) {
+    public User upsertAdminByCert(String cn, String snils, Role role) {
         String syntheticEmail = buildAdminEmail(cn, snils);
         String hash = pii.hash(syntheticEmail);
         User u = userRepository.findByEmailHash(hash).orElseGet(User::new);
         u.setEmail(syntheticEmail);
         u.setEmailHash(hash);
         u.setFullName(cn);
-        u.setRole(Role.ROLE_ADMIN);
+        u.setRole(role != null ? role : Role.ROLE_ADMIN);
         u.setEnabled(true);
         u.setLoginToken(null);
         u.setLoginTokenExpires(null);
         return userRepository.save(u);
+    }
+
+    /** Старый вызов без роли (совместимость). */
+    @Transactional
+    public User upsertAdminByCert(String cn, String snils) {
+        return upsertAdminByCert(cn, snils, Role.ROLE_ADMIN);
     }
 
     public static String buildAdminEmail(String cn, String snils) {

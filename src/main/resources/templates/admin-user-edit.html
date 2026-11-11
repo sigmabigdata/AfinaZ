@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<html lang="ru" xmlns:th="http://www.thymeleaf.org"
+     xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <title th:text="${mode == 'create'} ? 'НБД-Банк · Новый клиент' : 'НБД-Банк · Редактирование'">—</title>
@@ -55,6 +56,24 @@
             <label>Телефон</label>
             <input type="text" name="phone"
                    th:value="${mode == 'edit' && user.phone != null} ? ${user.phone} : ''"/>
+        </div>
+
+        <div class="form-field" sec:authorize="hasRole('ADMIN')">
+            <label>Роль</label>
+            <select name="role">
+                <option value="ROLE_USER"
+                        th:selected="${mode == 'edit' && user.role.name() == 'ROLE_USER'}">
+                    Клиент (ROLE_USER)
+                </option>
+                <option value="ROLE_EMPLOYEE"
+                        th:selected="${mode == 'edit' && user.role.name() == 'ROLE_EMPLOYEE'}">
+                    Сотрудник (ROLE_EMPLOYEE) — админ без настроек/системы
+                </option>
+                <option value="ROLE_ADMIN"
+                        th:selected="${mode == 'edit' && user.role.name() == 'ROLE_ADMIN'}">
+                    Администратор (ROLE_ADMIN) — полный доступ
+                </option>
+            </select>
         </div>
 
         <div class="checkbox-field">

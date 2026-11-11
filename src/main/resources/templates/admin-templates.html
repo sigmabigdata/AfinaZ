@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<html lang="ru" xmlns:th="http://www.thymeleaf.org"
+     xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <title>НБД-Банк · Админ · Шаблоны документов</title>
@@ -14,12 +15,12 @@
         <a th:href="@{/admin}">Дашборд</a>
         <a th:href="@{/admin/users}">Клиенты</a>
         <a th:href="@{/admin/templates}" class="active">Шаблоны</a>
-        <a th:href="@{/admin/system}">Система</a>
-        <a th:href="@{/admin/monitor}">Мониторинг</a>
-        <a th:href="@{/admin/crl}">CRL</a>
-        <a th:href="@{/admin/audit}">Аудит</a>
-        <a th:href="@{/admin/keys}">Ключи</a>
-        <a th:href="@{/admin/settings}">Настройки</a>
+        <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/system}">Система</a>
+        <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/monitor}">Мониторинг</a>
+        <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/crl}">CRL</a>
+        <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/audit}">Аудит</a>
+        <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/keys}">Ключи</a>
+        <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/settings}">Настройки</a>
         <a th:href="@{/admin/poa}">Доверенности</a>
     </nav>
     <button type="button" class="cmdk-trigger" title="Поиск (⌘K)" style="margin-right:8px;">🔍 <span style="opacity:0.6;">⌘K</span></button>
