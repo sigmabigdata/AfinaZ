@@ -25,10 +25,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import ru.example.ukep.service.SettingsService;
 
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("java:S5853")  // несколько assertThat на одном объекте — идиоматично для тестов
 class UserServiceTest {
+
+    @Mock
+    private SettingsService settings;
 
     @Mock UserRepository userRepository;
 
@@ -45,7 +49,7 @@ class UserServiceTest {
         Files.writeString(keyPath, Base64.getEncoder().encodeToString(rawKey),
                 StandardCharsets.UTF_8);
         pii = new PiiEncryptor(keyPath.toString());
-        service = new UserService(userRepository, pii);
+        service = new UserService(userRepository, pii, settings);
     }
 
     private User activeUser() {
