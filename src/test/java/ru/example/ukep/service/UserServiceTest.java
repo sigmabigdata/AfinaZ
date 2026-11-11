@@ -209,7 +209,7 @@ class UserServiceTest {
     void adminCreateDuplicateEmail() {
         when(userRepository.existsByEmailHash(anyString())).thenReturn(true);
         assertThatThrownBy(() ->
-                service.adminCreate("user@example.com", "Ivanov", null, Role.ROLE_USER, true))
+                service.adminCreate("user@example.com", "Ivanov", null, null, Role.ROLE_USER, true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -219,7 +219,7 @@ class UserServiceTest {
         when(userRepository.existsByEmailHash(anyString())).thenReturn(false);
         when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        User u = service.adminCreate("USER@Example.COM", null, null, Role.ROLE_USER, true);
+        User u = service.adminCreate("USER@Example.COM", null, null, null, Role.ROLE_USER, true);
         assertThat(u.getEmail()).isEqualTo("user@example.com");
         assertThat(u.getFullName()).isEqualToIgnoringCase("USER@Example.COM");
     }
