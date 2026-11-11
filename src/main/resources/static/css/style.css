@@ -2832,7 +2832,7 @@ table.docs td.actions {
 
 .user-row {
     display: grid;
-    grid-template-columns: 44px 1fr 160px 110px 130px 130px;
+    grid-template-columns: 24px 44px 1fr 160px 110px 130px 130px;
     gap: 16px;
     align-items: center;
     padding: 14px 20px;
@@ -2945,12 +2945,12 @@ table.docs td.actions {
 
 @media (max-width: 900px) {
     .user-row {
-        grid-template-columns: 40px 1fr 130px;
+        grid-template-columns: 24px 40px 1fr 110px;
         gap: 10px;
         padding: 12px 14px;
     }
-    .user-row-phone, .user-row-date { display: none; }
-    .user-row-actions { grid-column: 3; }
+    .user-row-phone, .user-row-date, .user-row-status { display: none; }
+    .user-row-actions { grid-column: 4; }
 }
 
 /* ============================================================
