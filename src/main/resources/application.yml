@@ -48,10 +48,16 @@ app:
   # Активируется через APP_SETUP_MODE=true (bootstrap.sh).
   # После завершения wizard .env.prod перезаписывается, mode=false.
   setup:
-    mode: ${APP_SETUP_MODE:false}
-    token: ${APP_SETUP_TOKEN:}
-    out-dir: ${APP_SETUP_OUT_DIR:/app/setup-out}
-    session-ttl-minutes: ${APP_SETUP_SESSION_TTL:60}
+    # ВНИМАНИЕ: НЕ использовать ${...} — @ConditionalOnProperty не резолвит placeholder.
+    # Spring Boot relaxed binding сам прочитает:
+    #   APP_SETUP_MODE          → app.setup.mode
+    #   APP_SETUP_TOKEN         → app.setup.token
+    #   APP_SETUP_OUT_DIR       → app.setup.out-dir
+    #   APP_SETUP_SESSION_TTL   → app.setup.session-ttl-minutes
+    mode: false
+    token: ""
+    out-dir: /app/setup-out
+    session-ttl-minutes: 60
 
 logging:
   level:
