@@ -7,6 +7,4 @@ import ru.example.ukep.entity.DocumentVisualization;
 import java.util.Optional;
 
 public interface DocumentVisualizationRepository extends JpaRepository<DocumentVisualization, Long> {
-    Optional<DocumentVisualization> findByDocument(Document document);
-    void deleteByDocument(Document document);
-}
+    Optional<DocumentVisualization> findByDocument(Document document);}
