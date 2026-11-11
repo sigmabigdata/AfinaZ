@@ -39,9 +39,6 @@ public class CleanupService {
 
     private static final Logger log = LoggerFactory.getLogger(CleanupService.class);
     private static final long DOCKER_TIMEOUT_SEC = 120;
-    private static final Pattern RECLAIM = Pattern.compile(
-            "Total reclaimed space:\\s*([\\d.]+\\s*[A-Za-z]+)");
-
     /** Отчёт по мусору в одной категории. */
     public record Category(String key, String title, long bytes, long count, String note) {}
 
@@ -541,33 +538,6 @@ public class CleanupService {
         }
         p.waitFor(DOCKER_TIMEOUT_SEC, TimeUnit.SECONDS);
         return sb.toString();
-    }
-
-    private long parseReclaimed(String s) {
-        Matcher m = RECLAIM.matcher(s);
-        if (m.find()) return parseHumanBytes(m.group(1));
-        return 0;
-    }
-
-    private String parseReclaimStr(String s) {
-        Matcher m = RECLAIM.matcher(s);
-        return m.find() ? m.group(1) : "0B";
-    }
-
-    public static long parseHumanBytes(String s) {
-        if (s == null || s.isBlank()) return 0;
-        String t = s.trim().toUpperCase().replaceAll("[^0-9.A-Z]", "");
-        try {
-            if (t.endsWith("B") && !t.endsWith("KB") && !t.endsWith("MB") && !t.endsWith("GB")
-                    && !t.endsWith("TB")) {
-                return (long) Double.parseDouble(t.substring(0, t.length() - 1));
-            }
-            if (t.endsWith("KB")) return (long) (Double.parseDouble(t.substring(0, t.length() - 2)) * 1024);
-            if (t.endsWith("MB")) return (long) (Double.parseDouble(t.substring(0, t.length() - 2)) * 1024 * 1024);
-            if (t.endsWith("GB")) return (long) (Double.parseDouble(t.substring(0, t.length() - 2)) * 1024 * 1024 * 1024);
-            if (t.endsWith("TB")) return (long) (Double.parseDouble(t.substring(0, t.length() - 2)) * 1024L * 1024 * 1024 * 1024);
-            return (long) Double.parseDouble(t);
-        } catch (Exception e) { return 0; }
     }
 
     public static String formatBytes(long b) {

@@ -41,10 +41,6 @@ public class DocumentService {
         Files.createDirectories(storageRoot);
     }
 
-    public List<Document> listForUser(User owner) {
-        return documentRepository.findAllByOwnerOrderByUploadedAtDesc(owner);
-    }
-
     public Document getOwned(Long id, User owner) {
         return documentRepository.findByIdAndOwner(id, owner)
                 .orElseThrow(() -> new IllegalArgumentException(DOC_NOT_FOUND));

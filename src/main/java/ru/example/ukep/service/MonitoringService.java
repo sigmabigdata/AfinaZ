@@ -100,11 +100,6 @@ public class MonitoringService {
         }
     }
 
-    /** Совместимость со старым кодом. */
-    public void checkHealth() {
-        checkAll("manual");
-    }
-
     public List<CheckResult> checkAll(String actor) {
         settings.set("monitor.last_check_at", Instant.now().toString(), SYSTEM);
 
@@ -208,11 +203,14 @@ public class MonitoringService {
         long t = System.nanoTime();
         try {
             String msg = fn.check();
-            return new CheckResult(component, title, true, msg, (System.nanoTime() - t) / 1_000_000);
+            long ms = (System.nanoTime() - t) / 1_000_000;
+            log.info("check[{}]: OK ({}ms) — {}", component, ms, msg);
+            return new CheckResult(component, title, true, msg, ms);
         } catch (Exception e) {
-            return new CheckResult(component, title, false,
-                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(),
-                    (System.nanoTime() - t) / 1_000_000);
+            long ms = (System.nanoTime() - t) / 1_000_000;
+            String err = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            log.warn("check[{}]: FAIL ({}ms) — {}", component, ms, err);
+            return new CheckResult(component, title, false, err, ms);
         }
     }
 
