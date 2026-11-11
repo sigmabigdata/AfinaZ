@@ -130,7 +130,8 @@ echo "$H_LOCAL" | grep -q '"status":"UP"' && pass "health локальный: UP
 H_EXT=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 15 "$APP_URL/actuator/health" 2>/dev/null)
 [ "$H_EXT" = "200" ] && pass "health внешний: 200" || fail "health внешний: $H_EXT"
 
-STARTED=$(docker logs afina-app 2>&1 | grep -c "Started UkepSignApplication" || echo "0")
+STARTED=$(docker logs afina-app 2>&1 | grep -c "Started UkepSignApplication" 2>/dev/null | head -1)
+[ -z "$STARTED" ] && STARTED=0
 [ "$STARTED" -ge 1 ] && pass "приложение стартовало ($STARTED раз в логе)" || fail "приложение не стартовало"
 
 ERR_COUNT=$(docker logs afina-app --since 1h 2>&1 | grep -c " ERROR " 2>/dev/null | head -1)
