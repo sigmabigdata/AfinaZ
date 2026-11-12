@@ -6,7 +6,10 @@
 
 services:
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile-postgres
+    image: afinaz-postgres:15-astra
     container_name: afina-postgres
     environment:
       POSTGRES_DB: ${DB_NAME:-afina_db}
@@ -18,7 +21,7 @@ services:
       DB_AUDITOR_PASSWORD: ${DB_AUDITOR_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/15/main
       - ./db/init:/docker-entrypoint-initdb.d:ro
     # shared_preload_libraries: pg_stat_statements из postgresql-contrib
     # pgaudit НЕ используется — в Astra Linux SE 1.8 его нет.
