@@ -15,7 +15,7 @@
 
             <dl class="summary-list">
                 <dt>Домен / URL</dt>
-                <dd><code th:text="'https://' + ${draft.domain}">https://example.ru</code></dd>
+                <dd><code th:text="'https://' + ${draft['domain']}">https://example.ru</code></dd>
 
                 <dt>TLS-режим</dt>
                 <dd>
@@ -27,22 +27,22 @@
                 <dd>
                     <span th:if="${draft.smtpMode == 'log'}">Только в логи (для теста)</span>
                     <span th:if="${draft.smtpMode == 'local'}">
-                        Локальный Postfix (<span th:text="${draft.smtpFrom}">noreply@…</span>)
+                        Локальный Postfix (<span th:text="${draft['smtpFrom']}">noreply@…</span>)
                     </span>
                     <span th:if="${draft.smtpMode == 'external'}">
-                        Внешний SMTP: <code th:text="${draft.smtpHost} + ':' + (${draft.smtpPort} ?: '587')">smtp:587</code>
-                        <br><small>From: <code th:text="${draft.smtpFrom}">noreply@…</code></small>
+                        Внешний SMTP: <code th:text="${draft['smtpHost']} + ':' + (${draft['smtpPort']} ?: '587')">smtp:587</code>
+                        <br><small>From: <code th:text="${draft['smtpFrom']}">noreply@…</code></small>
                     </span>
                 </dd>
 
                 <dt>Администратор</dt>
                 <dd>
-                    <b th:text="${draft.adminCn}">Иванов Иван</b>
+                    <b th:text="${draft['adminCn']}">Иванов Иван</b>
                     <br><small>СНИЛС: <code th:text="'***' + ${#strings.substring(draft.adminSnils, 7)}">***1234</code></small>
                 </dd>
 
                 <dt>IP-whitelist</dt>
-                <dd><code th:text="${draft.ipWhitelist}">127.0.0.1,::1</code></dd>
+                <dd><code th:text="${draft['ipWhitelist']}">127.0.0.1,::1</code></dd>
 
                 <dt>Ключи шифрования</dt>
                 <dd>✅ Уже сгенерированы (bootstrap.sh, 32 байта)</dd>

@@ -16,7 +16,7 @@
         <div class="setup-field">
             <label for="domain">Домен или IP <span class="req">*</span></label>
             <input type="text" id="domain" name="domain" required
-                   th:value="${draft.domain}"
+                   th:value="${draft['domain']}"
                    placeholder="afina.example.ru"
                    pattern="^[a-zA-Z0-9.\-]+$"
                    autocomplete="off"/>

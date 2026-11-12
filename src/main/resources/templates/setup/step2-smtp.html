@@ -53,7 +53,7 @@
         <div class="setup-field smtp-local-group" style="display:none;">
             <label for="smtpFromLocal">Email отправителя <span class="req">*</span></label>
             <input type="email" id="smtpFromLocal"
-                   th:value="${draft.smtpFrom}"
+                   th:value="${draft['smtpFrom']}"
                    placeholder="noreply@afina.example.ru"/>
             <div class="field-hint">
                 Письма будут отправляться через локальный Postfix с этим адресом.
@@ -65,7 +65,7 @@
             <div class="setup-field">
                 <label for="smtpHost">SMTP-хост <span class="req">*</span></label>
                 <input type="text" id="smtpHost" name="smtpHost"
-                       th:value="${draft.smtpHost}"
+                       th:value="${draft['smtpHost']}"
                        placeholder="smtp.yandex.ru"/>
             </div>
 
@@ -73,7 +73,7 @@
                 <div class="setup-field">
                     <label for="smtpPort">Порт</label>
                     <input type="number" id="smtpPort" name="smtpPort"
-                           th:value="${draft.smtpPort} ?: '587'"
+                           th:value="${draft['smtpPort']} ?: '587'"
                            min="1" max="65535" placeholder="587"/>
                 </div>
                 <div class="setup-field">
@@ -89,7 +89,7 @@
             <div class="setup-field">
                 <label for="smtpUser">Логин</label>
                 <input type="text" id="smtpUser" name="smtpUser"
-                       th:value="${draft.smtpUser}"
+                       th:value="${draft['smtpUser']}"
                        placeholder="afina@yandex.ru"
                        autocomplete="off"/>
             </div>
@@ -107,7 +107,7 @@
             <div class="setup-field">
                 <label for="smtpFrom">Email отправителя <span class="req">*</span></label>
                 <input type="email" id="smtpFrom" name="smtpFrom"
-                       th:value="${draft.smtpFrom}"
+                       th:value="${draft['smtpFrom']}"
                        placeholder="noreply@example.ru"/>
             </div>
         </div>

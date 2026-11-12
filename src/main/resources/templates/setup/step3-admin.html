@@ -25,7 +25,7 @@
         <div class="setup-field">
             <label for="adminCn">CN администратора <span class="req">*</span></label>
             <input type="text" id="adminCn" name="adminCn" required
-                   th:value="${draft.adminCn}"
+                   th:value="${draft['adminCn']}"
                    placeholder="Иванов Иван Иванович"
                    autocomplete="off"/>
             <div class="field-hint">
@@ -37,7 +37,7 @@
         <div class="setup-field">
             <label for="adminSnils">СНИЛС <span class="req">*</span></label>
             <input type="text" id="adminSnils" name="adminSnils" required
-                   th:value="${draft.adminSnils}"
+                   th:value="${draft['adminSnils']}"
                    pattern="[0-9]{11}"
                    placeholder="12345678901"
                    inputmode="numeric"
