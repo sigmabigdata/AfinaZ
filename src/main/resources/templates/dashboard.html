@@ -68,15 +68,15 @@
             <div style="text-align:center;">Подписано</div>
             <div style="text-align:center;">Без подписи</div>
             <div>Создан</div>
-            <div></div>
+            <div style="text-align:right;">Действия</div>
         </div>
-        <a th:each="f : ${folders}"
-           th:href="@{'/folders/' + ${f.id}}"
-           th:with="docs=${documentsByFolder.get(f.id)},
-                    total=${#lists.size(docs)},
-                    signed=${#lists.size(docs.?[signed])},
-                    unsigned=${total - signed}"
-           class="user-row folder-row">
+        <div th:each="f : ${folders}"
+             th:with="docs=${documentsByFolder.get(f.id)},
+                      total=${#lists.size(docs)},
+                      signed=${#lists.size(docs.?[signed])},
+                      unsigned=${total - signed}"
+             class="user-row folder-row"
+             th:attr="data-href=@{'/folders/' + ${f.id}}">
             <div class="folder-icon-sm">📁</div>
             <div class="user-row-main">
                 <div class="user-row-name" th:text="${f.name}">Раздел</div>
@@ -96,8 +96,17 @@
             </div>
             <div class="user-row-cell user-row-date"
                  th:text="${#temporals.format(f.createdAt,'dd.MM.yyyy')}">—</div>
-            <div class="folder-tile-arrow">→</div>
-        </a>
+            <div class="folder-row-actions">
+                <a th:href="@{'/folders/' + ${f.id}}"
+                   class="btn-ghost btn-sm" title="Открыть раздел">→</a>
+                <form method="post"
+                      th:action="@{'/folders/' + ${f.id} + '/delete'}"
+                      onsubmit="return confirm('Удалить раздел? Если в нём есть ПОДПИСАННЫЕ документы — удаление заблокировано (обратитесь к администратору).');"
+                      style="display:inline; margin:0;">
+                    <button type="submit" class="btn-danger btn-sm" title="Удалить раздел">🗑</button>
+                </form>
+            </div>
+        </div>
     </div>
 </main>
 
@@ -119,6 +128,15 @@
             btn.addEventListener('click', function () { window.TemplateUse.open(); });
         }
     });
+
+    // Клик по строке раздела → открыть раздел (кроме кнопок/форм)
+    document.querySelectorAll('.user-row.folder-row[data-href]').forEach(function(row) {
+        row.addEventListener('click', function(e) {
+            if (e.target.closest('a, button, form, input')) return;
+            window.location.href = this.dataset.href;
+        });
+    });
+
 </script>
 </body>
 </html>

@@ -3277,7 +3277,7 @@ table.audit-table td:nth-child(5) { white-space: nowrap; }  /* IP */
 
 .user-row.folder-row {
     display: grid !important;
-    grid-template-columns: 44px 1fr 80px 80px 120px 40px !important;
+    grid-template-columns: 44px 1fr 80px 80px 120px 140px !important;
     gap: 16px;
     align-items: center;
     padding: 14px 20px;
@@ -3341,3 +3341,17 @@ table.audit-table td:nth-child(5) { white-space: nowrap; }  /* IP */
     box-shadow: 0 2px 6px rgba(166,124,82,0.25);
 }
 .err-text { color: #a82323; }
+
+
+.user-row.folder-row .folder-row-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+    align-items: center;
+}
+.user-row.folder-row .folder-row-actions .btn-sm {
+    padding: 4px 10px;
+    font-size: 14px;
+    line-height: 1;
+}
+.user-row.folder-row[data-href] { cursor: pointer; }
