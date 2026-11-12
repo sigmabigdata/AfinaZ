@@ -2,7 +2,8 @@
 <html lang="ru" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{setup/layout :: head('IP-whitelist')}"></head>
 <body>
-<div th:replace="~{setup/layout :: page(4, 'IP-whitelist для /admin', ~{::form})}">
+<th:block th:replace="~{setup/layout :: page(4, 'IP-whitelist для /admin', ~{::.step-body})}">
+<div class="step-body">
 
     <form method="post" action="/setup/step/4" class="setup-form"
           autocomplete="off">
@@ -51,5 +52,6 @@
         </div>
     </form>
 </div>
+</th:block>
 </body>
 </html>

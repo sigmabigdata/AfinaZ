@@ -2,7 +2,8 @@
 <html lang="ru" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{setup/layout :: head('Домен и TLS')}"></head>
 <body>
-<div th:replace="~{setup/layout :: page(1, 'Домен и TLS', ~{::form})}">
+<th:block th:replace="~{setup/layout :: page(1, 'Домен и TLS', ~{::.step-body})}">
+<div class="step-body">
 
     <form method="post" action="/setup/step/1" class="setup-form"
           autocomplete="off">
@@ -66,5 +67,6 @@
     </form>
 
 </div>
+</th:block>
 </body>
 </html>

@@ -2,7 +2,8 @@
 <html lang="ru" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{setup/layout :: head('Перезапуск')}"></head>
 <body>
-<div th:replace="~{setup/layout :: page(6, 'Перезапуск приложения', ~{::div})}">
+<th:block th:replace="~{setup/layout :: page(6, 'Перезапуск приложения', ~{::.step-body})}">
+<div class="step-body">
 
     <div class="setup-finalizing">
         <div class="finalizing-spinner"></div>
@@ -60,5 +61,6 @@
     setTimeout(tick, 1000);
     </script>
 </div>
+</th:block>
 </body>
 </html>

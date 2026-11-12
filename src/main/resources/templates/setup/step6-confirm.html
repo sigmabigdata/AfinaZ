@@ -2,7 +2,8 @@
 <html lang="ru" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{setup/layout :: head('Подтверждение')}"></head>
 <body>
-<div th:replace="~{setup/layout :: page(6, 'Подтверждение', ~{::div})}">
+<th:block th:replace="~{setup/layout :: page(6, 'Подтверждение', ~{::.step-body})}">
+<div class="step-body">
 
     <div>
         <p class="setup-intro">
@@ -88,5 +89,6 @@
     });
     </script>
 </div>
+</th:block>
 </body>
 </html>

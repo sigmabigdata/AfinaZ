@@ -2,7 +2,8 @@
 <html lang="ru" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{setup/layout :: head('Проверки')}"></head>
 <body>
-<div th:replace="~{setup/layout :: page(5, 'Проверки перед запуском', ~{::div})}">
+<th:block th:replace="~{setup/layout :: page(5, 'Проверки перед запуском', ~{::.step-body})}">
+<div class="step-body">
 
     <div>
         <p class="setup-intro">
@@ -39,5 +40,6 @@
     });
     </script>
 </div>
+</th:block>
 </body>
 </html>
