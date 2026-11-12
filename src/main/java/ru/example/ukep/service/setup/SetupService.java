@@ -60,12 +60,18 @@ public class SetupService {
             });
 
     /** Обязательные поля для каждого шага (нельзя пропустить). */
-    private static final Map<Integer, List<String>> REQUIRED_FIELDS = Map.of(
-            1, List.of("domain", "tls"),
-            2, List.of("smtpMode"),
-            3, List.of("adminCn", "adminSnils"),
-            4, List.of("ipWhitelist")
-    );
+    /**
+     * Обязательные поля по шагам.
+     * <b>LinkedHashMap</b> — для детерминированного порядка итерации
+     * (Map.of не гарантирует порядок → getState() может вернуть шаг 4 вместо 1).
+     */
+    private static final Map<Integer, List<String>> REQUIRED_FIELDS = new java.util.LinkedHashMap<>();
+    static {
+        REQUIRED_FIELDS.put(1, List.of("domain", "tls"));
+        REQUIRED_FIELDS.put(2, List.of("smtpMode"));
+        REQUIRED_FIELDS.put(3, List.of("adminCn", "adminSnils"));
+        REQUIRED_FIELDS.put(4, List.of("ipWhitelist"));
+    }
 
     /** Поля, которые попадают в .env.prod.new на finalize. */
     private static final List<String> PERSISTED_FIELDS = List.of(
