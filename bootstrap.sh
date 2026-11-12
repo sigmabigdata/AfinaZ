@@ -60,6 +60,7 @@ ARG_DRY_RUN=0
 
 # ─── Помощники ───
 log()    { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
+info()   { echo -e "  ${DIM}${C}•${N} $*" | tee -a "$LOG_FILE"; }
 ok()     { echo -e "  ${G}✓${N} $*" | tee -a "$LOG_FILE"; }
 warn()   { echo -e "  ${Y}⚠${N} $*" | tee -a "$LOG_FILE"; }
 err()    { echo -e "  ${R}✗${N} $*" | tee -a "$LOG_FILE"; }
