@@ -882,10 +882,10 @@ main() {
     fi
 
     generate_secrets
+    fix_permissions        # ← ДО start_stack: app (uid 999) должен читать secrets
     generate_env_prod
     setup_tls
     start_stack
-    fix_permissions
     install_setup_applier
     print_summary
 }
