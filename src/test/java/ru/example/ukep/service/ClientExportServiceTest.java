@@ -5,7 +5,6 @@ import org.mockito.Mockito;
 import ru.example.ukep.entity.Document;
 import ru.example.ukep.entity.Role;
 import ru.example.ukep.entity.User;
-import ru.example.ukep.repository.AuditEventRepository;
 import ru.example.ukep.repository.DocumentRepository;
 import ru.example.ukep.repository.DocumentVisualizationRepository;
 import ru.example.ukep.repository.UserRepository;
@@ -33,7 +32,6 @@ class ClientExportServiceTest {
                 ur,
                 Mockito.mock(DocumentRepository.class),
                 Mockito.mock(DocumentVisualizationRepository.class),
-                Mockito.mock(AuditEventRepository.class),
                 Mockito.mock(DocumentService.class));
 
         assertThrows(IllegalArgumentException.class, () -> svc.exportClient(99L));
@@ -55,12 +53,9 @@ class ClientExportServiceTest {
         DocumentRepository dr = Mockito.mock(DocumentRepository.class);
         when(dr.findAllByOwnerOrderByUploadedAtDesc(user)).thenReturn(List.of());
 
-        AuditEventRepository ar = Mockito.mock(AuditEventRepository.class);
-        when(ar.findAllByOrderByEventTimeDesc(any())).thenReturn(List.of());
-
         ClientExportService svc = new ClientExportService(
                 ur, dr, Mockito.mock(DocumentVisualizationRepository.class),
-                ar, Mockito.mock(DocumentService.class));
+                Mockito.mock(DocumentService.class));
 
         byte[] zip = svc.exportClient(1L);
         assertNotNull(zip);

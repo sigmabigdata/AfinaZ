@@ -2,14 +2,11 @@ package ru.example.ukep.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.example.ukep.entity.AuditEvent;
 import ru.example.ukep.entity.Document;
 import ru.example.ukep.entity.DocumentSignature;
 import ru.example.ukep.entity.User;
-import ru.example.ukep.repository.AuditEventRepository;
 import ru.example.ukep.repository.DocumentRepository;
 import ru.example.ukep.repository.DocumentVisualizationRepository;
 import ru.example.ukep.repository.UserRepository;
@@ -38,24 +35,19 @@ public class ClientExportService {
     private static final Logger log = LoggerFactory.getLogger(ClientExportService.class);
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")
             .withZone(ZoneId.systemDefault());
-    private static final DateTimeFormatter CSV_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-            .withZone(ZoneId.systemDefault());
 
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final DocumentVisualizationRepository visRepository;
-    private final AuditEventRepository auditRepository;
     private final DocumentService documentService;
 
     public ClientExportService(UserRepository userRepository,
                                DocumentRepository documentRepository,
                                DocumentVisualizationRepository visRepository,
-                               AuditEventRepository auditRepository,
                                DocumentService documentService) {
         this.userRepository = userRepository;
         this.documentRepository = documentRepository;
         this.visRepository = visRepository;
-        this.auditRepository = auditRepository;
         this.documentService = documentService;
     }
 
@@ -80,8 +72,6 @@ public class ClientExportService {
             // 4. visualizations/ (PDF-штампы)
             exportVisualizations(zip, docs);
 
-            // 5. audit.csv (события по клиенту и его документам)
-            addTextFile(zip, "audit.csv", buildAuditCsv(user, docs));
         }
 
         log.info("Client export: user={}, documents={}, size={} B",
@@ -164,7 +154,6 @@ public class ClientExportService {
                   documents/            — оригинальные файлы документов
                   signatures/           — отсоединённые подписи (.sig)
                   visualizations/       — PDF с визуальными штампами
-                  audit.csv             — события аудита (CSV, UTF-8)
                 
                 Все подписи — CAdES-BES (ГОСТ). Проверить можно:
                   1) Через КриптоПро CADESCOM
@@ -202,53 +191,6 @@ public class ClientExportService {
                 user.getLastLoginAt() != null ? "\"" + user.getLastLoginAt().toString() + "\"" : "null");
     }
 
-    private String buildAuditCsv(User user, List<Document> docs) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("event_time,event_type,result,actor_email,target_type,target_id,details\n");
-
-        // События по самому пользователю
-        List<AuditEvent> userEvents = auditRepository.findAllByOrderByEventTimeDesc(PageRequest.of(0, 1000))
-                .stream()
-                .filter(e -> ("USER".equals(e.getTargetType()) && String.valueOf(user.getId()).equals(e.getTargetId()))
-                        || (e.getActorEmail() != null && e.getActorEmail().equals(user.getEmail())))
-                .toList();
-
-        for (AuditEvent e : userEvents) {
-            sb.append(String.format("%s,%s,%s,%s,%s,%s,%s\n",
-                    CSV_DATE.format(e.getEventTime()),
-                    csv(e.getEventType()),
-                    csv(e.getResult()),
-                    csv(e.getActorEmail()),
-                    csv(e.getTargetType()),
-                    csv(e.getTargetId()),
-                    csv(e.getDetails())));
-        }
-
-        // События по документам пользователя
-        Set<Long> docIds = new HashSet<>();
-        for (Document d : docs) docIds.add(d.getId());
-
-        List<AuditEvent> docEvents = auditRepository.findAllByOrderByEventTimeDesc(PageRequest.of(0, 2000))
-                .stream()
-                .filter(e -> "DOCUMENT".equals(e.getTargetType())
-                        && e.getTargetId() != null
-                        && isNumeric(e.getTargetId())
-                        && docIds.contains(Long.parseLong(e.getTargetId())))
-                .toList();
-
-        for (AuditEvent e : docEvents) {
-            sb.append(String.format("%s,%s,%s,%s,%s,%s,%s\n",
-                    CSV_DATE.format(e.getEventTime()),
-                    csv(e.getEventType()),
-                    csv(e.getResult()),
-                    csv(e.getActorEmail()),
-                    csv(e.getTargetType()),
-                    csv(e.getTargetId()),
-                    csv(e.getDetails())));
-        }
-
-        return sb.toString();
-    }
 
     private void addTextFile(ZipOutputStream zip, String name, String content) throws IOException {
         zip.putNextEntry(new ZipEntry(name));
@@ -295,17 +237,5 @@ public class ClientExportService {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    private static String csv(String s) {
-        if (s == null) return "";
-        return "\"" + s.replace("\"", "\"\"") + "\"";
-    }
 
-    /** true, если строка состоит только из цифр (без знака, без пробелов). */
-    private static boolean isNumeric(String s) {
-        if (s == null || s.isEmpty()) return false;
-        for (int i = 0; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i))) return false;
-        }
-        return true;
-    }
 }
