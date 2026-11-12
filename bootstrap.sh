@@ -802,6 +802,11 @@ fix_permissions() {
 install_setup_applier() {
     hdr "setup-applier (systemd)"
 
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        ok "[dry-run] systemd unit afina-setup-applier будет установлен"
+        return 0
+    fi
+
     if [ ! -f setup-applier.sh ]; then
         warn "setup-applier.sh не найден в $APP_DIR — пропускаю"
         return 0
