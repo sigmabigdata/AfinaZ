@@ -1,79 +1,177 @@
 # ПАО «НБД-Банк» — Сервис подписания документов УКЭП
 
-## 1. Требования к серверу
-- **ОС:** Astra Linux SE 1.8 или Ubuntu 22.04/24.04
-- **Архитектура:** x86_64
-- **RAM:** 4 ГБ
-- **Диск:** 50 ГБ SSD
-- **Порты:** 80 и 443
-- **ПО:** Docker и Docker Compose
+Веб-сервис для подписания документов УКЭП через КриптоПро.
 
-## 2. Что в дистрибутиве (всё ставится автоматически)
-- `certs/` — сертификаты Минцифры / СКБ Контур / Russian Trusted
-- `admins.env` — админ по умолчанию (Дырул Анатолий Юрьевич)
-- `secrets/` — ключи file.key, pii.key, backup.pass
-- `.env.prod` — конфигурация + пароли БД
-- Роли БД: afina_migrator, afina_app, afina_auditor
-- SSL: для IP — self-signed, для домена — Let's Encrypt
+Стек: Spring Boot 3.2.5 · PostgreSQL 15 · Angie · КриптоПро JCSP · Docker
 
-## 3. Онлайн-развертывание
-```bash
-# На Mac:
-rsync -avz ./ root@IP:/opt/afinaz/
+---
 
-# На сервере:
-cd /opt/afinaz && chmod +x install.sh && ./install.sh
-```
-Ответы: IP, TLS=2, Admin IP=*, Email=log, Images=**1**.
+## Требования к серверу
 
-## 4. Офлайн-развертывание
-```bash
-# На Mac:
-docker build -t afinaz-app:latest .
-docker build -f Dockerfile-postgres -t afinaz-postgres:15-astra .
-mkdir -p images
-docker save afinaz-app:latest | gzip > images/afinaz-app.tar.gz
-docker save afinaz-postgres:15-astra | gzip > images/afinaz-postgres.tar.gz
-rsync -avz --exclude .git ./ root@IP:/opt/afinaz/
-rsync -avz --progress images/ root@IP:/opt/afinaz/images/
+| Параметр | Минимум | Рекомендуется |
+|---|---|---|
+| ОС | Ubuntu 22.04 / Debian 11 / Astra SE 1.8 | Astra Linux SE 1.8 |
+| RAM | 4 GB | 8 GB |
+| Диск | 20 GB | 50 GB SSD |
+| Порты | 80, 443 | 80, 443 |
+| Docker | установлен | + compose |
 
-# На сервере:
-cd /opt/afinaz
-docker load < images/afinaz-app.tar.gz
-docker load < images/afinaz-postgres.tar.gz
-chmod +x install.sh && ./install.sh
-```
-Ответы: IP, TLS=2, Admin IP=*, Email=log, Images=**2**.
+Для банка (152-ФЗ, ГОСТ) — только Astra Linux SE 1.8. На Ubuntu/Debian — dev/test (флаг --accept-non-astra).
 
-## 5. Права доступа
-Скрипт сам выдаёт:
-```bash
-chown -R 999:999 storage logs backups crls certs angie-certs secrets
-chmod -R 775 storage logs backups crls certs angie-certs
-chmod 700 secrets && chmod 600 secrets/*.key secrets/backup.pass
-```
+---
 
-Если приложение упало с `AccessDeniedException`:
-```bash
-chown -R 999:999 storage certs secrets
-docker restart afina-app
-```
+## Установка — 3 шага
 
-## 6. Управление — утилита `afina`
-1 — Деплой, 2 — Перезапуск, 3 — Health, 4 — Логи, 5 — Бэкап, 6 — Восстановление, 7 — Очистка, 8 — Shell, 9 — psql, 10 — restore БД, 11 — restore storage, **12 — полная диагностика**.
+### Шаг 1. Собрать дистрибутив (на Mac, один раз)
 
-Команды для диагностики:
-- `afina doctor` — быстрая (10 проверок, ~5 сек)
-- `afina diag` — полная end-to-end (20 разделов, ~70 проверок)
-- `afina diag --no-color` — без ANSI-цветов (для логов)
-- `afina diag --quiet` — только PASS/WARN/FAIL
-- `afina diag --markdown-only` — только сгенерировать .md-отчёт
+    git clone https://github.com/sigmabigdata/AfinaZ.git
+    cd AfinaZ
+    ./build-dist.sh
 
-## 7. Решение проблем
-- **502 Bad Gateway** — `docker logs afina-app --tail 50`
-- **AccessDeniedException** — `chown -R 999:999 storage certs secrets && docker restart afina-app`
-- **password authentication failed** — `docker compose down && docker volume rm afinaz_pgdata && ./install.sh`
-- **Angie: cannot load certificate** — `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout angie-certs/privkey.pem -out angie-certs/fullchain.pem -subj "/CN=IP" && docker restart afina-angie`
-- **Angie: host not found in upstream "app:8080"** — подожди 30 сек, потом `docker restart afina-angie`
-- **Maven UnresolvableModelException** — используй офлайн-развертывание (раздел 4)
-- **Нет CRL для CN=...** — это норма (soft-fail). При загрузке .sig CRL скачаются, или через /admin/crl → Обновить все
+Результат (~15-20 мин): afina-dist-YYYYMMDD_HHMMSS.tar.gz (~2.5 GB).
+
+### Шаг 2. Передать на сервер
+
+    scp afina-dist-*.tar.gz root@IP:/root/
+
+### Шаг 3. Установить (одна команда)
+
+    cd /root
+    tar xzf afina-dist-*.tar.gz
+    cd afina-dist-*/
+
+    # Проверка (dry-run)
+    sudo ./install.sh --domain=IP --dry-run
+
+    # Установка
+    sudo ./install.sh --domain=IP --accept-non-astra
+
+Результат (~3-5 минут): URL для wizard с токеном.
+
+---
+
+## Первичная настройка через Wizard (5 минут)
+
+### 1. Открыть в браузере
+
+    https://ДОМЕН/setup?token=ТОКЕН
+
+Self-signed сертификат — браузер покажет «Не защищено». Обход:
+- Chrome: на странице ошибки набери thisisunsafe
+- Safari: Show Details → visit this website
+- Firefox: Advanced → Accept the Risk
+
+### 2. Пройти 6 шагов
+
+1. Домен + TLS: self-signed
+2. SMTP: Log (для теста, потом /admin/settings)
+3. Администратор: CN (ФИО) + СНИЛС
+4. IP-whitelist: 127.0.0.1,::1,172.0.0.0/8
+5. Проверки: preflight (WARN не блокеры)
+6. Подтверждение: «Завершить и перезапустить»
+
+### 3. Дождаться (~30 сек)
+
+Applier применит настройки, перезапустит app. Wizard выключится.
+
+### 4. Войти в админку
+
+    https://ДОМЕН/admin/login
+
+«Войти с УКЭП» → сертификат → PIN.
+
+---
+
+## После установки
+
+    docker compose -f docker-compose-prod.yml ps
+    curl -sk https://ДОМЕН/actuator/health
+    curl -sk -o /dev/null -w "%{http_code}\n" https://ДОМЕН/admin/login
+
+### Управление — команда afina
+
+    afina           # меню
+    afina status    # статус
+    afina logs app  # логи
+    afina diag      # диагностика
+    afina backup    # бэкап БД
+
+### Обслуживание
+
+- Бэкапы: afina backup (автоматически в 03:00)
+- Ключи: /admin/keys → ZIP с паролем
+- Обновление: git pull && docker compose build app && docker compose up -d app
+- Мониторинг: /admin/monitor
+
+---
+
+## Частые проблемы
+
+### Браузер: ERR_CERT_AUTHORITY_INVALID
+
+Нормально — self-signed. Обход:
+- Chrome: thisisunsafe
+- Safari: Show Details → visit this website
+- Firefox: Advanced → Accept Risk
+
+### Порт 80/443 занят
+
+install.sh автоматически маскирует nginx/apache2. ISPmanager на 1501 работает.
+Вернуть nginx: systemctl unmask nginx && systemctl enable --now nginx
+
+### App не стартует
+
+    docker logs afina-app --tail 100 2>&1 | grep -B2 -A10 "Caused by"
+
+Частые причины:
+- AccessDeniedException secrets/keys/ → chown 999:999 secrets/
+- PII ключ не найден → secrets/keys/pii.key.v1
+- NumberFormatException → удалить пустые MAIL_* из .env.prod
+
+### Восстановление из бэкапа
+
+    ./restore-prod.sh backups/afina_*.sql.gz.enc
+    ./restore-storage.sh backups/storage_*.tar.gz.enc
+
+---
+
+## Структура /opt/afinaz/
+
+    docker-compose-prod.yml   — стек
+    .env.prod                 — переменные (0600)
+    admins.env                — CN|SNILS
+    secrets/keys/*.key.vN     — AES-256 ключи
+    secrets/backup.pass       — пароль бэкапов
+    storage/documents/*.enc   — файлы (зашифрованы)
+    backups/                  — .sql.gz.enc
+    logs/                     — app.log
+    certs/                    — корневые УЦ
+    angie-certs/              — TLS
+
+---
+
+## Безопасность
+
+Ключи шифрования: secrets/keys/ (0600, uid 999)
+Пароль бэкапов: secrets/backup.pass
+Пароли БД: .env.prod
+
+Правила:
+- 1Password / сейф / зашифрованная флешка
+- НЕ передавать через email/мессенджеры
+- НЕ хранить в git
+
+При переезде: скопировать secrets/ + storage/ + backups/. Без ключей база нечитаема.
+
+---
+
+## Поддержка
+
+GitHub: sigmabigdata/AfinaZ
+Диагностика: afina diag
+
+## Сертификация
+
+Astra Linux SE 1.8 (ФСТЭК № 2557) · КриптоПро CSP 5.0 R2 · Angie 1.12.3 · Axiom JDK Pro 17.
+
+См. CERTIFICATION.md.
