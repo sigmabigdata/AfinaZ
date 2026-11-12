@@ -483,12 +483,10 @@ APP_SETUP_TOKEN=${SETUP_TOKEN}
 # SMTP / admin / IP-whitelist задаются через wizard
 ADMIN_IP_WHITELIST=127.0.0.1,::1,172.0.0.0/8
 MAIL_MODE=log
-MAIL_HOST=
-MAIL_PORT=
-MAIL_USERNAME=
-MAIL_PASSWORD=
+# НЕ задаём пустые MAIL_HOST/PORT — это вызывает NumberFormatException
+# в MonitoringService (@Value int не терпит пустую строку).
+# Значения по умолчанию: MAIL_HOST=localhost, MAIL_PORT=25.
 MAIL_FROM=noreply@${ARG_DOMAIN}
-MAIL_SSL=false
 
 CRYPTO_PRO_ENABLED=true
 ENVEOF
@@ -765,6 +763,40 @@ do_reset() {
 }
 
 # ═══════════════════════════════════════════════════════════
+# [install] Права доступа (chown 999:999 для app uid)
+# ═══════════════════════════════════════════════════════════
+fix_permissions() {
+    hdr "Права доступа (uid 999:999)"
+
+    if [ "$ARG_DRY_RUN" = "1" ]; then
+        ok "[dry-run] chown 999:999 для secrets storage logs backups crls setup-out angie-certs admins.env"
+        return 0
+    fi
+
+    # secrets — строго 700/600, owner 999
+    chown -R 999:999 secrets
+    chmod 700 secrets secrets/keys
+    chmod 600 secrets/keys/* secrets/backup.pass 2>/dev/null || true
+
+    # рабочие каталоги app
+    chown -R 999:999 storage logs backups crls setup-out angie-certs 2>/dev/null || true
+    chmod -R 775 storage logs backups crls setup-out angie-certs 2>/dev/null || true
+
+    # admins.env — wizard пишет (uid 999)
+    if [ -f admins.env ]; then
+        chown 999:999 admins.env
+        chmod 600 admins.env
+    fi
+
+    # certs — только чтение (root)
+    chown -R root:root certs 2>/dev/null || true
+    chmod 755 certs
+    chmod 644 certs/* 2>/dev/null || true
+
+    ok "Права выданы (secrets 700/600, storage 775)"
+}
+
+# ═══════════════════════════════════════════════════════════
 # [install] setup-applier (systemd unit)
 # ═══════════════════════════════════════════════════════════
 install_setup_applier() {
@@ -847,6 +879,7 @@ main() {
     generate_env_prod
     setup_tls
     start_stack
+    fix_permissions
     install_setup_applier
     print_summary
 }
