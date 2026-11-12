@@ -159,6 +159,14 @@
     </div>
 
     <div th:if="${not #lists.isEmpty(folders)}" class="user-list">
+        <div class="user-row folder-row folder-row-header">
+            <div></div>
+            <div>Название раздела</div>
+            <div style="text-align:center;">Подписано</div>
+            <div style="text-align:center;">Без подписи</div>
+            <div>Создан</div>
+            <div></div>
+        </div>
         <a th:each="f, folderStat : ${folders}"
            th:href="@{'/admin/users/' + ${user.id} + '/folders/' + ${f.id}}"
            th:with="docs=${documentsByFolder.get(f.id)},
