@@ -5,7 +5,7 @@
 <div th:replace="~{setup/layout :: page(1, 'Домен и TLS', ~{::form})}">
 
     <form method="post" action="/setup/step/1" class="setup-form"
-          th:object="${draft}" autocomplete="off">
+          autocomplete="off">
 
         <p class="setup-intro">
             Укажите <b>домен</b>, по которому будет доступен сервис,
@@ -32,7 +32,7 @@
 
             <label class="setup-radio">
                 <input type="radio" name="tls" value="self-signed"
-                       th:checked="${draft.tls == null or draft.tls == 'self-signed'}"/>
+                       th:checked="${draft['tls'] == null or draft['tls'] == 'self-signed'}"/>
                 <span>
                     <b>Self-signed</b> (рекомендуется для первого запуска)
                     <small>Автоматически сгенерируется сертификат на 1 год.
@@ -42,7 +42,7 @@
 
             <label class="setup-radio">
                 <input type="radio" name="tls" value="custom"
-                       th:checked="${draft.tls == 'custom'}"/>
+                       th:checked="${draft['tls'] == 'custom'}"/>
                 <span>
                     <b>Свой сертификат</b>
                     <small>Если у вас уже есть fullchain.pem и privkey.pem в

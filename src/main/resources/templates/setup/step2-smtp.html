@@ -5,7 +5,7 @@
 <div th:replace="~{setup/layout :: page(2, 'Email / SMTP', ~{::form})}">
 
     <form method="post" action="/setup/step/2" class="setup-form"
-          th:object="${draft}" autocomplete="off" id="smtp-form">
+          autocomplete="off" id="smtp-form">
 
         <p class="setup-intro">
             Настройте отправку писем. Сервис использует email для
@@ -18,7 +18,7 @@
 
             <label class="setup-radio">
                 <input type="radio" name="smtpMode" value="log"
-                       th:checked="${draft.smtpMode == null or draft.smtpMode == 'log'}"
+                       th:checked="${draft['smtpMode'] == null or draft['smtpMode'] == 'log'}"
                        onchange="afinaSmtpMode(this.value)"/>
                 <span>
                     <b>Только в логи</b> (для теста)
@@ -29,7 +29,7 @@
 
             <label class="setup-radio">
                 <input type="radio" name="smtpMode" value="local"
-                       th:checked="${draft.smtpMode == 'local'}"
+                       th:checked="${draft['smtpMode'] == 'local'}"
                        onchange="afinaSmtpMode(this.value)"/>
                 <span>
                     <b>Локальный Postfix</b> (порт 25)
@@ -40,7 +40,7 @@
 
             <label class="setup-radio">
                 <input type="radio" name="smtpMode" value="external"
-                       th:checked="${draft.smtpMode == 'external'}"
+                       th:checked="${draft['smtpMode'] == 'external'}"
                        onchange="afinaSmtpMode(this.value)"/>
                 <span>
                     <b>Внешний SMTP</b> (Yandex / Mailgun / корпоративный)
@@ -79,7 +79,7 @@
                 <div class="setup-field">
                     <label>
                         <input type="checkbox" id="smtpSsl" name="smtpSsl" value="true"
-                               th:checked="${draft.smtpSsl == 'true'}"/>
+                               th:checked="${draft['smtpSsl'] == 'true'}"/>
                         SSL (порт 465)
                     </label>
                     <div class="field-hint">Если выкл — STARTTLS (587)</div>

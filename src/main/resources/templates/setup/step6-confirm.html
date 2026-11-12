@@ -19,17 +19,17 @@
 
                 <dt>TLS-режим</dt>
                 <dd>
-                    <span th:if="${draft.tls == 'self-signed'}">Self-signed (можно заменить в /admin/ssl)</span>
-                    <span th:if="${draft.tls == 'custom'}">Свой сертификат (angie-certs/)</span>
+                    <span th:if="${draft['tls'] == 'self-signed'}">Self-signed (можно заменить в /admin/ssl)</span>
+                    <span th:if="${draft['tls'] == 'custom'}">Свой сертификат (angie-certs/)</span>
                 </dd>
 
                 <dt>SMTP</dt>
                 <dd>
-                    <span th:if="${draft.smtpMode == 'log'}">Только в логи (для теста)</span>
-                    <span th:if="${draft.smtpMode == 'local'}">
+                    <span th:if="${draft['smtpMode'] == 'log'}">Только в логи (для теста)</span>
+                    <span th:if="${draft['smtpMode'] == 'local'}">
                         Локальный Postfix (<span th:text="${draft['smtpFrom']}">noreply@…</span>)
                     </span>
-                    <span th:if="${draft.smtpMode == 'external'}">
+                    <span th:if="${draft['smtpMode'] == 'external'}">
                         Внешний SMTP: <code th:text="${draft['smtpHost']} + ':' + (${draft['smtpPort']} ?: '587')">smtp:587</code>
                         <br><small>From: <code th:text="${draft['smtpFrom']}">noreply@…</code></small>
                     </span>
@@ -38,7 +38,7 @@
                 <dt>Администратор</dt>
                 <dd>
                     <b th:text="${draft['adminCn']}">Иванов Иван</b>
-                    <br><small>СНИЛС: <code th:text="'***' + ${#strings.substring(draft.adminSnils, 7)}">***1234</code></small>
+                    <br><small>СНИЛС: <code th:text="'***' + ${#strings.substring(draft['adminSnils'], 7)}">***1234</code></small>
                 </dd>
 
                 <dt>IP-whitelist</dt>

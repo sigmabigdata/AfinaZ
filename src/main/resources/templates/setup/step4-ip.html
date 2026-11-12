@@ -5,7 +5,7 @@
 <div th:replace="~{setup/layout :: page(4, 'IP-whitelist для /admin', ~{::form})}">
 
     <form method="post" action="/setup/step/4" class="setup-form"
-          th:object="${draft}" autocomplete="off">
+          autocomplete="off">
 
         <p class="setup-intro">
             Укажите IP-адреса и подсети, с которых разрешён доступ
@@ -25,7 +25,7 @@
         <div class="setup-field">
             <label for="ipWhitelist">Список IP / CIDR <span class="req">*</span></label>
             <input type="text" id="ipWhitelist" name="ipWhitelist" required
-                   th:value="${draft.ipWhitelist != null ? draft.ipWhitelist : '127.0.0.1,::1,172.0.0.0/8'}"
+                   th:value="${draft['ipWhitelist'] != null ? draft['ipWhitelist'] : '127.0.0.1,::1,172.0.0.0/8'}"
                    placeholder="127.0.0.1,::1,172.0.0.0/8"/>
             <div class="field-hint">
                 Через запятую. Одиночные IP (<code>203.0.113.5</code>) или CIDR-подсети (<code>10.0.0.0/8</code>).
