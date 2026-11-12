@@ -3354,4 +3354,30 @@ table.audit-table td:nth-child(5) { white-space: nowrap; }  /* IP */
     font-size: 14px;
     line-height: 1;
 }
-.user-row.folder-row[data-href] { cursor: pointer; }
+
+
+/* ── Overlay-ссылка: клик по всей строке → открыть раздел ── */
+.user-row.folder-row {
+    position: relative;
+}
+
+.user-row.folder-row .folder-row-link {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    text-decoration: none;
+    color: transparent;
+    font-size: 0;
+}
+
+.user-row.folder-row .folder-row-actions {
+    position: relative;
+    z-index: 2;
+}
+
+/* Чтобы кнопки внутри actions были кликабельны над overlay */
+.user-row.folder-row .folder-row-actions a,
+.user-row.folder-row .folder-row-actions button {
+    position: relative;
+    z-index: 3;
+}

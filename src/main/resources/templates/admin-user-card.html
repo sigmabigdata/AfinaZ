@@ -172,8 +172,10 @@
                       total=${#lists.size(docs)},
                       signed=${#lists.size(docs.?[signed])},
                       unsigned=${total - signed}"
-             class="user-row folder-row"
-             th:attr="data-href=@{'/admin/users/' + ${user.id} + '/folders/' + ${f.id}}">
+             class="user-row folder-row">
+            <a th:href="@{'/admin/users/' + ${user.id} + '/folders/' + ${f.id}}"
+               class="folder-row-link"
+               aria-label="Открыть раздел"></a>
             <div class="folder-icon-sm">📁</div>
             <div class="user-row-main">
                 <div class="user-row-name" th:text="${f.name}">Раздел</div>
@@ -209,14 +211,6 @@
 
 <script th:src="@{/js/command-palette.js}"></script>
 <script th:src="@{/js/skeleton.js}">
-    // Клик по строке раздела → открыть раздел (кроме кнопок/форм)
-    document.querySelectorAll('.user-row.folder-row[data-href]').forEach(function(row) {
-        row.addEventListener('click', function(e) {
-            if (e.target.closest('a, button, form, input')) return;
-            window.location.href = this.dataset.href;
-        });
-    });
-
 </script>
 </body>
 </html>
