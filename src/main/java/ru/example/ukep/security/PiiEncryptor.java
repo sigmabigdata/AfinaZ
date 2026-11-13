@@ -216,11 +216,16 @@ public class PiiEncryptor {
         }
     }
 
-    /** Hash от телефона — только цифры. */
+    /** Hash от телефона — нормализуем в 11-значный формат (7XXXXXXXXXX). */
     public String hashPhone(String phone) {
         if (phone == null) return null;
         String digits = phone.replaceAll("\\D", "");
         if (digits.isEmpty()) return null;
+        if (digits.length() == 10) {
+            digits = "7" + digits;
+        } else if (digits.length() == 11 && digits.charAt(0) == '8') {
+            digits = "7" + digits.substring(1);
+        }
         return hash(digits);
     }
 }

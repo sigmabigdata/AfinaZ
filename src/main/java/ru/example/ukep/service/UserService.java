@@ -131,6 +131,16 @@ public class UserService implements UserDetailsService {
         return safeCn + "+" + snils + "@ukep.local";
     }
 
+    /** Приводит телефон к +7XXXXXXXXXX. Возвращает null, если номер невалидный. */
+    private static String normalizePhone(String phone) {
+        if (phone == null) return null;
+        String d = phone.replaceAll("\\D", "");
+        if (d.length() == 10) d = "7" + d;
+        else if (d.length() == 11 && d.charAt(0) == '8') d = "7" + d.substring(1);
+        if (d.length() != 11 || d.charAt(0) != '7') return null;
+        return "+" + d;
+    }
+
     public java.util.Optional<User> findEmployeeByCnAndSnils(String cn, String snils) {
         if (cn == null || cn.isBlank() || snils == null || snils.isBlank()) return java.util.Optional.empty();
         String hash = pii.hash(snils);
@@ -153,8 +163,10 @@ public class UserService implements UserDetailsService {
         u.setEmailHash(emailHash);
         u.setFullName(fullName == null || fullName.isBlank() ? email : fullName.trim());
         if (phone != null && !phone.isBlank()) {
-            u.setPhone(phone.trim());
-            u.setPhoneHash(pii.hashPhone(phone));
+            String norm = normalizePhone(phone);
+            if (norm == null) throw new IllegalArgumentException("Неверный формат телефона");
+            u.setPhone(norm);
+            u.setPhoneHash(pii.hashPhone(norm));
         }
         if (snils != null && !snils.isBlank()) {
             u.setSnils(snils.trim());
@@ -180,8 +192,10 @@ public class UserService implements UserDetailsService {
         }
         if (fullName != null && !fullName.isBlank()) u.setFullName(fullName.trim());
         if (phone != null && !phone.isBlank()) {
-            u.setPhone(phone.trim());
-            u.setPhoneHash(pii.hashPhone(phone));
+            String norm = normalizePhone(phone);
+            if (norm == null) throw new IllegalArgumentException("Неверный формат телефона");
+            u.setPhone(norm);
+            u.setPhoneHash(pii.hashPhone(norm));
         } else {
             u.setPhone(null);
             u.setPhoneHash(null);

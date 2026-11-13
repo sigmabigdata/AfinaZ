@@ -3381,3 +3381,6 @@ table.audit-table td:nth-child(5) { white-space: nowrap; }  /* IP */
     position: relative;
     z-index: 3;
 }
+
+/* Обязательные поля — красная звёздочка */
+.form-field .req { color: #d33; font-weight: 700; margin-left: 2px; }

@@ -37,50 +37,62 @@
 
     <h1 th:text="${mode == 'create'} ? 'Новый клиент' : 'Редактирование клиента'">—</h1>
 
-    <form class="form-card" method="post"
+    <form class="form-card" method="post" id="user-form"
           th:action="${mode == 'create'} ? @{/admin/users} : @{'/admin/users/' + ${user.id}}">
 
         <div class="form-field">
-            <label>Email *</label>
-            <input type="email" name="email" required
-                   th:value="${mode == 'edit'} ? ${user.email} : ''" autocomplete="off"/>
+            <label>Email <span class="req" id="email-req">*</span></label>
+            <input type="email" name="email" id="email-input"
+                   maxlength="254" autocomplete="email"
+                   th:value="${mode == 'edit'} ? ${user.email} : ''"/>
+            <div class="hint" id="email-hint">
+                Для роли «Сотрудник» можно оставить пустым — email сгенерируется автоматически.
+            </div>
         </div>
 
         <div class="form-field">
-            <label>ФИО</label>
-            <input type="text" name="fullName"
+            <label>ФИО <span class="req" id="fio-req"></span></label>
+            <input type="text" name="fullName" id="fullname-input"
+                   maxlength="255" minlength="2" autocomplete="name"
+                   placeholder="Иванов Иван Иванович"
                    th:value="${mode == 'edit'} ? ${user.fullName} : ''"/>
         </div>
 
         <div class="form-field">
             <label>Телефон</label>
-            <input type="text" name="phone"
+            <input type="tel" name="phone" id="phone-input"
+                   maxlength="18" inputmode="tel"
+                   pattern="[0-9+\-\(\)\s]{10,18}"
+                   title="Формат: +7 (999) 123-45-67"
+                   placeholder="+7 (999) 123-45-67"
+                   autocomplete="tel"
                    th:value="${mode == 'edit' && user.phone != null} ? ${user.phone} : ''"/>
+            <div class="hint">10–11 цифр. При сохранении приведём к виду <code>+7XXXXXXXXXX</code>.</div>
         </div>
 
         <div class="form-field" sec:authorize="hasRole('ADMIN')">
             <label>Роль</label>
-            <select name="role">
+            <select name="role" id="role-select">
                 <option value="ROLE_USER"
                         th:selected="${mode == 'edit' && user.role.name() == 'ROLE_USER'}">
                     Клиент (ROLE_USER)
                 </option>
                 <option value="ROLE_EMPLOYEE"
                         th:selected="${mode == 'edit' && user.role.name() == 'ROLE_EMPLOYEE'}">
-                    Сотрудник (ROLE_EMPLOYEE) — админ без настроек/системы
+                    Сотрудник (ROLE_EMPLOYEE)
                 </option>
-
             </select>
         </div>
 
-        <div class="form-field">
-            <label>СНИЛС <span class="muted small">(обязательно для роли Сотрудник/Администратор)</span></label>
-            <input type="text" name="snils"
-                   th:value="${mode == 'edit' && snils != null} ? ${snils} : ''"
-                   placeholder="12345678901"/>
+        <div class="form-field" id="snils-field">
+            <label>СНИЛС <span class="req" id="snils-req">*</span></label>
+            <input type="text" name="snils" id="snils-input"
+                   pattern="\d{11}" maxlength="11" inputmode="numeric"
+                   title="11 цифр без пробелов и дефисов"
+                   placeholder="12345678901"
+                   th:value="${mode == 'edit' && snils != null} ? ${snils} : ''"/>
             <div class="hint">
-                Обязательно для роли Сотрудник. Сохраняется в базе данных.
-                Для входа по сертификату УКЭП.
+                Обязателен для роли <b>Сотрудник</b>. Используется для входа по сертификату УКЭП.
             </div>
         </div>
 
@@ -91,8 +103,8 @@
         </div>
 
         <div class="alert info">
-            <b>Пароль не нужен.</b> Клиент входит по одноразовой ссылке, которую вы отправляете
-            кнопкой «Отправить ссылку для входа» в его карточке.
+            <b>Пароль не нужен.</b> Клиент входит по одноразовой ссылке (кнопка
+            «Отправить ссылку для входа» в карточке). Сотрудник — по сертификату УКЭП.
         </div>
 
         <div class="form-actions">
@@ -102,6 +114,75 @@
         </div>
     </form>
 </main>
+<script>
+(function () {
+    var role   = document.getElementById('role-select');
+    var snilsF = document.getElementById('snils-field');
+    var snilsI = document.getElementById('snils-input');
+    var snilsR = document.getElementById('snils-req');
+    var fioI   = document.getElementById('fullname-input');
+    var fioR   = document.getElementById('fio-req');
+    var emailI = document.getElementById('email-input');
+    var emailR = document.getElementById('email-req');
+    var phoneI = document.getElementById('phone-input');
+    var form   = document.getElementById('user-form');
+
+    function syncRole() {
+        if (!role) return;
+        var emp = role.value === 'ROLE_EMPLOYEE';
+        snilsF.style.display = emp ? '' : 'none';
+        snilsI.required = emp;
+        snilsR.style.display = emp ? '' : 'none';
+        fioI.required = emp;
+        fioR.textContent = emp ? '*' : '';
+        emailI.required = !emp;
+        emailR.style.display = emp ? 'none' : '';
+    }
+    if (role) { role.addEventListener('change', syncRole); syncRole(); }
+
+    function fmtPhone(v) {
+        var d = String(v || '').replace(/\D/g, '');
+        if (d.length === 10) d = '7' + d;
+        else if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+        if (d.length !== 11 || d[0] !== '7') return v;
+        return '+7 (' + d.slice(1,4) + ') ' + d.slice(4,7) + '-' + d.slice(7,9) + '-' + d.slice(9,11);
+    }
+    if (phoneI) phoneI.addEventListener('blur', function () { this.value = fmtPhone(this.value); });
+    if (snilsI) snilsI.addEventListener('input', function () {
+        this.value = this.value.replace(/\D/g, '').slice(0, 11);
+    });
+
+    if (form) form.addEventListener('submit', function (e) {
+        if (phoneI) {
+            var raw = phoneI.value.trim();
+            if (!raw) { phoneI.value = ''; }
+            else {
+                var d = raw.replace(/\D/g, '');
+                if (d.length === 10) d = '7' + d;
+                else if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+                if (d.length !== 11 || d[0] !== '7') {
+                    e.preventDefault();
+                    phoneI.setCustomValidity('Телефон должен содержать 10-11 цифр');
+                    phoneI.reportValidity();
+                    return;
+                }
+                phoneI.value = '+' + d;
+            }
+        }
+        if (snilsI && snilsF.style.display !== 'none') {
+            var s = snilsI.value.replace(/\D/g, '');
+            if (s.length !== 11) {
+                e.preventDefault();
+                snilsI.setCustomValidity('СНИЛС должен содержать ровно 11 цифр');
+                snilsI.reportValidity();
+                return;
+            }
+            snilsI.value = s;
+        }
+    });
+})();
+</script>
+
 <script th:src="@{/js/command-palette.js}"></script>
 <script th:src="@{/js/skeleton.js}"></script>
 </body>
